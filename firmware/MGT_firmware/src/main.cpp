@@ -1,15 +1,46 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include "v_globals/globals.h"
 #include "T1_CAN/can.h"
 #include "T2_PROCESSING/processing.h"
+#include "T3_SNAP/snap.h"
+#include "T5_MICROSD/mSD.h"
 #include "T6_DIAG/diag.h"
 
-void taskSnapshot   (void* pvParameters);
-void taskMQTT       (void* pvParameters);
-void taskStorage    (void* pvParameters);
+
+void taskMQTT    (void* pvParameters);
+void taskStorage (void* pvParameters);
 
 void setup() {
     Serial.begin(115200);
     Serial.println("ARRANCANDO MGT - Escuderia Fenix");
+
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    int intentos = 0;
+    while (WiFi.status() != WL_CONNECTED && intentos < 40) {
+        delay(500);
+        Serial.print(".");
+        intentos++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nWiFi OK");
+        configTime(-6 * 3600, 0, "pool.ntp.org");
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo)) {
+            time_t now;
+            time(&now);
+            t_offset = (uint64_t)now * 1000ULL - millis();
+            Serial.println("NTP sincronizado");
+        } else {
+            Serial.println("NTP fallido — usando millis()");
+        }
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        Serial.println("WiFi desconectado");
+    } else {
+        Serial.println("\nWiFi no disponible — usando millis()");
+    }
 
     xTaskCreatePinnedToCore(taskCAN,         "T1_CAN",  4096, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(taskProcessing,  "T2_PROC", 4096, NULL, 4, NULL, 0);
@@ -21,6 +52,4 @@ void setup() {
 
 void loop() { vTaskDelete(NULL); }
 
-void taskSnapshot (void* pvParameters) { for(;;) vTaskDelay(pdMS_TO_TICKS(67));    }
-void taskMQTT     (void* pvParameters) { for(;;) vTaskDelay(pdMS_TO_TICKS(100));   }
-void taskStorage  (void* pvParameters) { for(;;) vTaskDelay(pdMS_TO_TICKS(10000)); }
+void taskMQTT    (void* pvParameters) { for(;;) vTaskDelay(pdMS_TO_TICKS(100));   }

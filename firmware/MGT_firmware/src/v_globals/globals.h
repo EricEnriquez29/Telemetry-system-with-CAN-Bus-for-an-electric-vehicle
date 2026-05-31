@@ -45,3 +45,71 @@ extern float gyro_z;
 // ─────────────────────────────────────────
 extern float voltage_aux;
 extern float current_aux;
+
+// ─────────────────────────────────────────
+//  WIFI
+// ─────────────────────────────────────────
+extern const char* WIFI_SSID;
+extern const char* WIFI_PASS;
+
+// ─────────────────────────────────────────
+//  TIMESTAMP
+// ─────────────────────────────────────────
+extern uint64_t t_offset;   // offset NTP en ms
+extern uint64_t timestamp;  // timestamp actual del snapshot
+
+// ─────────────────────────────────────────
+//  SNAPSHOT
+// ─────────────────────────────────────────
+struct Snapshot {
+    uint64_t timestamp;
+
+    // Curtis
+    float current_rms;
+    float speed_vehicle;
+    float odometer_vehicle;
+    float temp_motor;
+    float temp_ctrl;
+    float temp_capacitors;
+    float motor_torque;
+    float battery_current;
+    float rpm;
+    float throttle_input;
+    float brake_input;
+    float contactor_state;
+    float keyswitch_voltage;
+
+    // BMS
+    float voltage_pack;
+    float current_pack;
+    float soc;
+    float cell_voltage[16];
+    float temp_max;
+    float temp_min;
+
+    // MDV
+    float gps_lat;
+    float gps_lon;
+    float acc_x;
+    float acc_y;
+    float acc_z;
+    float gyro_x;
+    float gyro_y;
+    float gyro_z;
+
+    // MCA
+    float voltage_aux;
+    float current_aux;
+};
+
+// ─────────────────────────────────────────
+//  SNAPSHOT
+// ─────────────────────────────────────────
+extern Snapshot snap_buffer[200];
+extern int      snap_count;
+
+// ─────────────────────────────────────────
+//  SESIÓN
+// ─────────────────────────────────────────
+extern int  session_ID;
+extern bool sesion_activa;
