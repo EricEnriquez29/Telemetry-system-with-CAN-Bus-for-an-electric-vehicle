@@ -2,7 +2,7 @@
 #include "../../include/config.h"
 
 // ─────────────────────────────────────────
-//  BUFFER FIFO CAN — 150 posiciones
+//  BUFFER FIFO CAN — 150 posiciones AAA
 // ─────────────────────────────────────────
 static twai_message_t can_fifo[150];
 static int fifo_head = 0, fifo_tail = 0, fifo_count = 0;
