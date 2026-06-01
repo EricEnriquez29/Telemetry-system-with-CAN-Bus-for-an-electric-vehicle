@@ -70,3 +70,17 @@ int      snap_count = 0;
 // ─────────────────────────────────────────
 int  session_ID   = 0;
 bool sesion_activa = false;
+
+// ─────────────────────────────────────────
+//  WATCHDOG
+// ─────────────────────────────────────────
+int counterWD = 0;
+
+// ─────────────────────────────────────────
+//  MQTT
+// ─────────────────────────────────────────
+SemaphoreHandle_t snap_mutex     = NULL;  // se inicializa en main.cpp
+uint32_t          mqtt_publicaciones = 0;
+bool              mqtt_wifi_ok    = false;
+bool              mqtt_conectado  = false;
+bool              mqtt_tx_on      = false;

@@ -113,3 +113,17 @@ extern int      snap_count;
 // ─────────────────────────────────────────
 extern int  session_ID;
 extern bool sesion_activa;
+
+// ─────────────────────────────────────────
+//  WATCHDOG
+// ─────────────────────────────────────────
+extern int counterWD;
+
+// ─────────────────────────────────────────
+//  MQTT
+// ─────────────────────────────────────────
+extern SemaphoreHandle_t snap_mutex;  // protege acceso al buffer entre T4 y T5
+extern uint32_t mqtt_publicaciones;   // contador total de publicaciones enviadas
+extern bool     mqtt_wifi_ok;         // true si WiFi está conectado
+extern bool     mqtt_conectado;       // true si broker MQTT está conectado
+extern bool     mqtt_tx_on;           // true si hay transmisión activa

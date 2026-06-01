@@ -4,17 +4,18 @@
 #include "T1_CAN/can.h"
 #include "T2_PROCESSING/processing.h"
 #include "T3_SNAP/snap.h"
+#include "T4_MQTT/mqtt.h"
 #include "T5_MICROSD/mSD.h"
 #include "T6_DIAG/diag.h"
-
-
-void taskMQTT    (void* pvParameters);
-void taskStorage (void* pvParameters);
 
 void setup() {
     Serial.begin(115200);
     Serial.println("ARRANCANDO MGT - Escuderia Fenix");
 
+    // ── Crear mutex antes de arrancar tareas ──
+    snap_mutex = xSemaphoreCreateMutex();
+
+    // ── WiFi + NTP ──
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     int intentos = 0;
     while (WiFi.status() != WL_CONNECTED && intentos < 40) {
@@ -35,13 +36,13 @@ void setup() {
         } else {
             Serial.println("NTP fallido — usando millis()");
         }
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
-        Serial.println("WiFi desconectado");
+        // No desconectar WiFi — T4 lo necesita
+        Serial.println("WiFi listo para T4");
     } else {
-        Serial.println("\nWiFi no disponible — usando millis()");
+        Serial.println("\nWiFi no disponible");
     }
 
+    // ── Crear tareas FreeRTOS ──
     xTaskCreatePinnedToCore(taskCAN,         "T1_CAN",  4096, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(taskProcessing,  "T2_PROC", 4096, NULL, 4, NULL, 0);
     xTaskCreatePinnedToCore(taskSnapshot,    "T3_SNAP", 4096, NULL, 4, NULL, 0);
@@ -51,5 +52,3 @@ void setup() {
 }
 
 void loop() { vTaskDelete(NULL); }
-
-void taskMQTT    (void* pvParameters) { for(;;) vTaskDelay(pdMS_TO_TICKS(100));   }
