@@ -51,8 +51,8 @@ float current_aux = -1;
 // ─────────────────────────────────────────
 //  WIFI
 // ─────────────────────────────────────────
-const char* WIFI_SSID = "INFINITUMA0AA_2.4";
-const char* WIFI_PASS = "hd5319GRBe";
+const char* WIFI_SSID = "ARRIS-FED2";
+const char* WIFI_PASS = "C704208B40622E42";
 
 // ─────────────────────────────────────────
 //  TIMESTAMP
@@ -84,3 +84,6 @@ uint32_t          mqtt_publicaciones = 0;
 bool              mqtt_wifi_ok    = false;
 bool              mqtt_conectado  = false;
 bool              mqtt_tx_on      = false;
+
+// Mutex global para proteger variables compartidas
+SemaphoreHandle_t globals_mutex = NULL;

@@ -14,6 +14,7 @@ void setup() {
 
     // ── Crear mutex antes de arrancar tareas ──
     snap_mutex = xSemaphoreCreateMutex();
+    globals_mutex = xSemaphoreCreateMutex();
 
     // ── WiFi + NTP ──
     WiFi.begin(WIFI_SSID, WIFI_PASS);

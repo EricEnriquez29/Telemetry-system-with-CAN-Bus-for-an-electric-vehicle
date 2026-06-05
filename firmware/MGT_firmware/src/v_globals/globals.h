@@ -127,3 +127,6 @@ extern uint32_t mqtt_publicaciones;   // contador total de publicaciones enviada
 extern bool     mqtt_wifi_ok;         // true si WiFi está conectado
 extern bool     mqtt_conectado;       // true si broker MQTT está conectado
 extern bool     mqtt_tx_on;           // true si hay transmisión activa
+
+// Mutex global para proteger variables compartidas
+extern SemaphoreHandle_t globals_mutex;

@@ -5,9 +5,6 @@
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 
-// ─────────────────────────────────────────
-//  FRECUENCIAS ESPERADAS POR ID
-// ─────────────────────────────────────────
 static const uint32_t expected[14] = {
     10, 10, 10, 1,
     10, 10, 10, 10, 10, 5,
@@ -27,9 +24,6 @@ static const uint16_t id_hex[14] = {
     0x400, 0x401, 0x402, 0x500
 };
 
-// ─────────────────────────────────────────
-//  ESTADISTICAS DE SESIÓN
-// ─────────────────────────────────────────
 static uint32_t counts_inicio[14] = {0};
 static uint32_t t_sesion_inicio    = 0;
 
@@ -84,21 +78,18 @@ static void imprimir_estadisticas_sesion() {
     Serial.println("============================================================");
 }
 
-// ─────────────────────────────────────────
-//  TAREA T6
-// ─────────────────────────────────────────
 void taskDiagnostics(void* pvParameters) {
     Serial.println("[T6] Diagnostics iniciada");
 
-    // ── LEDs ──
-    pinMode(LED_VERDE, OUTPUT);
-    pinMode(LED_AZUL,  OUTPUT);
-    pinMode(LED_ROJO,  OUTPUT);
-    digitalWrite(LED_VERDE, LOW);
-    digitalWrite(LED_AZUL,  LOW);
-    digitalWrite(LED_ROJO,  LOW);
+    pinMode(LED_VERDE,    OUTPUT);
+    pinMode(LED_AZUL,     OUTPUT);
+    pinMode(LED_ROJO,     OUTPUT);
+    pinMode(LED_AMARILLO, OUTPUT);
+    digitalWrite(LED_VERDE,    LOW);
+    digitalWrite(LED_AZUL,     LOW);
+    digitalWrite(LED_ROJO,     LOW);
+    digitalWrite(LED_AMARILLO, LOW);
 
-    // ── Watchdog ──
     Preferences nvs;
     nvs.begin("mgt_wd", false);
 
@@ -115,94 +106,96 @@ void taskDiagnostics(void* pvParameters) {
     esp_task_wdt_init(10, true);
     esp_task_wdt_add(NULL);
 
-    // ── Estado interno ──
-    uint32_t prev[14]    = {0};
-    bool     status_can  = true;
-    bool     led_verde   = false;
-    bool     led_azul    = false;
-    uint32_t t_led_verde = 0;
-    uint32_t t_led_azul  = 0;
-    bool     prev_sesion = false;
+    uint32_t prev[14]       = {0};
+    bool     status_can     = true;
+    bool     led_verde      = false;
+    bool     led_azul       = false;
+    bool     led_amarillo   = false;
+    uint32_t t_led_verde    = 0;
+    uint32_t t_led_azul     = 0;
+    uint32_t t_led_amarillo = 0;
+    bool     prev_sesion    = false;
 
     for (;;) {
         esp_task_wdt_reset();
 
-        uint32_t ahora = millis();
+        uint32_t ahora   = millis();
+        int      fifo_sz = can_fifo_size();
+        int      snap_sz = snap_count;
+        uint8_t  rec     = can_rec();
+        bool     bus_off = can_bus_off();
+
         uint32_t curr[14];
         can_snapshot_counts(curr);
 
-        // ── Evaluar IDs ──
         status_can = true;
         for (int i = 0; i < 14; i++) {
             uint32_t delta = curr[i] - prev[i];
             if (delta == 0) {
                 status_can = false;
-                switch (i) {
-                    case 0:  current_rms = speed_vehicle = odometer_vehicle = -1; break;
-                    case 1:  temp_motor = temp_ctrl = temp_capacitors = motor_torque = -1; break;
-                    case 2:  battery_current = rpm = throttle_input = brake_input = -1; break;
-                    case 3:  contactor_state = keyswitch_voltage = -1; break;
-                    case 4:  voltage_pack = current_pack = soc = -1; break;
-                    case 5:  cell_voltage[0] = cell_voltage[1] = cell_voltage[2] = cell_voltage[3] = -1; break;
-                    case 6:  cell_voltage[4] = cell_voltage[5] = cell_voltage[6] = cell_voltage[7] = -1; break;
-                    case 7:  cell_voltage[8] = cell_voltage[9] = cell_voltage[10] = cell_voltage[11] = -1; break;
-                    case 8:  cell_voltage[12] = cell_voltage[13] = cell_voltage[14] = cell_voltage[15] = -1; break;
-                    case 9:  temp_max = temp_min = -1; break;
-                    case 10: gps_lat = gps_lon = -1; break;
-                    case 11: acc_x = acc_y = acc_z = -1; break;
-                    case 12: gyro_x = gyro_y = gyro_z = -1; break;
-                    case 13: voltage_aux = current_aux = -1; break;
+                if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                    switch (i) {
+                        case 0:  current_rms = speed_vehicle = odometer_vehicle = -1; break;
+                        case 1:  temp_motor = temp_ctrl = temp_capacitors = motor_torque = -1; break;
+                        case 2:  battery_current = rpm = throttle_input = brake_input = -1; break;
+                        case 3:  contactor_state = keyswitch_voltage = -1; break;
+                        case 4:  voltage_pack = current_pack = soc = -1; break;
+                        case 5:  cell_voltage[0] = cell_voltage[1] = cell_voltage[2] = cell_voltage[3] = -1; break;
+                        case 6:  cell_voltage[4] = cell_voltage[5] = cell_voltage[6] = cell_voltage[7] = -1; break;
+                        case 7:  cell_voltage[8] = cell_voltage[9] = cell_voltage[10] = cell_voltage[11] = -1; break;
+                        case 8:  cell_voltage[12] = cell_voltage[13] = cell_voltage[14] = cell_voltage[15] = -1; break;
+                        case 9:  temp_max = temp_min = -1; break;
+                        case 10: gps_lat = gps_lon = -1; break;
+                        case 11: acc_x = acc_y = acc_z = -1; break;
+                        case 12: gyro_x = gyro_y = gyro_z = -1; break;
+                        case 13: voltage_aux = current_aux = -1; break;
+                    }
+                    xSemaphoreGive(globals_mutex);
+                } else {
+                    switch (i) {
+                        case 0:  current_rms = speed_vehicle = odometer_vehicle = -1; break;
+                        case 1:  temp_motor = temp_ctrl = temp_capacitors = motor_torque = -1; break;
+                        case 2:  battery_current = rpm = throttle_input = brake_input = -1; break;
+                        case 3:  contactor_state = keyswitch_voltage = -1; break;
+                        case 4:  voltage_pack = current_pack = soc = -1; break;
+                        case 5:  cell_voltage[0] = cell_voltage[1] = cell_voltage[2] = cell_voltage[3] = -1; break;
+                        case 6:  cell_voltage[4] = cell_voltage[5] = cell_voltage[6] = cell_voltage[7] = -1; break;
+                        case 7:  cell_voltage[8] = cell_voltage[9] = cell_voltage[10] = cell_voltage[11] = -1; break;
+                        case 8:  cell_voltage[12] = cell_voltage[13] = cell_voltage[14] = cell_voltage[15] = -1; break;
+                        case 9:  temp_max = temp_min = -1; break;
+                        case 10: gps_lat = gps_lon = -1; break;
+                        case 11: acc_x = acc_y = acc_z = -1; break;
+                        case 12: gyro_x = gyro_y = gyro_z = -1; break;
+                        case 13: voltage_aux = current_aux = -1; break;
+                    }
                 }
             }
         }
         for (int i = 0; i < 14; i++) prev[i] = curr[i];
 
-        // ── Detectar inicio de sesión ──
         if (sesion_activa && !prev_sesion) {
             t_sesion_inicio = ahora;
             can_snapshot_counts(counts_inicio);
         }
 
-        // ── Detectar cierre de sesión → imprimir estadísticas ──
         if (!sesion_activa && prev_sesion) {
             imprimir_estadisticas_sesion();
         }
 
         prev_sesion = sesion_activa;
 
-        // ── LEDs ──
-        if (ahora - t_led_verde >= 500) {
-            t_led_verde = ahora;
-            led_verde   = !led_verde;
-            digitalWrite(LED_VERDE, led_verde);
-        }
-
-        if (status_can) {
-            if (ahora - t_led_azul >= 500) {
-                t_led_azul = ahora;
-                led_azul   = !led_azul;
-                digitalWrite(LED_AZUL, led_azul);
-            }
-        } else {
-            led_azul = false;
-            digitalWrite(LED_AZUL, LOW);
-        }
-
-        digitalWrite(LED_ROJO, status_can ? LOW : HIGH);
-
-        // ── RAM ──
         uint32_t ram_libre = esp_get_free_heap_size() / 1024;
         uint32_t ram_total = 520;
         uint32_t ram_pct   = ram_libre * 100 / ram_total;
 
-        // ── Reporte serial ──
         Serial.println("============================================================");
         Serial.println(" Sistema de Telemetria - ISISA");
         Serial.println("============================================================");
 
         Serial.print(" counterWD: "); Serial.print(counterWD);
-        Serial.print(" | statusCAN: ");
-        Serial.println(status_can ? "OK" : "Fault");
+        Serial.print(" | statusCAN: "); Serial.print(status_can ? "OK" : "Fault");
+        Serial.print(" | Bus-Off: "); Serial.print(bus_off ? "ON" : "OFF");
+        Serial.print(" | REC: "); Serial.println(rec);
 
         Serial.print(" RAM: ");
         Serial.print(ram_libre);
@@ -213,13 +206,13 @@ void taskDiagnostics(void* pvParameters) {
         Serial.println("%)");
 
         Serial.print(" Buffer CAN: ");
-        Serial.print(can_fifo_size());
+        Serial.print(fifo_sz);
         Serial.print("/150 (");
-        Serial.print(can_fifo_size() * 100 / 150);
+        Serial.print(fifo_sz * 100 / 150);
         Serial.print("%) | Buffer Snap: ");
-        Serial.print(snap_count);
+        Serial.print(snap_sz);
         Serial.print("/200 (");
-        Serial.print(snap_count * 100 / 200);
+        Serial.print(snap_sz * 100 / 200);
         Serial.println("%)");
 
         Serial.print(" Total tramas recibidas: ");
@@ -233,27 +226,28 @@ void taskDiagnostics(void* pvParameters) {
         Serial.println("============================================================");
         Serial.println(" Snapshot mas reciente:");
 
-        if (snap_count > 0) {
-            Snapshot& s = snap_buffer[snap_count - 1];
+        if (snap_sz > 0) {
+            Snapshot& s = snap_buffer[snap_sz - 1];
 
-            uint32_t   ms  = s.timestamp % 1000;
-            time_t     seg = s.timestamp / 1000;
-            struct tm* t   = localtime(&seg);
+            uint32_t  ms  = s.timestamp % 1000;
+            time_t    seg = s.timestamp / 1000;
+            struct tm t;
+            localtime_r(&seg, &t);
+
             Serial.print(" Timestamp: ");
-            Serial.print(t->tm_year + 1900); Serial.print("-");
-            if (t->tm_mon + 1 < 10) Serial.print("0");
-            Serial.print(t->tm_mon  + 1); Serial.print("-");
-            if (t->tm_mday < 10) Serial.print("0");
-            Serial.print(t->tm_mday); Serial.print(" ");
-            if (t->tm_hour < 10) Serial.print("0");
-            Serial.print(t->tm_hour); Serial.print(":");
-            if (t->tm_min < 10) Serial.print("0");
-            Serial.print(t->tm_min); Serial.print(":");
-            if (t->tm_sec < 10) Serial.print("0");
-            Serial.print(t->tm_sec); Serial.print(".");
+            Serial.print(t.tm_year + 1900); Serial.print("-");
+            if (t.tm_mon + 1 < 10) Serial.print("0");
+            Serial.print(t.tm_mon  + 1); Serial.print("-");
+            if (t.tm_mday < 10) Serial.print("0");
+            Serial.print(t.tm_mday); Serial.print(" ");
+            if (t.tm_hour < 10) Serial.print("0");
+            Serial.print(t.tm_hour); Serial.print(":");
+            if (t.tm_min < 10) Serial.print("0");
+            Serial.print(t.tm_min); Serial.print(":");
+            if (t.tm_sec < 10) Serial.print("0");
+            Serial.print(t.tm_sec); Serial.print(".");
             Serial.println(ms);
 
-            // Curtis
             Serial.print(" Spd=");  Serial.print(s.speed_vehicle,     1);
             Serial.print(" Irms="); Serial.print(s.current_rms,       1);
             Serial.print(" Odo=");  Serial.println(s.odometer_vehicle, 3);
@@ -271,7 +265,6 @@ void taskDiagnostics(void* pvParameters) {
             Serial.print(" Cont="); Serial.print((int)s.contactor_state);
             Serial.print(" Vkey="); Serial.println(s.keyswitch_voltage, 1);
 
-            // BMS
             Serial.print(" Vpack="); Serial.print(s.voltage_pack, 1);
             Serial.print(" Ipack="); Serial.print(s.current_pack, 1);
             Serial.print(" SOC=");   Serial.println(s.soc,         1);
@@ -299,7 +292,6 @@ void taskDiagnostics(void* pvParameters) {
             Serial.print(" Tmax="); Serial.print((int)s.temp_max);
             Serial.print(" Tmin="); Serial.println((int)s.temp_min);
 
-            // MDV
             Serial.print(" Lat="); Serial.print(s.gps_lat,  6);
             Serial.print(" Lon="); Serial.println(s.gps_lon, 6);
 
@@ -311,7 +303,6 @@ void taskDiagnostics(void* pvParameters) {
             Serial.print(" GyroY="); Serial.print(s.gyro_y,  2);
             Serial.print(" GyroZ="); Serial.println(s.gyro_z,2);
 
-            // MCA
             Serial.print(" Vaux="); Serial.print(s.voltage_aux,  2);
             Serial.print(" Iaux="); Serial.println(s.current_aux,2);
 
@@ -320,11 +311,46 @@ void taskDiagnostics(void* pvParameters) {
         }
 
         Serial.println("============================================================");
-        Serial.println("============================================================");
         Serial.print(" MQTT: Publicaciones="); Serial.println(mqtt_publicaciones);
-        Serial.print(" MQTT Status: TxMQTT="); Serial.print(mqtt_tx_on   ? "ON" : "OFF");
+        Serial.print(" MQTT Status: TxMQTT="); Serial.print(mqtt_tx_on    ? "ON" : "OFF");
         Serial.print(" | ConexionWiFi=");      Serial.println(mqtt_wifi_ok ? "ON" : "OFF");
+        Serial.println("============================================================");
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        for (int i = 0; i < 10; i++) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_task_wdt_reset();
+
+            uint32_t ahora2 = millis();
+
+            if (ahora2 - t_led_verde >= 500) {
+                t_led_verde = ahora2;
+                led_verde   = !led_verde;
+                digitalWrite(LED_VERDE, led_verde);
+            }
+
+            if (status_can) {
+                if (ahora2 - t_led_azul >= 200) {
+                    t_led_azul = ahora2;
+                    led_azul   = !led_azul;
+                    digitalWrite(LED_AZUL, led_azul);
+                }
+            } else {
+                led_azul = false;
+                digitalWrite(LED_AZUL, LOW);
+            }
+
+            digitalWrite(LED_ROJO, status_can ? LOW : HIGH);
+
+            if (mqtt_conectado) {
+                if (ahora2 - t_led_amarillo >= 200) {
+                    t_led_amarillo = ahora2;
+                    led_amarillo   = !led_amarillo;
+                    digitalWrite(LED_AMARILLO, led_amarillo);
+                }
+            } else {
+                led_amarillo = false;
+                digitalWrite(LED_AMARILLO, LOW);
+            }
+        }
     }
 }
