@@ -42,7 +42,7 @@ def on_message(client, userdata, msg):
             Point("vehicle_telemetry")
             .tag("vehicle_id", str(data.get("veh_id", 25)))
             .tag("session_id",  str(data.get("sess_id", 0)))
-            .time(ts, WritePrecision.MILLISECONDS)
+            .time(ts, WritePrecision.MS)
             .field("curr_rms",   float(data.get("curr_rms",  0)))
             .field("speed_v",    float(data.get("speed_v",   0)))
             .field("odo_veh",    float(data.get("odo_veh",   0)))
