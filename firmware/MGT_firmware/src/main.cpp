@@ -13,11 +13,12 @@ void setup() {
     Serial.println("ARRANCANDO MGT - Escuderia Fenix");
 
     // ── Crear mutex antes de arrancar tareas ──
-    snap_mutex = xSemaphoreCreateMutex();
+    snap_mutex    = xSemaphoreCreateMutex();
     globals_mutex = xSemaphoreCreateMutex();
 
-    // ── WiFi + NTP ──
+    // ── WiFi ──
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    Serial.print("Conectando WiFi");
     int intentos = 0;
     while (WiFi.status() != WL_CONNECTED && intentos < 40) {
         delay(500);
@@ -27,18 +28,24 @@ void setup() {
 
     if (WiFi.status() == WL_CONNECTED) {
         Serial.println("\nWiFi OK");
-        configTime(-6 * 3600, 0, "pool.ntp.org");
+
+        // ── NTP — no salir hasta sincronizar ──
+        configTime(-6 * 3600, 0, "pool.ntp.org", "time.google.com");
         struct tm timeinfo;
-        if (getLocalTime(&timeinfo)) {
-            time_t now;
-            time(&now);
-            t_offset = (uint64_t)now * 1000ULL - millis();
-            Serial.println("NTP sincronizado");
-        } else {
-            Serial.println("NTP fallido — usando millis()");
+        Serial.print("Sincronizando con NTP");
+        while (!getLocalTime(&timeinfo)) {
+            Serial.print(".");
+            delay(1000);
         }
-        // No desconectar WiFi — T4 lo necesita
+        Serial.println("\nNTP sincronizado");
+
+        // ── Calcular t_offset ──
+        time_t now;
+        time(&now);
+        t_offset = (uint64_t)now * 1000ULL - millis();
+
         Serial.println("WiFi listo para T4");
+
     } else {
         Serial.println("\nWiFi no disponible");
     }
