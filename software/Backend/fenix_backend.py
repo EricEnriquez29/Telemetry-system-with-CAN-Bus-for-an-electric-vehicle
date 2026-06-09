@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -35,7 +35,7 @@ def on_message(client, userdata, msg):
         data = json.loads(msg.payload.decode())
 
         # Parsear timestamp
-        ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
+        ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone(timedelta(hours=-6)))
 
         # Construir punto InfluxDB
         point = (
@@ -80,7 +80,7 @@ def on_message(client, userdata, msg):
 
         # Escribir en InfluxDB
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
-        print(f"[DB] sess={data.get('sess_id')} t={data.get('times')} spd={data.get('speed_v')}")
+        print(f"INFLUXDB sess={data.get('sess_id')} t={data.get('times')} Snapshot guardado en InfluxDB")
 
     except Exception as e:
         print(f"[ERROR] {e}")
