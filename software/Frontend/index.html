@@ -93,14 +93,6 @@
       <div class="card" style="border-left: 4px solid #3498db;">
         <div class="card-title" style="color:#3498db;">Variables MQTT — Entradas</div>
         <div class="field-row">
-          <span class="field-label">Corriente RMS</span>
-          <span><span class="field-value" id="dval-in-curr_rms">—</span><span class="field-unit">A</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">RPM</span>
-          <span><span class="field-value" id="dval-in-rpm">—</span><span class="field-unit">rpm</span></span>
-        </div>
-        <div class="field-row">
           <span class="field-label">Voltaje Paquete</span>
           <span><span class="field-value" id="dval-in-volt_p">—</span><span class="field-unit">V</span></span>
         </div>
@@ -109,61 +101,30 @@
           <span><span class="field-value" id="dval-in-curr_p">—</span><span class="field-unit">A</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">SOC</span>
-          <span><span class="field-value" id="dval-in-soc">—</span><span class="field-unit">%</span></span>
+          <span class="field-label">V_rest paquete</span>
+          <span><span class="field-value" id="dval-in-v_rest">—</span><span class="field-unit">V</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Tiempo en reposo</span>
+          <span><span class="field-value" id="dval-in-t_reposo">—</span><span class="field-unit">s</span></span>
         </div>
         <div class="derived-note">
-          curr_p &gt; 0 → regeneración<br>
-          curr_p &lt; 0 → tracción
+          V_rest se actualiza tras 60s con |curr_p| &lt; 10A<br>
+          |curr_p| &gt; 10A para calcular R
         </div>
       </div>
 
-      <!-- Variables derivadas -->
+      <!-- Resistencia interna -->
       <div class="card" style="border-left: 4px solid #e74c3c;">
-        <div class="card-title" style="color:#e74c3c;">Variables Derivadas — Tren Motriz</div>
+        <div class="card-title" style="color:#e74c3c;">Resistencia Interna</div>
         <div class="field-row">
-          <span class="field-label">Torque estimado</span>
-          <span><span class="field-value" id="dval-tau_est">—</span><span class="field-unit">Nm</span></span>
+          <span class="field-label">R paquete</span>
+          <span><span class="field-value" id="dval-r_pack">—</span><span class="field-unit">Ω</span></span>
         </div>
-        <div class="field-row">
-          <span class="field-label">Potencia mecánica</span>
-          <span><span class="field-value" id="dval-p_mec">—</span><span class="field-unit">W</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Potencia eléctrica HV</span>
-          <span><span class="field-value" id="dval-p_hv">—</span><span class="field-unit">W</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Potencia regenerativa</span>
-          <span><span class="field-value" id="dval-p_regen">—</span><span class="field-unit">W</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Eficiencia sistema</span>
-          <span><span class="field-value" id="dval-eta">—</span><span class="field-unit">%</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Energía consumida HV</span>
-          <span><span class="field-value" id="dval-E_HV">—</span><span class="field-unit">Wh</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Carga consumida HV</span>
-          <span><span class="field-value" id="dval-Q_HV">—</span><span class="field-unit">Ah</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Energía regenerada</span>
-          <span><span class="field-value" id="dval-E_regen">—</span><span class="field-unit">Wh</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Capacidad restante</span>
-          <span><span class="field-value" id="dval-Q_HV_rest">—</span><span class="field-unit">Ah</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Energía restante</span>
-          <span><span class="field-value" id="dval-E_HV_rest">—</span><span class="field-unit">Wh</span></span>
-        </div>
+        <div id="r-cells-container"></div>
         <div class="derived-note">
-          p_regen: válida cuando curr_p &gt; 0<br>
-          eta: válida cuando P_HV &gt; 300W y curr_p &lt; 0
+          R = (V_rest - V_load) / |I_load|<br>
+          válida cuando |curr_p| &gt; 10A y V_rest disponible
         </div>
       </div>
 
@@ -355,7 +316,7 @@ function updateDashboard(payload) {
   chartControl.update("none");
 
   // Variables MQTT de entrada para verificación
-  const MQTT_INPUTS = ["curr_rms", "rpm", "volt_p", "curr_p", "soc"];
+  const MQTT_INPUTS = [];
   MQTT_INPUTS.forEach(key => {
     const el = document.getElementById(`dval-in-${key}`);
     if (!el) return;
@@ -383,9 +344,76 @@ function updateDashboard(payload) {
     }
   });
 
-  // Celdas
+  // Variables MQTT de entrada para resistencia
+  const volt_p_el = document.getElementById("dval-in-volt_p");
+  const curr_p_el = document.getElementById("dval-in-curr_p");
+  const v_rest_el = document.getElementById("dval-in-v_rest");
+  const t_rep_el  = document.getElementById("dval-in-t_reposo");
+  if (volt_p_el) volt_p_el.textContent = (data.volt_p  ?? "—").toFixed ? data.volt_p.toFixed(3)  : "—";
+  if (curr_p_el) curr_p_el.textContent = (data.curr_p  ?? "—").toFixed ? data.curr_p.toFixed(2)  : "—";
+  if (v_rest_el) v_rest_el.textContent = (data.v_rest_pack != null) ? data.v_rest_pack.toFixed(3) : "n/a";
+  if (t_rep_el)  t_rep_el.textContent  = (data.t_reposo_s ?? 0).toFixed(1);
+
+  // Resistencia paquete
+  const r_pack_el = document.getElementById("dval-r_pack");
+  if (r_pack_el) {
+    const rp = data.r_pack;
+    if (rp !== null && rp !== undefined) {
+      r_pack_el.textContent = rp.toFixed(6);
+      r_pack_el.className = "field-value";
+    } else {
+      r_pack_el.textContent = "n/a";
+      r_pack_el.className = "field-null";
+    }
+  }
+
+  // Resistencias por celda — crear dinámicamente si no existen
+  const r_cells = data.r_cells || {};
+  const rContainer = document.getElementById("r-cells-container");
+  if (rContainer) {
+    for (let i = 1; i <= 16; i++) {
+      const key = `r_cell_${i}`;
+      const val = r_cells[key];
+      let rowEl = document.getElementById(`row-${key}`);
+      if (!rowEl) {
+        rowEl = document.createElement("div");
+        rowEl.className = "field-row";
+        rowEl.id = `row-${key}`;
+        const lbl = document.createElement("span");
+        lbl.className = "field-label";
+        lbl.textContent = `R Celda ${i}`;
+        const valWrap = document.createElement("span");
+        const valEl = document.createElement("span");
+        valEl.className = "field-value";
+        valEl.id = `dval-${key}`;
+        valEl.textContent = "—";
+        const unitEl = document.createElement("span");
+        unitEl.className = "field-unit";
+        unitEl.textContent = " Ω";
+        valWrap.appendChild(valEl);
+        valWrap.appendChild(unitEl);
+        rowEl.appendChild(lbl);
+        rowEl.appendChild(valWrap);
+        rContainer.appendChild(rowEl);
+      }
+      const valEl = document.getElementById(`dval-${key}`);
+      if (valEl) {
+        if (val !== null && val !== undefined) {
+          valEl.textContent = val.toFixed(6);
+          valEl.className = "field-value";
+        } else {
+          valEl.textContent = "n/a";
+          valEl.className = "field-null";
+        }
+      }
+    }
+  }
+
+  // Celdas — ordenadas numéricamente
   const cells = data.cells || {};
-  const cellKeys = Object.keys(cells).sort();
+  const cellKeys = Object.keys(cells).sort((a, b) => {
+    return parseInt(a.replace("cell_", "")) - parseInt(b.replace("cell_", ""));
+  });
   if (cellKeys.length > 0) {
     document.getElementById("cells-section").style.display = "block";
     const cellGrid = document.getElementById("cells-grid");

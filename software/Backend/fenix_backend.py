@@ -7,6 +7,7 @@ fenix_backend.py  –  Escudería Fénix
 
 import json
 import math
+import time
 import requests
 from datetime import datetime, timezone, timedelta
 import paho.mqtt.client as mqtt
@@ -30,49 +31,71 @@ INFLUX_BUCKET = "Telemetria"
 API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
 
 # ─── Constantes del motor y paquete ──────────────────────────────────────────
-KT    = 0.143    # Nm/A — constante de torque ME MAX 6kW
-E_NOM = 5210.0   # Wh  — energía nominal paquete 16S LiFePO4 100Ah (52.1V × 100Ah)
-Q_NOM = 100.0    # Ah  — capacidad nominal del paquete
+KT              = 0.143   # Nm/A — constante de torque ME MAX 6kW
+E_NOM           = 5210.0  # Wh  — energía nominal 16S LiFePO4 100Ah
+Q_NOM           = 100.0   # Ah  — capacidad nominal
+I_MIN           = 10.0    # A   — umbral mínimo corriente
+T_REPOSO        = 60.0    # s   — segundos en reposo para actualizar V_rest
+DT              = 0.1     # s   — intervalo entre snapshots (10 Hz)
 
 # ─── Acumuladores por sesión (RAM) ────────────────────────────────────────────
-_session_id_prev = None
-_E_HV    = 0.0   # Wh — energía consumida acumulada
-_Q_HV    = 0.0   # Ah — carga consumida acumulada
-_E_regen = 0.0   # Wh — energía regenerada acumulada
-DT       = 0.1   # s  — intervalo entre snapshots (10 Hz)
+_session_id_prev  = None
+_E_HV             = 0.0
+_Q_HV             = 0.0
+_E_regen          = 0.0
+
+# ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
+_v_rest_pack      = None          # V — voltaje paquete en reposo
+_v_rest_cells     = [None] * 16   # V — voltaje por celda en reposo
+_t_reposo_inicio  = None          # timestamp cuando empieza el reposo
+_en_reposo        = False         # True cuando |curr_p| < I_MIN
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
 
 # ─── Cálculo de variables derivadas ──────────────────────────────────────────
-def compute_derived(data: dict, p_hv_val, p_regen_val, soc: float) -> dict:
-    curr_rms = float(data.get("curr_rms", 0))
-    rpm      = abs(float(data.get("rpm",      0)))
-    volt_p   = float(data.get("volt_p",   0))
-    curr_p   = float(data.get("curr_p",   0))
+def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
+    curr_rms   = float(data.get("curr_rms", 0))
+    rpm        = abs(float(data.get("rpm",  0)))
+    volt_p     = float(data.get("volt_p",  0))
+    cell_volts = data.get("cell_volts", [])
 
-    # Torque estimado: τ_est = Kt × curr_rms [Nm]
+    # ── Torque estimado ────────────────────────────────────────────────────
     tau_est = KT * curr_rms
 
-    # Potencia mecánica: P_mec = τ_est × (2π × rpm / 60) [W]
+    # ── Potencia mecánica ──────────────────────────────────────────────────
     p_mec = tau_est * (2 * math.pi * rpm / 60)
 
-    # Potencia eléctrica HV: solo en descarga (curr_p < -5A), valor positivo
-    p_hv = (volt_p * abs(curr_p)) if curr_p < -5.0 else None
+    # ── Potencia eléctrica HV (solo descarga) ─────────────────────────────
+    p_hv = (volt_p * abs(curr_p)) if curr_p < -I_MIN else None
 
-    # Potencia regenerativa: solo en regen (curr_p > 5A)
-    p_regen = (volt_p * curr_p) if curr_p > 5.0 else None
+    # ── Potencia regenerativa (solo regen) ────────────────────────────────
+    p_regen = (volt_p * curr_p) if curr_p > I_MIN else None
 
-    # Eficiencia: válida solo cuando p_hv > 300W y curr_p < -5A
+    # ── Eficiencia ────────────────────────────────────────────────────────
     if p_hv is not None and p_hv > 300:
-        eta = (p_mec / p_hv) * 100
+        eta = min((p_mec / p_hv) * 100, 100.0)
     else:
         eta = None
 
-    # Capacidad y energía restante (instantáneas desde SOC del BMS)
+    # ── Capacidad y energía restante ──────────────────────────────────────
     Q_HV_rest = Q_NOM * (soc / 100.0)
     E_HV_rest = E_NOM * (soc / 100.0)
+
+    # ── Resistencia interna paquete ───────────────────────────────────────
+    r_pack = None
+    if _v_rest_pack is not None and abs(curr_p) > I_MIN:
+        r_pack = (_v_rest_pack - volt_p) / abs(curr_p)
+
+    # ── Resistencia interna por celda ─────────────────────────────────────
+    r_cells = {}
+    for i, v_load in enumerate(cell_volts):
+        v_rest = _v_rest_cells[i] if i < len(_v_rest_cells) else None
+        if v_rest is not None and abs(curr_p) > I_MIN:
+            r_cells[f"r_cell_{i+1}"] = round((v_rest - float(v_load)) / abs(curr_p), 8)
+        else:
+            r_cells[f"r_cell_{i+1}"] = None
 
     return {
         "tau_est":    round(tau_est, 4),
@@ -82,7 +105,9 @@ def compute_derived(data: dict, p_hv_val, p_regen_val, soc: float) -> dict:
         "eta":        round(eta,     2) if eta      is not None else None,
         "Q_HV_rest":  round(Q_HV_rest, 3),
         "E_HV_rest":  round(E_HV_rest, 2),
-        # Acumulativas — se actualizan en on_message
+        "r_pack":     round(r_pack,  6) if r_pack  is not None else None,
+        "r_cells":    r_cells,
+        # Acumulativas — se asignan en on_message
         "E_HV":    None,
         "Q_HV":    None,
         "E_regen": None,
@@ -99,42 +124,57 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 def on_message(client, userdata, msg):
     global _session_id_prev, _E_HV, _Q_HV, _E_regen
+    global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
+
     try:
         data = json.loads(msg.payload.decode())
 
-        # ── 1. Detectar cambio de sesión — reiniciar acumuladores ─────────────
+        curr_p     = float(data.get("curr_p",  0))
+        soc        = float(data.get("soc",     0))
+        volt_p     = float(data.get("volt_p",  0))
+        cell_volts = data.get("cell_volts", [])
+
+        # ── 1. Detectar cambio de sesión ──────────────────────────────────────
         new_session_id = str(data.get("sess_id", 0))
         if new_session_id != _session_id_prev:
-            print(f"[Sesión] Nueva sesión detectada: {_session_id_prev} → {new_session_id} — reiniciando acumuladores")
+            print(f"[Sesión] {_session_id_prev} → {new_session_id} — reiniciando acumuladores")
             _session_id_prev = new_session_id
             _E_HV    = 0.0
             _Q_HV    = 0.0
             _E_regen = 0.0
 
-        # ── 2. Calcular variables derivadas ───────────────────────────────────
-        curr_p = float(data.get("curr_p", 0))
-        soc    = float(data.get("soc",    0))
-        derived = compute_derived(data, None, None, soc)
+        # ── 2. Lógica de reposo para V_rest (60 segundos) ─────────────────────
+        now = time.time()
+        if abs(curr_p) < I_MIN:
+            if not _en_reposo:
+                # Empieza el reposo
+                _en_reposo        = True
+                _t_reposo_inicio  = now
+            else:
+                # Ya estaba en reposo — verificar si ya pasaron 60s
+                if (now - _t_reposo_inicio) >= T_REPOSO:
+                    _v_rest_pack  = volt_p
+                    _v_rest_cells = [float(v) for v in cell_volts] if cell_volts else _v_rest_cells
+        else:
+            # Salió del reposo
+            _en_reposo = False
 
-        # ── 3. Actualizar acumuladores ────────────────────────────────────────
-        # E_HV: solo en descarga (curr_p < -5A)
-        if curr_p < -5.0 and derived["p_hv"] is not None:
+        # ── 3. Calcular variables derivadas ───────────────────────────────────
+        derived = compute_derived(data, soc, curr_p)
+
+        # ── 4. Actualizar acumuladores ────────────────────────────────────────
+        if curr_p < -I_MIN and derived["p_hv"] is not None:
             _E_HV += derived["p_hv"] * DT / 3600.0
-
-        # Q_HV: solo en descarga (curr_p < -5A)
-        if curr_p < -5.0:
+        if curr_p < -I_MIN:
             _Q_HV += abs(curr_p) * DT / 3600.0
-
-        # E_regen: solo en regen (curr_p > 5A)
-        if curr_p > 5.0 and derived["p_regen"] is not None:
+        if curr_p > I_MIN and derived["p_regen"] is not None:
             _E_regen += derived["p_regen"] * DT / 3600.0
 
-        # Asignar acumuladores al derived
         derived["E_HV"]    = round(_E_HV,    3)
         derived["Q_HV"]    = round(_Q_HV,    4)
         derived["E_regen"] = round(_E_regen, 3)
 
-        # ── 4. Guardar en InfluxDB ────────────────────────────────────────────
+        # ── 5. Guardar en InfluxDB ────────────────────────────────────────────
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
             tzinfo=timezone(timedelta(hours=-6))
         )
@@ -172,7 +212,6 @@ def on_message(client, userdata, msg):
             .field("gyro_z",    float(data.get("gyro_z",    0)))
             .field("volt_a",    float(data.get("volt_a",    0)))
             .field("curr_a",    float(data.get("curr_a",    0)))
-            # Variables derivadas
             .field("tau_est",   derived["tau_est"])
             .field("p_mec",     derived["p_mec"])
             .field("E_HV",      derived["E_HV"])
@@ -182,19 +221,26 @@ def on_message(client, userdata, msg):
             .field("E_HV_rest", derived["E_HV_rest"])
         )
 
-        # Campos condicionales — solo se escriben si tienen valor
-        if derived["p_regen"] is not None:
-            point = point.field("p_regen", derived["p_regen"])
-        if derived["eta"] is not None:
-            point = point.field("eta",     derived["eta"])
+        # Campos condicionales
+        if derived["p_hv"]    is not None: point = point.field("p_hv",    derived["p_hv"])
+        if derived["p_regen"] is not None: point = point.field("p_regen", derived["p_regen"])
+        if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
+        if derived["r_pack"]  is not None: point = point.field("r_pack",  derived["r_pack"])
 
-        for i, v in enumerate(data.get("cell_volts", [])):
+        for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
+
+        # Resistencias por celda — condicionales
+        for i in range(16):
+            key = f"r_cell_{i+1}"
+            val = derived["r_cells"].get(key)
+            if val is not None:
+                point = point.field(key, val)
 
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
         print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
 
-        # ── 5. Empaquetar snapshot para fenix_api ─────────────────────────────
+        # ── 6. Empaquetar snapshot para fenix_api ─────────────────────────────
         snapshot = {
             "timestamp":  data.get("times"),
             "vehicle_id": str(data.get("veh_id", 25)),
@@ -229,8 +275,7 @@ def on_message(client, userdata, msg):
                 "volt_a":    float(data.get("volt_a",    0)),
                 "curr_a":    float(data.get("curr_a",    0)),
                 "cells": {f"cell_{i+1}": float(v)
-                          for i, v in enumerate(data.get("cell_volts", []))},
-                # Variables derivadas
+                          for i, v in enumerate(cell_volts)},
                 "tau_est":    derived["tau_est"],
                 "p_mec":      derived["p_mec"],
                 "p_hv":       derived["p_hv"],
@@ -241,10 +286,14 @@ def on_message(client, userdata, msg):
                 "E_regen":    derived["E_regen"],
                 "Q_HV_rest":  derived["Q_HV_rest"],
                 "E_HV_rest":  derived["E_HV_rest"],
+                "r_pack":     derived["r_pack"],
+                "r_cells":    derived["r_cells"],
+                "v_rest_pack": _v_rest_pack,
+                "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
             }
         }
 
-        # ── 6. Empujar a fenix_api ────────────────────────────────────────────
+        # ── 7. Empujar a fenix_api ────────────────────────────────────────────
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
