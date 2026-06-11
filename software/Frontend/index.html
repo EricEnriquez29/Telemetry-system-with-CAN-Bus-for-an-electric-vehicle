@@ -108,6 +108,10 @@
           <span class="field-label">Corriente Paquete</span>
           <span><span class="field-value" id="dval-in-curr_p">—</span><span class="field-unit">A</span></span>
         </div>
+        <div class="field-row">
+          <span class="field-label">SOC</span>
+          <span><span class="field-value" id="dval-in-soc">—</span><span class="field-unit">%</span></span>
+        </div>
         <div class="derived-note">
           curr_p &gt; 0 → regeneración<br>
           curr_p &lt; 0 → tracción
@@ -136,6 +140,26 @@
         <div class="field-row">
           <span class="field-label">Eficiencia sistema</span>
           <span><span class="field-value" id="dval-eta">—</span><span class="field-unit">%</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Energía consumida HV</span>
+          <span><span class="field-value" id="dval-E_HV">—</span><span class="field-unit">Wh</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Carga consumida HV</span>
+          <span><span class="field-value" id="dval-Q_HV">—</span><span class="field-unit">Ah</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Energía regenerada</span>
+          <span><span class="field-value" id="dval-E_regen">—</span><span class="field-unit">Wh</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Capacidad restante</span>
+          <span><span class="field-value" id="dval-Q_HV_rest">—</span><span class="field-unit">Ah</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Energía restante</span>
+          <span><span class="field-value" id="dval-E_HV_rest">—</span><span class="field-unit">Wh</span></span>
         </div>
         <div class="derived-note">
           p_regen: válida cuando curr_p &gt; 0<br>
@@ -331,7 +355,7 @@ function updateDashboard(payload) {
   chartControl.update("none");
 
   // Variables MQTT de entrada para verificación
-  const MQTT_INPUTS = ["curr_rms", "rpm", "volt_p", "curr_p"];
+  const MQTT_INPUTS = ["curr_rms", "rpm", "volt_p", "curr_p", "soc"];
   MQTT_INPUTS.forEach(key => {
     const el = document.getElementById(`dval-in-${key}`);
     if (!el) return;
@@ -344,7 +368,7 @@ function updateDashboard(payload) {
 
   // Variables derivadas — null muestra "n/a" pero NO borra valor anterior
   // excepción: eta y p_regen se limpian cuando cambia el modo tracción/regen
-  const DERIVED_KEYS = ["tau_est", "p_mec", "p_hv", "p_regen", "eta"];
+  const DERIVED_KEYS = ["tau_est", "p_mec", "p_hv", "p_regen", "eta", "E_HV", "Q_HV", "E_regen", "Q_HV_rest", "E_HV_rest"];
   DERIVED_KEYS.forEach(key => {
     const el = document.getElementById(`dval-${key}`);
     if (!el) return;

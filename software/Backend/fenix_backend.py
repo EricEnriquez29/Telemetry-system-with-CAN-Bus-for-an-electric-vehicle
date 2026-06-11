@@ -29,17 +29,26 @@ INFLUX_BUCKET = "Telemetria"
 # ─── URL interna de fenix_api ─────────────────────────────────────────────────
 API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
 
-# ─── Constantes del motor ─────────────────────────────────────────────────────
-KT = 0.143  # Nm/A — constante de torque ME MAX 6kW
+# ─── Constantes del motor y paquete ──────────────────────────────────────────
+KT    = 0.143    # Nm/A — constante de torque ME MAX 6kW
+E_NOM = 5210.0   # Wh  — energía nominal paquete 16S LiFePO4 100Ah (52.1V × 100Ah)
+Q_NOM = 100.0    # Ah  — capacidad nominal del paquete
+
+# ─── Acumuladores por sesión (RAM) ────────────────────────────────────────────
+_session_id_prev = None
+_E_HV    = 0.0   # Wh — energía consumida acumulada
+_Q_HV    = 0.0   # Ah — carga consumida acumulada
+_E_regen = 0.0   # Wh — energía regenerada acumulada
+DT       = 0.1   # s  — intervalo entre snapshots (10 Hz)
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
 
 # ─── Cálculo de variables derivadas ──────────────────────────────────────────
-def compute_derived(data: dict) -> dict:
+def compute_derived(data: dict, p_hv_val, p_regen_val, soc: float) -> dict:
     curr_rms = float(data.get("curr_rms", 0))
-    rpm      = abs(float(data.get("rpm",      0)))  # siempre positivo
+    rpm      = abs(float(data.get("rpm",      0)))
     volt_p   = float(data.get("volt_p",   0))
     curr_p   = float(data.get("curr_p",   0))
 
@@ -52,21 +61,31 @@ def compute_derived(data: dict) -> dict:
     # Potencia eléctrica HV: solo en descarga (curr_p < -5A), valor positivo
     p_hv = (volt_p * abs(curr_p)) if curr_p < -5.0 else None
 
-    # Potencia regenerativa: válida solo cuando curr_p > 5A
+    # Potencia regenerativa: solo en regen (curr_p > 5A)
     p_regen = (volt_p * curr_p) if curr_p > 5.0 else None
 
-    # Eficiencia: válida solo cuando |P_HV| > 300W y curr_p < -5A (tracción real)
-    if p_hv is not None and abs(p_hv) > 300:
-        eta = (p_mec / abs(p_hv)) * 100
+    # Eficiencia: válida solo cuando p_hv > 300W y curr_p < -5A
+    if p_hv is not None and p_hv > 300:
+        eta = (p_mec / p_hv) * 100
     else:
         eta = None
 
+    # Capacidad y energía restante (instantáneas desde SOC del BMS)
+    Q_HV_rest = Q_NOM * (soc / 100.0)
+    E_HV_rest = E_NOM * (soc / 100.0)
+
     return {
-        "tau_est": round(tau_est, 4),
-        "p_mec":   round(p_mec,   2),
-        "p_hv":    round(p_hv,    2) if p_hv    is not None else None,
-        "p_regen": round(p_regen, 2) if p_regen is not None else None,
-        "eta":     round(eta,     2) if eta      is not None else None,
+        "tau_est":    round(tau_est, 4),
+        "p_mec":      round(p_mec,   2),
+        "p_hv":       round(p_hv,    2) if p_hv    is not None else None,
+        "p_regen":    round(p_regen, 2) if p_regen is not None else None,
+        "eta":        round(eta,     2) if eta      is not None else None,
+        "Q_HV_rest":  round(Q_HV_rest, 3),
+        "E_HV_rest":  round(E_HV_rest, 2),
+        # Acumulativas — se actualizan en on_message
+        "E_HV":    None,
+        "Q_HV":    None,
+        "E_regen": None,
     }
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
@@ -79,13 +98,43 @@ def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
+    global _session_id_prev, _E_HV, _Q_HV, _E_regen
     try:
         data = json.loads(msg.payload.decode())
 
-        # ── 1. Calcular variables derivadas ───────────────────────────────────
-        derived = compute_derived(data)
+        # ── 1. Detectar cambio de sesión — reiniciar acumuladores ─────────────
+        new_session_id = str(data.get("sess_id", 0))
+        if new_session_id != _session_id_prev:
+            print(f"[Sesión] Nueva sesión detectada: {_session_id_prev} → {new_session_id} — reiniciando acumuladores")
+            _session_id_prev = new_session_id
+            _E_HV    = 0.0
+            _Q_HV    = 0.0
+            _E_regen = 0.0
 
-        # ── 2. Guardar en InfluxDB ────────────────────────────────────────────
+        # ── 2. Calcular variables derivadas ───────────────────────────────────
+        curr_p = float(data.get("curr_p", 0))
+        soc    = float(data.get("soc",    0))
+        derived = compute_derived(data, None, None, soc)
+
+        # ── 3. Actualizar acumuladores ────────────────────────────────────────
+        # E_HV: solo en descarga (curr_p < -5A)
+        if curr_p < -5.0 and derived["p_hv"] is not None:
+            _E_HV += derived["p_hv"] * DT / 3600.0
+
+        # Q_HV: solo en descarga (curr_p < -5A)
+        if curr_p < -5.0:
+            _Q_HV += abs(curr_p) * DT / 3600.0
+
+        # E_regen: solo en regen (curr_p > 5A)
+        if curr_p > 5.0 and derived["p_regen"] is not None:
+            _E_regen += derived["p_regen"] * DT / 3600.0
+
+        # Asignar acumuladores al derived
+        derived["E_HV"]    = round(_E_HV,    3)
+        derived["Q_HV"]    = round(_Q_HV,    4)
+        derived["E_regen"] = round(_E_regen, 3)
+
+        # ── 4. Guardar en InfluxDB ────────────────────────────────────────────
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
             tzinfo=timezone(timedelta(hours=-6))
         )
@@ -126,7 +175,11 @@ def on_message(client, userdata, msg):
             # Variables derivadas
             .field("tau_est",   derived["tau_est"])
             .field("p_mec",     derived["p_mec"])
-            .field("p_hv",      derived["p_hv"])
+            .field("E_HV",      derived["E_HV"])
+            .field("Q_HV",      derived["Q_HV"])
+            .field("E_regen",   derived["E_regen"])
+            .field("Q_HV_rest", derived["Q_HV_rest"])
+            .field("E_HV_rest", derived["E_HV_rest"])
         )
 
         # Campos condicionales — solo se escriben si tienen valor
@@ -141,7 +194,7 @@ def on_message(client, userdata, msg):
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
         print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
 
-        # ── 3. Empaquetar snapshot para fenix_api ─────────────────────────────
+        # ── 5. Empaquetar snapshot para fenix_api ─────────────────────────────
         snapshot = {
             "timestamp":  data.get("times"),
             "vehicle_id": str(data.get("veh_id", 25)),
@@ -178,15 +231,20 @@ def on_message(client, userdata, msg):
                 "cells": {f"cell_{i+1}": float(v)
                           for i, v in enumerate(data.get("cell_volts", []))},
                 # Variables derivadas
-                "tau_est":  derived["tau_est"],
-                "p_mec":    derived["p_mec"],
-                "p_hv":     derived["p_hv"],
-                "p_regen":  derived["p_regen"],
-                "eta":      derived["eta"],
+                "tau_est":    derived["tau_est"],
+                "p_mec":      derived["p_mec"],
+                "p_hv":       derived["p_hv"],
+                "p_regen":    derived["p_regen"],
+                "eta":        derived["eta"],
+                "E_HV":       derived["E_HV"],
+                "Q_HV":       derived["Q_HV"],
+                "E_regen":    derived["E_regen"],
+                "Q_HV_rest":  derived["Q_HV_rest"],
+                "E_HV_rest":  derived["E_HV_rest"],
             }
         }
 
-        # ── 4. Empujar a fenix_api ────────────────────────────────────────────
+        # ── 6. Empujar a fenix_api ────────────────────────────────────────────
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
