@@ -199,6 +199,11 @@ def on_message(client, userdata, msg):
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
                 print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%", flush=True)
+            elif _soh_soc_inicio == 0.0 and soc > 0.0:
+                # Corregir SOC_inicio si llegó como 0 por reinicio del backend
+                _soh_soc_inicio = soc
+                _soh_Q_SOH      = 0.0
+                print(f"[SOH] SOC_inicio corregido a {soc:.1f}%", flush=True)
 
             # Verificar gap — si el último snapshot con descarga fue hace más de 10 min
             if _soh_t_ultimo is not None and (now - _soh_t_ultimo) > T_GAP_MAX:
