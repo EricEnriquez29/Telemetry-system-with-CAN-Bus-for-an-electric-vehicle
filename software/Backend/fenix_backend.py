@@ -64,9 +64,9 @@ def compute_derived(data: dict) -> dict:
     return {
         "tau_est": round(tau_est, 4),
         "p_mec":   round(p_mec,   2),
-        "p_hv":    round(p_hv,    2),
+        "p_hv":    round(p_hv,    2) if p_hv    is not None else None,
         "p_regen": round(p_regen, 2) if p_regen is not None else None,
-        "eta":     round(eta,     2) if eta     is not None else None,
+        "eta":     round(eta,     2) if eta      is not None else None,
     }
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
