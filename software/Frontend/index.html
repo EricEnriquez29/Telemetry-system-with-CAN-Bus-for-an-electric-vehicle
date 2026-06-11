@@ -314,9 +314,13 @@ function updateDashboard(payload) {
     cat.fields.forEach(f => {
       const el = document.getElementById(`val-${f.key}`);
       if (!el) return;
-      const val = data[f.key];
-      el.textContent = (val !== undefined && val !== null)
-        ? (typeof val === "number" ? val.toFixed(2) : val) : "—";
+      let val = data[f.key];
+      if (val !== undefined && val !== null) {
+        if (f.key === "rpm") val = Math.abs(val);
+        el.textContent = typeof val === "number" ? val.toFixed(2) : val;
+      } else {
+        el.textContent = "—";
+      }
     });
   });
 
@@ -331,13 +335,15 @@ function updateDashboard(payload) {
   MQTT_INPUTS.forEach(key => {
     const el = document.getElementById(`dval-in-${key}`);
     if (!el) return;
-    const val = data[key];
+    let val = data[key];
     if (val !== undefined && val !== null) {
+      if (key === "rpm") val = Math.abs(val);
       el.textContent = val.toFixed(2);
     }
   });
 
   // Variables derivadas — null muestra "n/a" pero NO borra valor anterior
+  // excepción: eta y p_regen se limpian cuando cambia el modo tracción/regen
   const DERIVED_KEYS = ["tau_est", "p_mec", "p_hv", "p_regen", "eta"];
   DERIVED_KEYS.forEach(key => {
     const el = document.getElementById(`dval-${key}`);
@@ -346,13 +352,10 @@ function updateDashboard(payload) {
     if (val !== null && val !== undefined) {
       el.textContent = val.toFixed(2);
       el.className = "field-value";
-    } else if (val === null) {
-      // Solo muestra n/a si nunca ha tenido valor (texto es "—")
-      if (el.textContent === "—") {
-        el.textContent = "n/a";
-        el.className = "field-null";
-      }
-      // Si ya tenía un valor, lo mantiene sin parpadear
+    } else {
+      // Siempre limpiar a n/a cuando el backend manda null
+      el.textContent = "n/a";
+      el.className = "field-null";
     }
   });
 

@@ -39,7 +39,7 @@ write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
 # ─── Cálculo de variables derivadas ──────────────────────────────────────────
 def compute_derived(data: dict) -> dict:
     curr_rms = float(data.get("curr_rms", 0))
-    rpm      = float(data.get("rpm",      0))
+    rpm      = abs(float(data.get("rpm",      0)))  # siempre positivo
     volt_p   = float(data.get("volt_p",   0))
     curr_p   = float(data.get("curr_p",   0))
 
