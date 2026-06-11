@@ -245,11 +245,15 @@ def on_message(client, userdata, msg):
 
         # SOC0 — tomar 4 muestras sincronizadas a 1Hz, usar la de menor corriente
         if _soc0_aux is None and len(_aux_muestras) < 4:
-            # Tomar una muestra por segundo
+            # Tomar una muestra por segundo, solo si los valores son válidos
             if _aux_ultimo_t is None or (now - _aux_ultimo_t) >= 1.0:
-                _aux_muestras.append((curr_a, volt_a))
-                _aux_ultimo_t = now
-                print(f"[AUX] Muestra {len(_aux_muestras)}/4 — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
+                if curr_a > 0.0 and volt_a > 10.0:
+                    _aux_muestras.append((curr_a, volt_a))
+                    _aux_ultimo_t = now
+                    print(f"[AUX] Muestra {len(_aux_muestras)}/4 — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
+                else:
+                    print(f"[AUX] Muestra descartada — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
+                    _aux_ultimo_t = now  # avanzar el timer aunque se descarte
 
             # Cuando se tienen las 4, buscar la de menor corriente
             if len(_aux_muestras) == 4:
