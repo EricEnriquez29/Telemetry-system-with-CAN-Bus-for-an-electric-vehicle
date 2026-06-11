@@ -135,6 +135,18 @@
           <span class="field-label">SOH por capacidad</span>
           <span><span class="field-value" id="dval-soh_c">—</span><span class="field-unit">%</span></span>
         </div>
+        <div class="field-row">
+          <span class="field-label">Estado medición</span>
+          <span><span class="field-value" id="dval-soh_activo">—</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">SOC inicio intervalo</span>
+          <span><span class="field-value" id="dval-soh_soc_inicio">—</span><span class="field-unit">%</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Q acumulado (real)</span>
+          <span><span class="field-value" id="dval-soh_Q_SOH">—</span><span class="field-unit">Ah</span></span>
+        </div>
         <div class="derived-note">
           Válido cuando ΔSoC ≥ 30% en misma sesión<br>
           sin gaps &gt; 10 min sin descarga
@@ -368,6 +380,30 @@ function updateDashboard(payload) {
       soh_el.textContent = "n/a";
       soh_el.className = "field-null";
     }
+  }
+
+  const soh_activo_el = document.getElementById("dval-soh_activo");
+  if (soh_activo_el) {
+    const activo = data.soh_activo;
+    if (activo === true) {
+      soh_activo_el.textContent = "● Midiendo";
+      soh_activo_el.style.color = "#27ae60";
+    } else if (activo === false) {
+      soh_activo_el.textContent = "○ En espera";
+      soh_activo_el.style.color = "#aaa";
+    }
+  }
+
+  const soh_soc_inicio_el = document.getElementById("dval-soh_soc_inicio");
+  if (soh_soc_inicio_el) {
+    const v = data.soh_soc_inicio;
+    soh_soc_inicio_el.textContent = (v !== null && v !== undefined) ? v.toFixed(1) : "n/a";
+  }
+
+  const soh_q_el = document.getElementById("dval-soh_Q_SOH");
+  if (soh_q_el) {
+    const v = data.soh_Q_SOH;
+    soh_q_el.textContent = (v !== null && v !== undefined) ? v.toFixed(4) : "n/a";
   }
 
   // Variables MQTT de entrada para resistencia

@@ -345,6 +345,9 @@ def on_message(client, userdata, msg):
                 "r_pack":     derived["r_pack"],
                 "r_cells":    derived["r_cells"],
                 "soh_c":      derived["soh_c"],
+                "soh_activo": _soh_activo,
+                "soh_Q_SOH":  round(_soh_Q_SOH, 4),
+                "soh_soc_inicio": _soh_soc_inicio,
                 "v_rest_pack": _v_rest_pack,
                 "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
             }
