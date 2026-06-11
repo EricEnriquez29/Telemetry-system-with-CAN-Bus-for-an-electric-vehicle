@@ -3,36 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fénix Telemetría</title>
+  <title>Sistema de Telemetria — Escudería Fénix UPIITA</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #0d0d0d; color: #f0f0f0;
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: 'Share Tech Mono', monospace;
       padding: 24px; min-height: 100vh;
     }
+
+    /* ── Header ── */
     #header {
-      display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 2px solid #ff3c00; padding-bottom: 12px; margin-bottom: 24px;
+      text-align: center;
+      border-bottom: 2px solid #ef5e20;
+      padding-bottom: 14px;
+      margin-bottom: 0;
     }
-    #title { font-size: 26px; font-weight: bold; letter-spacing: 2px; color: #ff3c00; }
-    #status-bar { font-size: 13px; color: #aaa; }
+    #title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px; font-weight: 700;
+      letter-spacing: 2px; color: #ef5e20;
+      text-transform: uppercase;
+    }
+    #subheader {
+      display: flex; justify-content: center; align-items: center;
+      gap: 24px; padding: 8px 0;
+      margin-bottom: 16px;
+      font-size: 12px; color: #aaa;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    #status-bar { font-size: 12px; color: #aaa; }
     #ws-indicator { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #aaa; }
-    #ws-dot { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; transition: background 0.3s; }
+    #ws-dot { width: 9px; height: 9px; border-radius: 50%; background: #e74c3c; transition: background 0.3s; }
     #ws-dot.connected { background: #27ae60; }
 
+    /* ── Pestañas ── */
+    .tabs-bar {
+      display: flex; gap: 0;
+      border-bottom: 1px solid #2a2a2a;
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 10px 24px; font-size: 12px; cursor: pointer;
+      color: #666; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color 0.15s;
+      font-family: 'Share Tech Mono', monospace;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .tab.active { color: #ef5e20; border-bottom: 2px solid #ef5e20; }
+    .tab:hover:not(.active) { color: #aaa; }
+
+    /* ── Gráficas ── */
     .chart-section {
       background: #1a1a1a; border-radius: 10px;
       padding: 16px; margin-bottom: 24px;
     }
     .chart-title {
-      font-size: 13px; font-weight: bold; text-transform: uppercase;
+      font-size: 12px; text-transform: uppercase;
       letter-spacing: 1px; margin-bottom: 12px;
     }
     .chart-container { position: relative; height: 220px; width: 100%; }
 
+    /* ── Grid de tarjetas ── */
     #grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -40,7 +75,7 @@
     }
     .card { background: #1a1a1a; border-radius: 10px; padding: 16px; }
     .card-title {
-      font-size: 13px; font-weight: bold; text-transform: uppercase;
+      font-size: 12px; text-transform: uppercase;
       letter-spacing: 1px; margin-bottom: 12px;
     }
     .field-row {
@@ -48,16 +83,17 @@
       padding: 6px 0; border-bottom: 1px solid #2a2a2a;
     }
     .field-row:last-child { border-bottom: none; }
-    .field-label { font-size: 13px; color: #aaa; }
-    .field-value { font-size: 18px; font-weight: bold; color: #f0f0f0; }
+    .field-label { font-size: 12px; color: #aaa; }
+    .field-value { font-size: 18px; color: #f0f0f0; }
     .field-unit  { font-size: 11px; color: #666; margin-left: 4px; }
 
+    /* ── Celdas ── */
     #cells-section {
       background: #1a1a1a; border-radius: 10px; padding: 16px;
       border-left: 4px solid #f39c12; margin-bottom: 24px;
     }
     #cells-title {
-      font-size: 13px; font-weight: bold; text-transform: uppercase;
+      font-size: 12px; text-transform: uppercase;
       letter-spacing: 1px; color: #f39c12; margin-bottom: 16px;
     }
     #cells-grid {
@@ -65,60 +101,106 @@
     }
     .cell-card { background: #222; border-radius: 6px; padding: 8px 10px; text-align: center; }
     .cell-name  { font-size: 10px; color: #666; margin-bottom: 4px; }
-    .cell-value { font-size: 16px; font-weight: bold; }
+    .cell-value { font-size: 15px; }
     .cell-ok    { color: #f0f0f0; }
     .cell-warn  { color: #e74c3c; }
+
+    /* ── Pestaña vacía ── */
+    .empty-tab {
+      color: #444; font-size: 12px; text-align: center;
+      padding: 60px; border: 1px dashed #2a2a2a; border-radius: 10px;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
 
+  <!-- Header -->
   <div id="header">
-    <div id="title">ESCUDERÍA FÉNIX — TELEMETRÍA</div>
-    <div style="display:flex; gap:24px; align-items:center;">
-      <div id="ws-indicator">
-        <div id="ws-dot"></div>
-        <span id="ws-label">Desconectado</span>
-      </div>
-      <div id="status-bar">Sin datos</div>
+    <div id="title">Sistema de Telemetria de Escudería Fénix UPIITA</div>
+  </div>
+  <div id="subheader">
+    <div id="ws-indicator">
+      <div id="ws-dot"></div>
+      <span id="ws-label">Desconectado</span>
     </div>
+    <div id="status-bar">Sin datos</div>
   </div>
 
-  <!-- Gráfica RPM + Throttle + Brake -->
-  <div class="chart-section" style="border-left: 4px solid #e74c3c;">
-    <div class="chart-title" style="color:#e74c3c;">📈 RPM / Throttle / Brake — 15 s</div>
-    <div class="chart-container"><canvas id="chart-control"></canvas></div>
+  <!-- Pestañas -->
+  <div class="tabs-bar">
+    <div class="tab" onclick="switchTab(0)">Principal</div>
+    <div class="tab" onclick="switchTab(1)">Tabla de Vueltas</div>
+    <div class="tab" onclick="switchTab(2)">Ploteo</div>
+    <div class="tab active" onclick="switchTab(3)">Prueba</div>
   </div>
 
-  <!-- Gráfica Corriente -->
-  <div class="chart-section" style="border-left: 4px solid #3498db;">
-    <div class="chart-title" style="color:#3498db;">⚡ Corriente Paquete — 15 s</div>
-    <div class="chart-container"><canvas id="chart-curr"></canvas></div>
+  <!-- Pestaña 0: Principal -->
+  <div id="tab-0" style="display:none;">
+    <div class="empty-tab">— Pestaña principal — en construcción —</div>
   </div>
 
-  <!-- Gráfica SOC -->
-  <div class="chart-section" style="border-left: 4px solid #27ae60;">
-    <div class="chart-title" style="color:#27ae60;">🔋 Estado de Carga (SOC) — 15 s</div>
-    <div class="chart-container"><canvas id="chart-soc"></canvas></div>
+  <!-- Pestaña 1: Tabla de vueltas -->
+  <div id="tab-1" style="display:none;">
+    <div class="empty-tab">— Tabla de vueltas — en construcción —</div>
   </div>
 
-  <!-- Variables numéricas -->
-  <div id="grid"></div>
-
-  <!-- Celdas -->
-  <div id="cells-section" style="display:none;">
-    <div id="cells-title">🔋 VOLTAJE DE CELDAS</div>
-    <div id="cells-grid"></div>
+  <!-- Pestaña 2: Ploteo -->
+  <div id="tab-2" style="display:none;">
+    <div class="empty-tab">— Ploteo — en construcción —</div>
   </div>
+
+  <!-- Pestaña 3: Prueba -->
+  <div id="tab-3">
+
+    <!-- Gráfica RPM + Throttle + Brake -->
+    <div class="chart-section" style="border-left: 4px solid #e74c3c;">
+      <div class="chart-title" style="color:#e74c3c;">RPM / Throttle / Brake — 15 s</div>
+      <div class="chart-container"><canvas id="chart-control"></canvas></div>
+    </div>
+
+    <!-- Gráfica Corriente -->
+    <div class="chart-section" style="border-left: 4px solid #3498db;">
+      <div class="chart-title" style="color:#3498db;">Corriente Paquete — 15 s</div>
+      <div class="chart-container"><canvas id="chart-curr"></canvas></div>
+    </div>
+
+    <!-- Gráfica SOC -->
+    <div class="chart-section" style="border-left: 4px solid #27ae60;">
+      <div class="chart-title" style="color:#27ae60;">Estado de Carga (SOC) — 15 s</div>
+      <div class="chart-container"><canvas id="chart-soc"></canvas></div>
+    </div>
+
+    <!-- Variables numéricas -->
+    <div id="grid"></div>
+
+    <!-- Celdas -->
+    <div id="cells-section" style="display:none;">
+      <div id="cells-title">Voltaje de Celdas</div>
+      <div id="cells-grid"></div>
+    </div>
+
+  </div><!-- fin tab-3 -->
 
 <script>
+// ── Pestañas ──────────────────────────────────────────────────────────────────
+const tabEls = document.querySelectorAll('.tab');
+function switchTab(i) {
+  tabEls.forEach((t, j) => {
+    t.classList.toggle('active', i === j);
+    document.getElementById('tab-' + j).style.display = i === j ? 'block' : 'none';
+  });
+}
+
+// ── Categorías ────────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { title: "🏎️ Velocidad & Motor", color: "#e74c3c", fields: [
+  { title: "Velocidad & Motor", color: "#e74c3c", fields: [
       { key: "speed_v",  label: "Velocidad",        unit: "km/h" },
       { key: "rpm",      label: "RPM",               unit: "rpm"  },
       { key: "mot_torq", label: "Torque Motor",      unit: "Nm"   },
       { key: "curr_rms", label: "Corriente RMS",     unit: "A"    },
   ]},
-  { title: "🔋 Batería HV", color: "#27ae60", fields: [
+  { title: "Batería HV", color: "#27ae60", fields: [
       { key: "soc",       label: "Estado de Carga",   unit: "%"  },
       { key: "volt_p",    label: "Voltaje Paquete",   unit: "V"  },
       { key: "curr_p",    label: "Corriente Paquete", unit: "A"  },
@@ -126,32 +208,32 @@ const CATEGORIES = [
       { key: "tmp_max",   label: "Temp. Max Celda",   unit: "°C" },
       { key: "tmp_min",   label: "Temp. Min Celda",   unit: "°C" },
   ]},
-  { title: "🌡️ Temperaturas", color: "#e67e22", fields: [
+  { title: "Temperaturas", color: "#e67e22", fields: [
       { key: "tmp_mot",  label: "Motor",       unit: "°C" },
       { key: "tmp_cont", label: "Controlador", unit: "°C" },
       { key: "tmp_cap",  label: "Capacitores", unit: "°C" },
   ]},
-  { title: "⚡ Auxiliar", color: "#8e44ad", fields: [
+  { title: "Auxiliar", color: "#8e44ad", fields: [
       { key: "volt_a",  label: "Voltaje Aux",        unit: "V" },
       { key: "curr_a",  label: "Corriente Aux",      unit: "A" },
       { key: "ksy_v",   label: "Voltaje KSY",        unit: "V" },
       { key: "cont_st", label: "Estado Controlador", unit: ""  },
   ]},
-  { title: "🕹️ Controles", color: "#2980b9", fields: [
+  { title: "Controles", color: "#2980b9", fields: [
       { key: "throttle", label: "Acelerador",  unit: "%" },
       { key: "brake",    label: "Freno Regen", unit: "%" },
       { key: "odo_veh",  label: "Odómetro",    unit: "m" },
   ]},
-  { title: "📍 GPS", color: "#16a085", fields: [
+  { title: "GPS", color: "#16a085", fields: [
       { key: "gps_lat", label: "Latitud",  unit: "°" },
       { key: "gps_lon", label: "Longitud", unit: "°" },
   ]},
-  { title: "📐 IMU – Acelerómetro", color: "#d35400", fields: [
+  { title: "IMU — Acelerómetro", color: "#d35400", fields: [
       { key: "acc_x", label: "Acc X", unit: "g" },
       { key: "acc_y", label: "Acc Y", unit: "g" },
       { key: "acc_z", label: "Acc Z", unit: "g" },
   ]},
-  { title: "🔄 IMU – Giroscopio", color: "#c0392b", fields: [
+  { title: "IMU — Giroscopio", color: "#c0392b", fields: [
       { key: "gyro_x", label: "Gyro X", unit: "°/s" },
       { key: "gyro_y", label: "Gyro Y", unit: "°/s" },
       { key: "gyro_z", label: "Gyro Z", unit: "°/s" },
@@ -194,35 +276,32 @@ CATEGORIES.forEach(cat => {
 
 // ── Gráficas ──────────────────────────────────────────────────────────────────
 const WINDOW_MS = 15000;
-
 const X_OPTS = {
   type: "time",
   time: { unit: "second", displayFormats: { second: "HH:mm:ss" } },
-  ticks: { color: "#aaa", maxTicksLimit: 15 },
-  grid:  { color: "#222" },
+  ticks: { color: "#aaa", maxTicksLimit: 15, font: { family: "'Share Tech Mono'" } },
+  grid: { color: "#222" },
 };
 
-// Gráfica RPM + Throttle + Brake (dos ejes Y)
 const ctxControl = document.getElementById("chart-control").getContext("2d");
 const chartControl = new Chart(ctxControl, {
   type: "line",
   data: { datasets: [
-    { label: "RPM",      data: [], borderColor: "#e74c3c", backgroundColor: "rgba(231,76,60,0.06)",   borderWidth: 2, pointRadius: 0, fill: true,  tension: 0, yAxisID: "yRpm"      },
-    { label: "Throttle", data: [], borderColor: "#27ae60", backgroundColor: "rgba(39,174,96,0.0)",    borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent"  },
-    { label: "Brake",    data: [], borderColor: "#e67e22", backgroundColor: "rgba(230,126,34,0.0)",   borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent"  },
+    { label: "RPM",      data: [], borderColor: "#e74c3c", backgroundColor: "rgba(231,76,60,0.06)",  borderWidth: 2, pointRadius: 0, fill: true,  tension: 0, yAxisID: "yRpm"     },
+    { label: "Throttle", data: [], borderColor: "#27ae60", backgroundColor: "rgba(39,174,96,0.0)",   borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent" },
+    { label: "Brake",    data: [], borderColor: "#e67e22", backgroundColor: "rgba(230,126,34,0.0)",  borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent" },
   ]},
   options: {
     animation: false, responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: true, labels: { color: "#aaa", boxWidth: 12 } } },
+    plugins: { legend: { display: true, labels: { color: "#aaa", boxWidth: 12, font: { family: "'Share Tech Mono'" } } } },
     scales: {
       x: X_OPTS,
-      yRpm:     { position: "left",  title: { display: true, text: "RPM", color: "#e74c3c" }, ticks: { color: "#e74c3c" }, grid: { color: "#222" }, min: 0, max: 5000 },
-      yPercent: { position: "right", title: { display: true, text: "%",   color: "#aaa"    }, ticks: { color: "#aaa"    }, grid: { drawOnChartArea: false }, min: 0, max: 100 },
+      yRpm:     { position: "left",  title: { display: true, text: "RPM", color: "#e74c3c", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#e74c3c", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: 0, max: 5000 },
+      yPercent: { position: "right", title: { display: true, text: "%",   color: "#aaa",    font: { family: "'Share Tech Mono'" } }, ticks: { color: "#aaa",    font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0, max: 100 },
     }
   }
 });
 
-// Gráfica Corriente
 const ctxCurr = document.getElementById("chart-curr").getContext("2d");
 const chartCurr = new Chart(ctxCurr, {
   type: "line",
@@ -230,11 +309,10 @@ const chartCurr = new Chart(ctxCurr, {
   options: {
     animation: false, responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false } },
-    scales: { x: X_OPTS, y: { title: { display: true, text: "A", color: "#aaa" }, ticks: { color: "#aaa" }, grid: { color: "#222" }, min: -150, max: 150 } }
+    scales: { x: X_OPTS, y: { title: { display: true, text: "A", color: "#aaa", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#aaa", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: -150, max: 150 } }
   }
 });
 
-// Gráfica SOC
 const ctxSoc = document.getElementById("chart-soc").getContext("2d");
 const chartSoc = new Chart(ctxSoc, {
   type: "line",
@@ -242,7 +320,7 @@ const chartSoc = new Chart(ctxSoc, {
   options: {
     animation: false, responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false } },
-    scales: { x: X_OPTS, y: { title: { display: true, text: "%", color: "#aaa" }, ticks: { color: "#aaa" }, grid: { color: "#222" }, min: 0, max: 100 } }
+    scales: { x: X_OPTS, y: { title: { display: true, text: "%", color: "#aaa", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#aaa", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: 0, max: 100 } }
   }
 });
 
@@ -259,10 +337,8 @@ function updateCharts(timestamp, data) {
   pushDataset(chartControl, 1, timestamp, data.throttle || 0);
   pushDataset(chartControl, 2, timestamp, data.brake    || 0);
   chartControl.update("none");
-
   pushDataset(chartCurr, 0, timestamp, data.curr_p || 0);
   chartCurr.update("none");
-
   pushDataset(chartSoc, 0, timestamp, data.soc || 0);
   chartSoc.update("none");
 }
@@ -291,11 +367,9 @@ function connect() {
 
 function updateDashboard(payload) {
   const data = payload.data || {};
-
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // Valores numéricos
   CATEGORIES.forEach(cat => {
     cat.fields.forEach(f => {
       const el = document.getElementById(`val-${f.key}`);
@@ -306,10 +380,8 @@ function updateDashboard(payload) {
     });
   });
 
-  // Gráficas
   updateCharts(payload.timestamp, data);
 
-  // Celdas
   const cells = data.cells || {};
   const cellKeys = Object.keys(cells).sort();
   if (cellKeys.length > 0) {
