@@ -2,6 +2,7 @@
 fenix_backend.py  –  Escudería Fénix
 - Escucha MQTT y guarda en InfluxDB
 - Calcula variables derivadas del tren motriz
+- Calcula orientación (Roll/Pitch) y aceleraciones compensadas (dinámica vehicular)
 - Empuja cada snapshot a fenix_api via HTTP POST (RAM)
 """
 
@@ -44,8 +45,11 @@ DT              = 0.1     # s   — intervalo entre snapshots (10 Hz)
 Q_NOM_AUX = 100.0   # Ah
 E_NOM_AUX = 1280.0  # Wh (12.8V × 100Ah)
 
+# ─── Constantes IMU ───────────────────────────────────────────────────────────
+ALPHA_CF = 0.98   # Coeficiente filtro complementario
+G_CONST  = 9.81   # m/s²
+
 # Curva OCV vs SOC para LiFePO4 4S (celdas EVE 2.8V-3.65V)
-# Interpolación lineal por tramos
 AUX_OCV_TABLE = [
     (11.2, 0.0),
     (12.0, 5.0),
@@ -76,31 +80,38 @@ _session_id_prev  = None
 _E_HV             = 0.0
 _Q_HV             = 0.0
 _E_regen          = 0.0
-_E_aux            = 0.0   # Wh — energía auxiliar acumulada
-_Q_aux            = 0.0   # Ah — carga auxiliar acumulada
-_soc0_aux         = None  # % — SOC inicial auxiliar (OCV al inicio de sesión)
-_aux_muestras     = []    # lista de (curr_a, volt_a) — primeras 4 muestras a 1Hz
-_aux_ultimo_t     = None  # timestamp de la última muestra tomada
+_E_aux            = 0.0
+_Q_aux            = 0.0
+_soc0_aux         = None
+_aux_muestras     = []
+_aux_ultimo_t     = None
 
 # ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
-_v_rest_pack      = None          # V — voltaje paquete en reposo
-_v_rest_cells     = [None] * 16   # V — voltaje por celda en reposo
-_t_reposo_inicio  = None          # timestamp cuando empieza el reposo
-_en_reposo        = False         # True cuando |curr_p| < I_MIN
+_v_rest_pack      = None
+_v_rest_cells     = [None] * 16
+_t_reposo_inicio  = None
+_en_reposo        = False
 
 # ─── Variables SOH (RAM) ─────────────────────────────────────────────────────
-_soh_c            = None    # % — último SOH calculado
-_soh_Q_SOH        = 0.0     # Ah — Coulombs acumulados para medición SOH
-_soh_soc_inicio   = None    # % — SOC al inicio del intervalo SOH
-_soh_t_ultimo     = None    # timestamp del último snapshot con |curr_p| > I_MIN
-_soh_activo       = False   # True cuando hay un intervalo SOH en curso
+_soh_c            = None
+_soh_Q_SOH        = 0.0
+_soh_soc_inicio   = None
+_soh_t_ultimo     = None
+_soh_activo       = False
+
+# ─── Variables filtro complementario IMU (RAM) ───────────────────────────────
+_phi_rad   = 0.0   # Roll acumulado [rad]
+_theta_rad = 0.0   # Pitch acumulado [rad]
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
 
+
 # ─── Cálculo de variables derivadas ──────────────────────────────────────────
 def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
+    global _phi_rad, _theta_rad
+
     curr_rms   = float(data.get("curr_rms", 0))
     rpm        = abs(float(data.get("rpm",  0)))
     volt_p     = float(data.get("volt_p",  0))
@@ -142,6 +153,50 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         else:
             r_cells[f"r_cell_{i+1}"] = None
 
+    # ── Orientación — filtro complementario ───────────────────────────────
+    # El MPU-6050 entrega acc en g y gyro en °/s
+    acc_x  = float(data.get("acc_x",  0))
+    acc_y  = float(data.get("acc_y",  0))
+    acc_z  = float(data.get("acc_z",  0))
+    gyro_x = float(data.get("gyro_x", 0))
+    gyro_y = float(data.get("gyro_y", 0))
+
+    # Ángulos del acelerómetro [rad]
+    phi_acc   = math.atan2(acc_y, acc_z)
+    theta_acc = math.atan2(-acc_x, math.sqrt(acc_y**2 + acc_z**2))
+
+    # Integración del giroscopio: gyro en °/s → rad/s → integrar con DT
+    gyro_x_rad = math.radians(gyro_x)
+    gyro_y_rad = math.radians(gyro_y)
+
+    phi_giro   = _phi_rad   + gyro_x_rad * DT
+    theta_giro = _theta_rad + gyro_y_rad * DT
+
+    # Filtro complementario [rad]
+    _phi_rad   = ALPHA_CF * phi_giro   + (1 - ALPHA_CF) * phi_acc
+    _theta_rad = ALPHA_CF * theta_giro + (1 - ALPHA_CF) * theta_acc
+
+    # Convertir a grados
+    phi_deg   = math.degrees(_phi_rad)
+    theta_deg = math.degrees(_theta_rad)
+
+    # ── Aceleraciones compensadas por gravedad ────────────────────────────
+    # acc_x/y/z viene en g → convertir a m/s² multiplicando por G_CONST
+    # Calcular componente gravitacional proyectada en cada eje del vehículo
+    gx = -G_CONST * math.sin(_theta_rad)
+    gy =  G_CONST * math.sin(_phi_rad) * math.cos(_theta_rad)
+    gz =  G_CONST * math.cos(_phi_rad) * math.cos(_theta_rad)
+
+    # Aceleración dinámica real [m/s²]
+    ax_veh = (acc_x * G_CONST) - gx
+    ay_veh = (acc_y * G_CONST) - gy
+    az_veh = (acc_z * G_CONST) - gz
+
+    # Expresar en G (dividir entre 9.81)
+    Gx = ax_veh / G_CONST
+    Gy = ay_veh / G_CONST
+    Gz = az_veh / G_CONST
+
     return {
         "tau_est":    round(tau_est, 4),
         "p_mec":      round(p_mec,   2),
@@ -152,6 +207,13 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "E_HV_rest":  round(E_HV_rest, 2),
         "r_pack":     round(r_pack,  6) if r_pack  is not None else None,
         "r_cells":    r_cells,
+        # Orientación
+        "phi":        round(phi_deg,   4),
+        "theta":      round(theta_deg, 4),
+        # Aceleraciones compensadas
+        "Gx":         round(Gx, 4),
+        "Gy":         round(Gy, 4),
+        "Gz":         round(Gz, 4),
         # Acumulativas y SOH — se asignan en on_message
         "E_HV":    None,
         "Q_HV":    None,
@@ -163,6 +225,7 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "Q_aux":      None,
         "soc_aux":    None,
     }
+
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
 def on_connect(client, userdata, flags, rc, properties=None):
@@ -177,6 +240,7 @@ def on_message(client, userdata, msg):
     global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux, _soc0_aux, _aux_muestras, _aux_ultimo_t
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
+    global _phi_rad, _theta_rad
 
     try:
         data = json.loads(msg.payload.decode())
@@ -204,27 +268,27 @@ def on_message(client, userdata, msg):
             _soh_soc_inicio = None
             _soh_t_ultimo   = None
             _soh_activo     = False
+            # Reiniciar filtro complementario IMU
+            _phi_rad   = 0.0
+            _theta_rad = 0.0
 
         # ── 2. Lógica de reposo para V_rest (60 segundos) ─────────────────────
         now = time.time()
         if abs(curr_p) < I_MIN:
             if not _en_reposo:
-                # Empieza el reposo
                 _en_reposo        = True
                 _t_reposo_inicio  = now
             else:
-                # Ya estaba en reposo — verificar si ya pasaron 60s
                 if (now - _t_reposo_inicio) >= T_REPOSO:
                     _v_rest_pack  = volt_p
                     _v_rest_cells = [float(v) for v in cell_volts] if cell_volts else _v_rest_cells
         else:
-            # Salió del reposo
             _en_reposo = False
 
         # ── 3. Calcular variables derivadas ───────────────────────────────────
         derived = compute_derived(data, soc, curr_p)
 
-        # ── 4. Actualizar acumuladores ────────────────────────────────────────
+        # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -I_MIN and derived["p_hv"] is not None:
             _E_HV += derived["p_hv"] * DT / 3600.0
         if curr_p < -I_MIN:
@@ -237,15 +301,14 @@ def on_message(client, userdata, msg):
         derived["E_regen"] = round(_E_regen, 3)
 
         # ── 5. Sistema auxiliar ───────────────────────────────────────────────
-        volt_a    = float(data.get("volt_a",   0))
-        curr_a    = float(data.get("curr_a",   0))
-        p_aux     = volt_a * curr_a
-        _E_aux   += p_aux   * DT / 3600.0
-        _Q_aux   += curr_a  * DT / 3600.0
+        volt_a = float(data.get("volt_a", 0))
+        curr_a = float(data.get("curr_a", 0))
+        p_aux  = volt_a * curr_a
+        _E_aux += p_aux  * DT / 3600.0
+        _Q_aux += curr_a * DT / 3600.0
 
-        # SOC0 — tomar 4 muestras sincronizadas a 1Hz, usar la de menor corriente
+        # SOC0 auxiliar — 4 muestras a 1Hz, usar la de menor corriente
         if _soc0_aux is None and len(_aux_muestras) < 4:
-            # Tomar una muestra por segundo, solo si los valores son válidos
             if _aux_ultimo_t is None or (now - _aux_ultimo_t) >= 1.0:
                 if curr_a > 0.0 and volt_a > 10.0:
                     _aux_muestras.append((curr_a, volt_a))
@@ -253,9 +316,8 @@ def on_message(client, userdata, msg):
                     print(f"[AUX] Muestra {len(_aux_muestras)}/4 — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
                 else:
                     print(f"[AUX] Muestra descartada — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
-                    _aux_ultimo_t = now  # avanzar el timer aunque se descarte
+                    _aux_ultimo_t = now
 
-            # Cuando se tienen las 4, buscar la de menor corriente
             if len(_aux_muestras) == 4:
                 min_curr, volt_ocv = min(_aux_muestras, key=lambda x: x[0])
                 _soc0_aux = ocv_to_soc_aux(volt_ocv)
@@ -271,46 +333,41 @@ def on_message(client, userdata, msg):
         derived["Q_aux"]   = round(_Q_aux,  4)
         derived["soc_aux"] = round(soc_aux, 2) if soc_aux is not None else None
 
-        # ── 5. Lógica SOH ─────────────────────────────────────────────────────
+        # ── 6. Lógica SOH ─────────────────────────────────────────────────────
         if curr_p < -I_MIN:
-            # Hay descarga activa
             if not _soh_activo:
-                # Inicio de nuevo intervalo SOH
                 _soh_activo     = True
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
                 print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%", flush=True)
             elif _soh_soc_inicio is not None and _soh_soc_inicio < 1.0 and soc > 1.0:
-                # Corregir SOC_inicio si llegó como casi 0 por reinicio del backend
                 _soh_soc_inicio = soc
                 _soh_Q_SOH      = 0.0
                 print(f"[SOH] SOC_inicio corregido a {soc:.1f}%", flush=True)
 
-            # Verificar gap — si el último snapshot con descarga fue hace más de 10 min
             if _soh_t_ultimo is not None and (now - _soh_t_ultimo) > T_GAP_MAX:
-                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — intervalo inválido, reiniciando", flush=True)
+                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — reiniciando", flush=True)
                 _soh_activo     = False
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
             else:
-                # Acumular Coulombs para SOH
                 _soh_Q_SOH += abs(curr_p) * DT / 3600.0
 
             _soh_t_ultimo = now
 
-            # Verificar si ya se descargó el 30%
             if _soh_soc_inicio is not None:
                 delta_soc = _soh_soc_inicio - soc
                 if delta_soc >= SOC_MIN_DELTA:
                     Q_teorico = Q_NOM * (delta_soc / 100.0)
                     _soh_c    = round((_soh_Q_SOH / Q_teorico) * 100.0, 2)
                     print(f"[SOH] Calculado — ΔSoC={delta_soc:.1f}% Q_real={_soh_Q_SOH:.3f}Ah Q_teo={Q_teorico:.3f}Ah SOH={_soh_c:.2f}%", flush=True)
-                    # Reiniciar para el siguiente intervalo
                     _soh_activo     = False
                     _soh_Q_SOH      = 0.0
                     _soh_soc_inicio = None
 
         derived["soh_c"] = round(_soh_c, 2) if _soh_c is not None else None
+
+        # ── 7. Escribir en InfluxDB ───────────────────────────────────────────
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
             tzinfo=timezone(timedelta(hours=-6))
         )
@@ -348,6 +405,7 @@ def on_message(client, userdata, msg):
             .field("gyro_z",    float(data.get("gyro_z",    0)))
             .field("volt_a",    float(data.get("volt_a",    0)))
             .field("curr_a",    float(data.get("curr_a",    0)))
+            # Derivadas siempre presentes
             .field("tau_est",   derived["tau_est"])
             .field("p_mec",     derived["p_mec"])
             .field("E_HV",      derived["E_HV"])
@@ -355,7 +413,19 @@ def on_message(client, userdata, msg):
             .field("E_regen",   derived["E_regen"])
             .field("Q_HV_rest", derived["Q_HV_rest"])
             .field("E_HV_rest", derived["E_HV_rest"])
+            .field("p_aux",     derived["p_aux"])
+            .field("E_aux",     derived["E_aux"])
+            .field("Q_aux",     derived["Q_aux"])
+            # Orientación y aceleraciones compensadas
+            .field("phi",       derived["phi"])
+            .field("theta",     derived["theta"])
+            .field("Gx",        derived["Gx"])
+            .field("Gy",        derived["Gy"])
+            .field("Gz",        derived["Gz"])
         )
+
+        if derived["soc_aux"] is not None:
+            point = point.field("soc_aux", derived["soc_aux"])
 
         # Campos condicionales
         if derived["p_hv"]    is not None: point = point.field("p_hv",    derived["p_hv"])
@@ -363,17 +433,10 @@ def on_message(client, userdata, msg):
         if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
         if derived["r_pack"]  is not None: point = point.field("r_pack",  derived["r_pack"])
         if derived["soh_c"]   is not None: point = point.field("soh_c",   derived["soh_c"])
-        point = (point
-            .field("p_aux",   derived["p_aux"])
-            .field("E_aux",   derived["E_aux"])
-            .field("Q_aux",   derived["Q_aux"])
-            .field("soc_aux", derived["soc_aux"])
-        )
 
         for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
 
-        # Resistencias por celda — condicionales
         for i in range(16):
             key = f"r_cell_{i+1}"
             val = derived["r_cells"].get(key)
@@ -383,7 +446,7 @@ def on_message(client, userdata, msg):
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
         print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
 
-        # ── 6. Empaquetar snapshot para fenix_api ─────────────────────────────
+        # ── 8. Empaquetar snapshot para fenix_api ─────────────────────────────
         snapshot = {
             "timestamp":  data.get("times"),
             "vehicle_id": str(data.get("veh_id", 25)),
@@ -417,8 +480,8 @@ def on_message(client, userdata, msg):
                 "gyro_z":    float(data.get("gyro_z",    0)),
                 "volt_a":    float(data.get("volt_a",    0)),
                 "curr_a":    float(data.get("curr_a",    0)),
-                "cells": {f"cell_{i+1}": float(v)
-                          for i, v in enumerate(cell_volts)},
+                "cells": {f"cell_{i+1}": float(v) for i, v in enumerate(cell_volts)},
+                # Derivadas tren motriz
                 "tau_est":    derived["tau_est"],
                 "p_mec":      derived["p_mec"],
                 "p_hv":       derived["p_hv"],
@@ -435,16 +498,24 @@ def on_message(client, userdata, msg):
                 "soh_activo": _soh_activo,
                 "soh_Q_SOH":  round(_soh_Q_SOH, 4),
                 "soh_soc_inicio": _soh_soc_inicio,
+                # Auxiliar
                 "p_aux":      derived["p_aux"],
                 "E_aux":      derived["E_aux"],
                 "Q_aux":      derived["Q_aux"],
                 "soc_aux":    derived["soc_aux"],
+                # Reposo
                 "v_rest_pack": _v_rest_pack,
                 "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
+                # Orientación y aceleraciones compensadas
+                "phi":        derived["phi"],
+                "theta":      derived["theta"],
+                "Gx":         derived["Gx"],
+                "Gy":         derived["Gy"],
+                "Gz":         derived["Gz"],
             }
         }
 
-        # ── 7. Empujar a fenix_api ────────────────────────────────────────────
+        # ── 9. Empujar a fenix_api ────────────────────────────────────────────
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
@@ -452,6 +523,7 @@ def on_message(client, userdata, msg):
 
     except Exception as e:
         print(f"[ERROR on_message] {e}")
+
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():

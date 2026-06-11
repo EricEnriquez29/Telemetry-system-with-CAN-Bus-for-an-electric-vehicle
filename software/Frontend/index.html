@@ -47,10 +47,11 @@
     .cell-ok    { color: #f0f0f0; }
     .cell-warn  { color: #e74c3c; }
     .empty-tab { color: #444; font-size: 12px; text-align: center; padding: 60px; border: 1px dashed #2a2a2a; border-radius: 10px; letter-spacing: 1px; }
-    /* Derivadas */
+    .derived-note { font-size: 11px; color: #555; margin-top: 8px; letter-spacing: 0.5px; }
     #derived-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
     @media (max-width: 700px) { #derived-grid { grid-template-columns: 1fr; } }
-    .derived-note { font-size: 11px; color: #555; margin-top: 8px; letter-spacing: 0.5px; }
+    .value-positive { color: #27ae60; }
+    .value-negative { color: #e74c3c; }
   </style>
 </head>
 <body>
@@ -86,57 +87,105 @@
     <div class="empty-tab">— Ploteo — en construcción —</div>
   </div>
 
-  <!-- Pestaña 3: Derivadas Prueba -->
+  <!-- Pestaña 3: Derivadas Prueba — Dinámica Vehicular -->
   <div id="tab-3" style="display:none;">
-
-    <!-- Gráfica auxiliar -->
-    <div class="chart-section" style="border-left: 4px solid #f39c12;">
-      <div class="chart-title" style="color:#f39c12;">Sistema Auxiliar — 15 s</div>
-      <div class="chart-container"><canvas id="chart-aux"></canvas></div>
-    </div>
 
     <div id="derived-grid">
 
-      <!-- Variables MQTT de entrada auxiliar -->
-      <div class="card" style="border-left: 4px solid #3498db;">
-        <div class="card-title" style="color:#3498db;">Variables MQTT — Entradas Auxiliar</div>
+      <!-- Entradas IMU crudas -->
+      <div class="card" style="border-left:4px solid #3498db;">
+        <div class="card-title" style="color:#3498db;">Entradas IMU — MPU-6050 (crudas)</div>
         <div class="field-row">
-          <span class="field-label">Voltaje Aux</span>
-          <span><span class="field-value" id="dval-in-volt_a">—</span><span class="field-unit">V</span></span>
+          <span class="field-label">Acc X</span>
+          <span><span class="field-value" id="dval-in-acc_x">—</span><span class="field-unit">g</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Corriente Aux</span>
-          <span><span class="field-value" id="dval-in-curr_a">—</span><span class="field-unit">A</span></span>
+          <span class="field-label">Acc Y</span>
+          <span><span class="field-value" id="dval-in-acc_y">—</span><span class="field-unit">g</span></span>
         </div>
-        <div class="derived-note">
-          LiFePO4 4S Humsienk 100Ah<br>
-          Rango: 11.2V (0%) — 14.6V (100%)
+        <div class="field-row">
+          <span class="field-label">Acc Z</span>
+          <span><span class="field-value" id="dval-in-acc_z">—</span><span class="field-unit">g</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gyro X</span>
+          <span><span class="field-value" id="dval-in-gyro_x">—</span><span class="field-unit">°/s</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gyro Y</span>
+          <span><span class="field-value" id="dval-in-gyro_y">—</span><span class="field-unit">°/s</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gyro Z</span>
+          <span><span class="field-value" id="dval-in-gyro_z">—</span><span class="field-unit">°/s</span></span>
         </div>
       </div>
 
-      <!-- Variables derivadas auxiliar -->
-      <div class="card" style="border-left: 4px solid #f39c12;">
-        <div class="card-title" style="color:#f39c12;">Sistema Auxiliar — Derivadas</div>
+      <!-- Orientación estimada -->
+      <div class="card" style="border-left:4px solid #ef5e20;">
+        <div class="card-title" style="color:#ef5e20;">Orientación — Filtro Complementario (α = 0.98)</div>
         <div class="field-row">
-          <span class="field-label">Potencia auxiliar</span>
-          <span><span class="field-value" id="dval-p_aux">—</span><span class="field-unit">W</span></span>
+          <span class="field-label">Roll φ</span>
+          <span><span class="field-value" id="dval-phi">—</span><span class="field-unit">°</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Energía consumida</span>
-          <span><span class="field-value" id="dval-E_aux">—</span><span class="field-unit">Wh</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Carga consumida</span>
-          <span><span class="field-value" id="dval-Q_aux">—</span><span class="field-unit">Ah</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">SOC estimado</span>
-          <span><span class="field-value" id="dval-soc_aux">—</span><span class="field-unit">%</span></span>
+          <span class="field-label">Pitch θ</span>
+          <span><span class="field-value" id="dval-theta">—</span><span class="field-unit">°</span></span>
         </div>
         <div class="derived-note">
-          SOC estimado por OCV + Coulomb counting<br>
-          E_aux y Q_aux acumulan desde inicio de sesión
+          98% giroscopio + 2% acelerómetro<br>
+          τ ≈ 4.9 s — corrección de deriva cada ~5 s<br><br>
+          En reposo con acc_x=−0.17, acc_y=0.01, acc_z=1.00:<br>
+          φ esperado ≈ 0.57°&nbsp;&nbsp;&nbsp;θ esperado ≈ 9.65°
         </div>
+      </div>
+
+      <!-- Aceleraciones compensadas -->
+      <div class="card" style="border-left:4px solid #27ae60;">
+        <div class="card-title" style="color:#27ae60;">Aceleraciones Compensadas por Gravedad</div>
+        <div class="field-row">
+          <span class="field-label">Gx — longitudinal</span>
+          <span><span class="field-value" id="dval-Gx">—</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gy — lateral</span>
+          <span><span class="field-value" id="dval-Gy">—</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gz — vertical</span>
+          <span><span class="field-value" id="dval-Gz">—</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="derived-note">
+          acc crudo (m/s²) − componente gravitacional proyectada<br>
+          dividido entre 9.81 m/s² para expresar en G<br><br>
+          En reposo plano: Gx ≈ 0.00 &nbsp; Gy ≈ 0.00 &nbsp; Gz ≈ 0.00
+        </div>
+      </div>
+
+      <!-- Valores esperados en reposo -->
+      <div class="card" style="border-left:4px solid #8e44ad;">
+        <div class="card-title" style="color:#8e44ad;">Referencia — Valores Esperados en Reposo</div>
+        <div class="field-row">
+          <span class="field-label">φ esperado</span>
+          <span><span class="field-value" style="color:#8e44ad;">0.57</span><span class="field-unit">°</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">θ esperado</span>
+          <span><span class="field-value" style="color:#8e44ad;">9.65</span><span class="field-unit">°</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gx esperado</span>
+          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gy esperado</span>
+          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Gz esperado</span>
+          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
+        </div>
+        <div class="derived-note">Calculados con acc_x=−0.17, acc_y=0.01, acc_z=1.00</div>
       </div>
 
     </div>
@@ -279,38 +328,6 @@ function pushDataset(chart, datasetIndex, timestamp, value) {
   while (ds.data.length > 0 && ds.data[0].x < cutoff) ds.data.shift();
 }
 
-// ── Gráfica Sistema Auxiliar ──────────────────────────────────────────────────
-const ctxAux = document.getElementById("chart-aux").getContext("2d");
-const chartAux = new Chart(ctxAux, {
-  type: "line",
-  data: { datasets: [
-    { label: "Voltaje (V)",  data: [], borderColor: "#f39c12", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yVolt" },
-    { label: "Corriente (A)",data: [], borderColor: "#3498db", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yCurr" },
-    { label: "SOC (%)",      data: [], borderColor: "#27ae60", backgroundColor: "rgba(39,174,96,0.06)", borderWidth: 2, pointRadius: 0, fill: true, tension: 0, yAxisID: "yPct" },
-    { label: "Q_aux (Ah)",   data: [], borderColor: "#9b59b6", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yQ" },
-  ]},
-  options: {
-    animation: false, responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: true, labels: { color: "#aaa", boxWidth: 12, font: { family: "'Share Tech Mono'" } } } },
-    scales: {
-      x: X_OPTS,
-      yVolt: { position: "left",  title: { display: true, text: "V",  color: "#f39c12", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#f39c12", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: 11, max: 15 },
-      yCurr: { position: "right", title: { display: true, text: "A",  color: "#3498db", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#3498db", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0,  max: 20  },
-      yPct:  { position: "right", title: { display: true, text: "%",  color: "#27ae60", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#27ae60", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0,  max: 100 },
-      yQ:    { position: "right", title: { display: true, text: "Ah", color: "#9b59b6", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#9b59b6", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0  },
-    }
-  }
-});
-
-function updateAuxChart(timestamp, data) {
-  const vals = [data.volt_a, data.curr_a, data.soc_aux, data.Q_aux];
-  vals.forEach((val, idx) => {
-    if (val === null || val === undefined) return;
-    pushDataset(chartAux, idx, timestamp, val);
-  });
-  chartAux.update("none");
-}
-
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 
@@ -337,7 +354,7 @@ function updateDashboard(payload) {
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // Variables originales
+  // ── Variables originales (pestaña Prueba) ─────────────────────────────────
   CATEGORIES.forEach(cat => {
     cat.fields.forEach(f => {
       const el = document.getElementById(`val-${f.key}`);
@@ -352,135 +369,17 @@ function updateDashboard(payload) {
     });
   });
 
-  // Gráfica
+  // ── Gráfica RPM/Throttle/Brake ────────────────────────────────────────────
   pushDataset(chartControl, 0, payload.timestamp, data.rpm      || 0);
   pushDataset(chartControl, 1, payload.timestamp, data.throttle || 0);
   pushDataset(chartControl, 2, payload.timestamp, data.brake    || 0);
   chartControl.update("none");
 
-  // Variables MQTT de entrada para verificación
-  const MQTT_INPUTS = [];
-  MQTT_INPUTS.forEach(key => {
-    const el = document.getElementById(`dval-in-${key}`);
-    if (!el) return;
-    let val = data[key];
-    if (val !== undefined && val !== null) {
-      if (key === "rpm") val = Math.abs(val);
-      el.textContent = val.toFixed(2);
-    }
-  });
-
-  // Variables derivadas — null muestra "n/a" pero NO borra valor anterior
-  // excepción: eta y p_regen se limpian cuando cambia el modo tracción/regen
-  const DERIVED_KEYS = ["tau_est", "p_mec", "p_hv", "p_regen", "eta", "E_HV", "Q_HV", "E_regen", "Q_HV_rest", "E_HV_rest"];
-  DERIVED_KEYS.forEach(key => {
-    const el = document.getElementById(`dval-${key}`);
-    if (!el) return;
-    const val = data[key];
-    if (val !== null && val !== undefined) {
-      el.textContent = val.toFixed(2);
-      el.className = "field-value";
-    } else {
-      // Siempre limpiar a n/a cuando el backend manda null
-      el.textContent = "n/a";
-      el.className = "field-null";
-    }
-  });
-
-  // Sistema auxiliar
-  const AUX_KEYS = ["p_aux", "E_aux", "Q_aux", "soc_aux"];
-  AUX_KEYS.forEach(key => {
-    const el = document.getElementById(`dval-${key}`);
-    if (!el) return;
-    const val = data[key];
-    if (val !== null && val !== undefined) {
-      el.textContent = val.toFixed(2);
-      el.className = "field-value";
-    } else {
-      el.textContent = "n/a";
-      el.className = "field-null";
-    }
-  });
-
-  // Gráfica auxiliar
-  updateAuxChart(payload.timestamp, data);
-
-  // Entradas MQTT auxiliar
-  const volt_a_el = document.getElementById("dval-in-volt_a");
-  const curr_a_el = document.getElementById("dval-in-curr_a");
-  if (volt_a_el && data.volt_a != null) volt_a_el.textContent = data.volt_a.toFixed(3);
-  if (curr_a_el && data.curr_a != null) curr_a_el.textContent = data.curr_a.toFixed(2);
-
-  // Variables MQTT de entrada para resistencia
-  const volt_p_el = document.getElementById("dval-in-volt_p");
-  const curr_p_el = document.getElementById("dval-in-curr_p");
-  const v_rest_el = document.getElementById("dval-in-v_rest");
-  const t_rep_el  = document.getElementById("dval-in-t_reposo");
-  if (volt_p_el) volt_p_el.textContent = (data.volt_p  ?? "—").toFixed ? data.volt_p.toFixed(3)  : "—";
-  if (curr_p_el) curr_p_el.textContent = (data.curr_p  ?? "—").toFixed ? data.curr_p.toFixed(2)  : "—";
-  if (v_rest_el) v_rest_el.textContent = (data.v_rest_pack != null) ? data.v_rest_pack.toFixed(3) : "n/a";
-  if (t_rep_el)  t_rep_el.textContent  = (data.t_reposo_s ?? 0).toFixed(1);
-
-  // Resistencia paquete
-  const r_pack_el = document.getElementById("dval-r_pack");
-  if (r_pack_el) {
-    const rp = data.r_pack;
-    if (rp !== null && rp !== undefined) {
-      r_pack_el.textContent = rp.toFixed(6);
-      r_pack_el.className = "field-value";
-    } else {
-      r_pack_el.textContent = "n/a";
-      r_pack_el.className = "field-null";
-    }
-  }
-
-  // Resistencias por celda — crear dinámicamente si no existen
-  const r_cells = data.r_cells || {};
-  const rContainer = document.getElementById("r-cells-container");
-  if (rContainer) {
-    for (let i = 1; i <= 16; i++) {
-      const key = `r_cell_${i}`;
-      const val = r_cells[key];
-      let rowEl = document.getElementById(`row-${key}`);
-      if (!rowEl) {
-        rowEl = document.createElement("div");
-        rowEl.className = "field-row";
-        rowEl.id = `row-${key}`;
-        const lbl = document.createElement("span");
-        lbl.className = "field-label";
-        lbl.textContent = `R Celda ${i}`;
-        const valWrap = document.createElement("span");
-        const valEl = document.createElement("span");
-        valEl.className = "field-value";
-        valEl.id = `dval-${key}`;
-        valEl.textContent = "—";
-        const unitEl = document.createElement("span");
-        unitEl.className = "field-unit";
-        unitEl.textContent = " Ω";
-        valWrap.appendChild(valEl);
-        valWrap.appendChild(unitEl);
-        rowEl.appendChild(lbl);
-        rowEl.appendChild(valWrap);
-        rContainer.appendChild(rowEl);
-      }
-      const valEl = document.getElementById(`dval-${key}`);
-      if (valEl) {
-        if (val !== null && val !== undefined) {
-          valEl.textContent = val.toFixed(6);
-          valEl.className = "field-value";
-        } else {
-          valEl.textContent = "n/a";
-          valEl.className = "field-null";
-        }
-      }
-    }
-  }
-
-  // Celdas — ordenadas numéricamente
+  // ── Celdas ────────────────────────────────────────────────────────────────
   const cells = data.cells || {};
-  const cellKeys = Object.keys(cells).sort((a, b) => {
-    return parseInt(a.replace("cell_", "")) - parseInt(b.replace("cell_", ""));
-  });
+  const cellKeys = Object.keys(cells).sort((a, b) =>
+    parseInt(a.replace("cell_", "")) - parseInt(b.replace("cell_", ""))
+  );
   if (cellKeys.length > 0) {
     document.getElementById("cells-section").style.display = "block";
     const cellGrid = document.getElementById("cells-grid");
@@ -506,6 +405,28 @@ function updateDashboard(payload) {
       valEl.className = "cell-value " + ((val < 3.0 || val > 4.2) ? "cell-warn" : "cell-ok");
     });
   }
+
+  // ── Entradas IMU crudas (pestaña Derivadas Prueba) ────────────────────────
+  ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"].forEach(key => {
+    const el = document.getElementById(`dval-in-${key}`);
+    if (!el) return;
+    const val = data[key];
+    if (val != null) el.textContent = val.toFixed(3);
+  });
+
+  // ── Orientación y aceleraciones compensadas ───────────────────────────────
+  ["phi", "theta", "Gx", "Gy", "Gz"].forEach(key => {
+    const el = document.getElementById(`dval-${key}`);
+    if (!el) return;
+    const val = data[key];
+    if (val != null) {
+      el.textContent = val.toFixed(4);
+      el.className = "field-value";
+    } else {
+      el.textContent = "n/a";
+      el.className = "field-null";
+    }
+  });
 }
 
 connect();
