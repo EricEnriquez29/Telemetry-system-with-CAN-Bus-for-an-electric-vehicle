@@ -1,14 +1,12 @@
 """
 fenix_backend.py  –  Escudería Fénix
 - Escucha MQTT y guarda en InfluxDB
+- Calcula variables derivadas del tren motriz
 - Empuja cada snapshot a fenix_api via HTTP POST (RAM)
-
-Uso:
-    pip install paho-mqtt influxdb-client requests
-    python fenix_backend.py
 """
 
 import json
+import math
 import requests
 from datetime import datetime, timezone, timedelta
 import paho.mqtt.client as mqtt
@@ -31,9 +29,46 @@ INFLUX_BUCKET = "Telemetria"
 # ─── URL interna de fenix_api ─────────────────────────────────────────────────
 API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
 
+# ─── Constantes del motor ─────────────────────────────────────────────────────
+KT = 0.143  # Nm/A — constante de torque ME MAX 6kW
+
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
+
+# ─── Cálculo de variables derivadas ──────────────────────────────────────────
+def compute_derived(data: dict) -> dict:
+    curr_rms = float(data.get("curr_rms", 0))
+    rpm      = float(data.get("rpm",      0))
+    volt_p   = float(data.get("volt_p",   0))
+    curr_p   = float(data.get("curr_p",   0))
+
+    # Torque estimado: τ_est = Kt × curr_rms [Nm]
+    tau_est = KT * curr_rms
+
+    # Potencia mecánica: P_mec = τ_est × (2π × rpm / 60) [W]
+    p_mec = tau_est * (2 * math.pi * rpm / 60)
+
+    # Potencia eléctrica HV: P_HV = volt_p × curr_p [W]
+    # curr_p positivo = regeneración (BMS Daly), negativo = tracción
+    p_hv = volt_p * curr_p
+
+    # Potencia regenerativa: válida solo cuando curr_p > 0
+    p_regen = (volt_p * curr_p) if curr_p > 0 else None
+
+    # Eficiencia: válida solo cuando P_HV > 300W y curr_p < 0 (tracción)
+    if p_hv > 300 and curr_p < 0:
+        eta = (p_mec / p_hv) * 100
+    else:
+        eta = None
+
+    return {
+        "tau_est": round(tau_est, 4),
+        "p_mec":   round(p_mec,   2),
+        "p_hv":    round(p_hv,    2),
+        "p_regen": round(p_regen, 2) if p_regen is not None else None,
+        "eta":     round(eta,     2) if eta     is not None else None,
+    }
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
 def on_connect(client, userdata, flags, rc, properties=None):
@@ -48,7 +83,10 @@ def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())
 
-        # ── 1. Guardar en InfluxDB ────────────────────────────────────────────
+        # ── 1. Calcular variables derivadas ───────────────────────────────────
+        derived = compute_derived(data)
+
+        # ── 2. Guardar en InfluxDB ────────────────────────────────────────────
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
             tzinfo=timezone(timedelta(hours=-6))
         )
@@ -86,7 +124,17 @@ def on_message(client, userdata, msg):
             .field("gyro_z",    float(data.get("gyro_z",    0)))
             .field("volt_a",    float(data.get("volt_a",    0)))
             .field("curr_a",    float(data.get("curr_a",    0)))
+            # Variables derivadas
+            .field("tau_est",   derived["tau_est"])
+            .field("p_mec",     derived["p_mec"])
+            .field("p_hv",      derived["p_hv"])
         )
+
+        # Campos condicionales — solo se escriben si tienen valor
+        if derived["p_regen"] is not None:
+            point = point.field("p_regen", derived["p_regen"])
+        if derived["eta"] is not None:
+            point = point.field("eta",     derived["eta"])
 
         for i, v in enumerate(data.get("cell_volts", [])):
             point = point.field(f"cell_{i+1}", float(v))
@@ -94,7 +142,7 @@ def on_message(client, userdata, msg):
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
         print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
 
-        # ── 2. Empaquetar snapshot para fenix_api ─────────────────────────────
+        # ── 3. Empaquetar snapshot para fenix_api ─────────────────────────────
         snapshot = {
             "timestamp":  data.get("times"),
             "vehicle_id": str(data.get("veh_id", 25)),
@@ -130,10 +178,16 @@ def on_message(client, userdata, msg):
                 "curr_a":    float(data.get("curr_a",    0)),
                 "cells": {f"cell_{i+1}": float(v)
                           for i, v in enumerate(data.get("cell_volts", []))},
+                # Variables derivadas
+                "tau_est":  derived["tau_est"],
+                "p_mec":    derived["p_mec"],
+                "p_hv":     derived["p_hv"],
+                "p_regen":  derived["p_regen"],
+                "eta":      derived["eta"],
             }
         }
 
-        # ── 3. Empujar a fenix_api ────────────────────────────────────────────
+        # ── 4. Empujar a fenix_api ────────────────────────────────────────────
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
