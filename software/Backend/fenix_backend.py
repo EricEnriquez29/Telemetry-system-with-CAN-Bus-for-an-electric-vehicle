@@ -53,12 +53,12 @@ def compute_derived(data: dict) -> dict:
     # curr_p positivo = regeneración (BMS Daly), negativo = tracción
     p_hv = volt_p * curr_p
 
-    # Potencia regenerativa: válida solo cuando curr_p > 0
-    p_regen = (volt_p * curr_p) if curr_p > 0 else None
+    # Potencia regenerativa: válida solo cuando curr_p > 5A (umbral anti-ruido)
+    p_regen = (volt_p * curr_p) if curr_p > 5.0 else None
 
-    # Eficiencia: válida solo cuando P_HV > 300W y curr_p < 0 (tracción)
-    if p_hv > 300 and curr_p < 0:
-        eta = (p_mec / p_hv) * 100
+    # Eficiencia: válida solo cuando |P_HV| > 300W y curr_p < -5A (tracción real)
+    if abs(p_hv) > 300 and curr_p < -5.0:
+        eta = (p_mec / abs(p_hv)) * 100
     else:
         eta = None
 
