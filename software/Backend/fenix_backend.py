@@ -79,6 +79,8 @@ _E_regen          = 0.0
 _E_aux            = 0.0   # Wh — energía auxiliar acumulada
 _Q_aux            = 0.0   # Ah — carga auxiliar acumulada
 _soc0_aux         = None  # % — SOC inicial auxiliar (OCV al inicio de sesión)
+_aux_muestras     = []    # lista de (curr_a, volt_a) — primeras 4 muestras a 1Hz
+_aux_ultimo_t     = None  # timestamp de la última muestra tomada
 
 # ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
 _v_rest_pack      = None          # V — voltaje paquete en reposo
@@ -172,7 +174,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
-    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux, _soc0_aux
+    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux, _soc0_aux, _aux_muestras, _aux_ultimo_t
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
 
@@ -192,9 +194,11 @@ def on_message(client, userdata, msg):
             _E_HV    = 0.0
             _Q_HV    = 0.0
             _E_regen = 0.0
-            _E_aux   = 0.0
-            _Q_aux   = 0.0
-            _soc0_aux = None
+            _E_aux        = 0.0
+            _Q_aux        = 0.0
+            _soc0_aux     = None
+            _aux_muestras = []
+            _aux_ultimo_t = None
             # Reiniciar SOH
             _soh_Q_SOH      = 0.0
             _soh_soc_inicio = None
@@ -239,10 +243,19 @@ def on_message(client, userdata, msg):
         _E_aux   += p_aux   * DT / 3600.0
         _Q_aux   += curr_a  * DT / 3600.0
 
-        # SOC0 se estima una sola vez por sesión con OCV (corriente baja)
-        if _soc0_aux is None and curr_a < 2.0:
-            _soc0_aux = ocv_to_soc_aux(volt_a)
-            print(f"[AUX] SOC0 estimado = {_soc0_aux:.1f}% (volt_a={volt_a:.3f}V)", flush=True)
+        # SOC0 — tomar 4 muestras sincronizadas a 1Hz, usar la de menor corriente
+        if _soc0_aux is None and len(_aux_muestras) < 4:
+            # Tomar una muestra por segundo
+            if _aux_ultimo_t is None or (now - _aux_ultimo_t) >= 1.0:
+                _aux_muestras.append((curr_a, volt_a))
+                _aux_ultimo_t = now
+                print(f"[AUX] Muestra {len(_aux_muestras)}/4 — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
+
+            # Cuando se tienen las 4, buscar la de menor corriente
+            if len(_aux_muestras) == 4:
+                min_curr, volt_ocv = min(_aux_muestras, key=lambda x: x[0])
+                _soc0_aux = ocv_to_soc_aux(volt_ocv)
+                print(f"[AUX] SOC0 = {_soc0_aux:.1f}% (volt_ocv={volt_ocv:.3f}V, curr_min={min_curr:.2f}A)", flush=True)
 
         if _soc0_aux is not None:
             soc_aux = max(0.0, _soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0)
