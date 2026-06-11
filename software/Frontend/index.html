@@ -47,7 +47,8 @@
     .cell-warn  { color: #e74c3c; }
     .empty-tab { color: #444; font-size: 12px; text-align: center; padding: 60px; border: 1px dashed #2a2a2a; border-radius: 10px; letter-spacing: 1px; }
     /* Derivadas */
-    #derived-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px; }
+    #derived-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
+    @media (max-width: 700px) { #derived-grid { grid-template-columns: 1fr; } }
     .derived-note { font-size: 11px; color: #555; margin-top: 8px; letter-spacing: 0.5px; }
   </style>
 </head>
@@ -88,9 +89,34 @@
   <div id="tab-3" style="display:none;">
     <div id="derived-grid">
 
-      <!-- Tren motriz eléctrico -->
+      <!-- Variables MQTT de entrada -->
+      <div class="card" style="border-left: 4px solid #3498db;">
+        <div class="card-title" style="color:#3498db;">Variables MQTT — Entradas</div>
+        <div class="field-row">
+          <span class="field-label">Corriente RMS</span>
+          <span><span class="field-value" id="dval-in-curr_rms">—</span><span class="field-unit">A</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">RPM</span>
+          <span><span class="field-value" id="dval-in-rpm">—</span><span class="field-unit">rpm</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Voltaje Paquete</span>
+          <span><span class="field-value" id="dval-in-volt_p">—</span><span class="field-unit">V</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Corriente Paquete</span>
+          <span><span class="field-value" id="dval-in-curr_p">—</span><span class="field-unit">A</span></span>
+        </div>
+        <div class="derived-note">
+          curr_p &gt; 0 → regeneración<br>
+          curr_p &lt; 0 → tracción
+        </div>
+      </div>
+
+      <!-- Variables derivadas -->
       <div class="card" style="border-left: 4px solid #e74c3c;">
-        <div class="card-title" style="color:#e74c3c;">Tren Motriz Eléctrico</div>
+        <div class="card-title" style="color:#e74c3c;">Variables Derivadas — Tren Motriz</div>
         <div class="field-row">
           <span class="field-label">Torque estimado</span>
           <span><span class="field-value" id="dval-tau_est">—</span><span class="field-unit">Nm</span></span>
@@ -300,18 +326,33 @@ function updateDashboard(payload) {
   pushDataset(chartControl, 2, payload.timestamp, data.brake    || 0);
   chartControl.update("none");
 
-  // Variables derivadas
+  // Variables MQTT de entrada para verificación
+  const MQTT_INPUTS = ["curr_rms", "rpm", "volt_p", "curr_p"];
+  MQTT_INPUTS.forEach(key => {
+    const el = document.getElementById(`dval-in-${key}`);
+    if (!el) return;
+    const val = data[key];
+    if (val !== undefined && val !== null) {
+      el.textContent = val.toFixed(2);
+    }
+  });
+
+  // Variables derivadas — null muestra "n/a" pero NO borra valor anterior
   const DERIVED_KEYS = ["tau_est", "p_mec", "p_hv", "p_regen", "eta"];
   DERIVED_KEYS.forEach(key => {
     const el = document.getElementById(`dval-${key}`);
     if (!el) return;
     const val = data[key];
-    if (val === null || val === undefined) {
-      el.textContent = "n/a";
-      el.className = "field-null";
-    } else {
+    if (val !== null && val !== undefined) {
       el.textContent = val.toFixed(2);
       el.className = "field-value";
+    } else if (val === null) {
+      // Solo muestra n/a si nunca ha tenido valor (texto es "—")
+      if (el.textContent === "—") {
+        el.textContent = "n/a";
+        el.className = "field-null";
+      }
+      // Si ya tenía un valor, lo mantiene sin parpadear
     }
   });
 
