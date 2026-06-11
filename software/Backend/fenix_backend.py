@@ -33,18 +33,51 @@ API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
 # ─── Constantes del motor y paquete ──────────────────────────────────────────
 KT              = 0.143   # Nm/A — constante de torque ME MAX 6kW
 E_NOM           = 5210.0  # Wh  — energía nominal 16S LiFePO4 100Ah
-Q_NOM           = 100.0   # Ah  — capacidad nominal
+Q_NOM           = 100.0   # Ah  — capacidad nominal HV
 I_MIN           = 10.0    # A   — umbral mínimo corriente
 T_REPOSO        = 60.0    # s   — segundos en reposo para actualizar V_rest
 T_GAP_MAX       = 600.0   # s   — gap máximo sin descarga para SOH (10 min)
 SOC_MIN_DELTA   = 30.0    # %   — descarga mínima para calcular SOH
 DT              = 0.1     # s   — intervalo entre snapshots (10 Hz)
 
+# ─── Constantes batería auxiliar (LiFePO4 4S Humsienk 100Ah) ─────────────────
+Q_NOM_AUX = 100.0   # Ah
+E_NOM_AUX = 1280.0  # Wh (12.8V × 100Ah)
+
+# Curva OCV vs SOC para LiFePO4 4S (celdas EVE 2.8V-3.65V)
+# Interpolación lineal por tramos
+AUX_OCV_TABLE = [
+    (11.2, 0.0),
+    (12.0, 5.0),
+    (12.8, 10.0),
+    (13.2, 20.0),
+    (13.3, 40.0),
+    (13.4, 60.0),
+    (13.6, 80.0),
+    (14.2, 95.0),
+    (14.6, 100.0),
+]
+
+def ocv_to_soc_aux(v: float) -> float:
+    """Interpola el SOC de la batería auxiliar dado su voltaje en circuito abierto."""
+    if v <= AUX_OCV_TABLE[0][0]:
+        return 0.0
+    if v >= AUX_OCV_TABLE[-1][0]:
+        return 100.0
+    for i in range(len(AUX_OCV_TABLE) - 1):
+        v0, s0 = AUX_OCV_TABLE[i]
+        v1, s1 = AUX_OCV_TABLE[i + 1]
+        if v0 <= v <= v1:
+            return s0 + (s1 - s0) * (v - v0) / (v1 - v0)
+    return 0.0
+
 # ─── Acumuladores por sesión (RAM) ────────────────────────────────────────────
 _session_id_prev  = None
 _E_HV             = 0.0
 _Q_HV             = 0.0
 _E_regen          = 0.0
+_E_aux            = 0.0   # Wh — energía auxiliar acumulada
+_Q_aux            = 0.0   # Ah — carga auxiliar acumulada
 
 # ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
 _v_rest_pack      = None          # V — voltaje paquete en reposo
@@ -121,6 +154,11 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "Q_HV":    None,
         "E_regen": None,
         "soh_c":   None,
+        # Auxiliar — se asignan en on_message
+        "p_aux":      None,
+        "E_aux":      None,
+        "Q_aux":      None,
+        "soc_aux":    None,
     }
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
@@ -153,6 +191,8 @@ def on_message(client, userdata, msg):
             _E_HV    = 0.0
             _Q_HV    = 0.0
             _E_regen = 0.0
+            _E_aux   = 0.0
+            _Q_aux   = 0.0
             # Reiniciar SOH
             _soh_Q_SOH      = 0.0
             _soh_soc_inicio = None
@@ -190,6 +230,20 @@ def on_message(client, userdata, msg):
         derived["Q_HV"]    = round(_Q_HV,    4)
         derived["E_regen"] = round(_E_regen, 3)
 
+        # ── 5. Sistema auxiliar ───────────────────────────────────────────────
+        volt_a    = float(data.get("volt_a",   0))
+        curr_a    = float(data.get("curr_a",   0))
+        p_aux     = volt_a * curr_a
+        _E_aux   += p_aux   * DT / 3600.0
+        _Q_aux   += curr_a  * DT / 3600.0
+        soc0_aux  = ocv_to_soc_aux(volt_a)
+        soc_aux   = max(0.0, soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0)
+
+        derived["p_aux"]   = round(p_aux,   2)
+        derived["E_aux"]   = round(_E_aux,  3)
+        derived["Q_aux"]   = round(_Q_aux,  4)
+        derived["soc_aux"] = round(soc_aux, 2)
+
         # ── 5. Lógica SOH ─────────────────────────────────────────────────────
         if curr_p < -I_MIN:
             # Hay descarga activa
@@ -199,8 +253,8 @@ def on_message(client, userdata, msg):
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
                 print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%", flush=True)
-            elif _soh_soc_inicio == 0.0 and soc > 0.0:
-                # Corregir SOC_inicio si llegó como 0 por reinicio del backend
+            elif _soh_soc_inicio is not None and _soh_soc_inicio < 1.0 and soc > 1.0:
+                # Corregir SOC_inicio si llegó como casi 0 por reinicio del backend
                 _soh_soc_inicio = soc
                 _soh_Q_SOH      = 0.0
                 print(f"[SOH] SOC_inicio corregido a {soc:.1f}%", flush=True)
@@ -282,6 +336,12 @@ def on_message(client, userdata, msg):
         if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
         if derived["r_pack"]  is not None: point = point.field("r_pack",  derived["r_pack"])
         if derived["soh_c"]   is not None: point = point.field("soh_c",   derived["soh_c"])
+        point = (point
+            .field("p_aux",   derived["p_aux"])
+            .field("E_aux",   derived["E_aux"])
+            .field("Q_aux",   derived["Q_aux"])
+            .field("soc_aux", derived["soc_aux"])
+        )
 
         for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
@@ -348,6 +408,10 @@ def on_message(client, userdata, msg):
                 "soh_activo": _soh_activo,
                 "soh_Q_SOH":  round(_soh_Q_SOH, 4),
                 "soh_soc_inicio": _soh_soc_inicio,
+                "p_aux":      derived["p_aux"],
+                "E_aux":      derived["E_aux"],
+                "Q_aux":      derived["Q_aux"],
+                "soc_aux":    derived["soc_aux"],
                 "v_rest_pack": _v_rest_pack,
                 "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
             }

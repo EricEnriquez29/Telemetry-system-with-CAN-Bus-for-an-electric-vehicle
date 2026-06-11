@@ -89,67 +89,45 @@
   <div id="tab-3" style="display:none;">
     <div id="derived-grid">
 
-      <!-- Variables MQTT de entrada -->
+      <!-- Variables MQTT de entrada auxiliar -->
       <div class="card" style="border-left: 4px solid #3498db;">
-        <div class="card-title" style="color:#3498db;">Variables MQTT — Entradas</div>
+        <div class="card-title" style="color:#3498db;">Variables MQTT — Entradas Auxiliar</div>
         <div class="field-row">
-          <span class="field-label">Voltaje Paquete</span>
-          <span><span class="field-value" id="dval-in-volt_p">—</span><span class="field-unit">V</span></span>
+          <span class="field-label">Voltaje Aux</span>
+          <span><span class="field-value" id="dval-in-volt_a">—</span><span class="field-unit">V</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Corriente Paquete</span>
-          <span><span class="field-value" id="dval-in-curr_p">—</span><span class="field-unit">A</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">V_rest paquete</span>
-          <span><span class="field-value" id="dval-in-v_rest">—</span><span class="field-unit">V</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Tiempo en reposo</span>
-          <span><span class="field-value" id="dval-in-t_reposo">—</span><span class="field-unit">s</span></span>
+          <span class="field-label">Corriente Aux</span>
+          <span><span class="field-value" id="dval-in-curr_a">—</span><span class="field-unit">A</span></span>
         </div>
         <div class="derived-note">
-          V_rest se actualiza tras 60s con |curr_p| &lt; 10A<br>
-          |curr_p| &gt; 10A para calcular R
+          LiFePO4 4S Humsienk 100Ah<br>
+          Rango: 11.2V (0%) — 14.6V (100%)
         </div>
       </div>
 
-      <!-- Resistencia interna -->
-      <div class="card" style="border-left: 4px solid #e74c3c;">
-        <div class="card-title" style="color:#e74c3c;">Resistencia Interna</div>
+      <!-- Variables derivadas auxiliar -->
+      <div class="card" style="border-left: 4px solid #f39c12;">
+        <div class="card-title" style="color:#f39c12;">Sistema Auxiliar — Derivadas</div>
         <div class="field-row">
-          <span class="field-label">R paquete</span>
-          <span><span class="field-value" id="dval-r_pack">—</span><span class="field-unit">Ω</span></span>
-        </div>
-        <div id="r-cells-container"></div>
-        <div class="derived-note">
-          R = (V_rest - V_load) / |I_load|<br>
-          válida cuando |curr_p| &gt; 10A y V_rest disponible
-        </div>
-      </div>
-
-      <!-- SOH -->
-      <div class="card" style="border-left: 4px solid #9b59b6;">
-        <div class="card-title" style="color:#9b59b6;">Estado de Salud (SOH)</div>
-        <div class="field-row">
-          <span class="field-label">SOH por capacidad</span>
-          <span><span class="field-value" id="dval-soh_c">—</span><span class="field-unit">%</span></span>
+          <span class="field-label">Potencia auxiliar</span>
+          <span><span class="field-value" id="dval-p_aux">—</span><span class="field-unit">W</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Estado medición</span>
-          <span><span class="field-value" id="dval-soh_activo">—</span></span>
+          <span class="field-label">Energía consumida</span>
+          <span><span class="field-value" id="dval-E_aux">—</span><span class="field-unit">Wh</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">SOC inicio intervalo</span>
-          <span><span class="field-value" id="dval-soh_soc_inicio">—</span><span class="field-unit">%</span></span>
+          <span class="field-label">Carga consumida</span>
+          <span><span class="field-value" id="dval-Q_aux">—</span><span class="field-unit">Ah</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Q acumulado (real)</span>
-          <span><span class="field-value" id="dval-soh_Q_SOH">—</span><span class="field-unit">Ah</span></span>
+          <span class="field-label">SOC estimado</span>
+          <span><span class="field-value" id="dval-soc_aux">—</span><span class="field-unit">%</span></span>
         </div>
         <div class="derived-note">
-          Válido cuando ΔSoC ≥ 30% en misma sesión<br>
-          sin gaps &gt; 10 min sin descarga
+          SOC estimado por OCV + Coulomb counting<br>
+          E_aux y Q_aux acumulan desde inicio de sesión
         </div>
       </div>
 
@@ -369,42 +347,26 @@ function updateDashboard(payload) {
     }
   });
 
-  // SOH
-  const soh_el = document.getElementById("dval-soh_c");
-  if (soh_el) {
-    const soh = data.soh_c;
-    if (soh !== null && soh !== undefined) {
-      soh_el.textContent = soh.toFixed(2);
-      soh_el.className = "field-value";
+  // Sistema auxiliar
+  const AUX_KEYS = ["p_aux", "E_aux", "Q_aux", "soc_aux"];
+  AUX_KEYS.forEach(key => {
+    const el = document.getElementById(`dval-${key}`);
+    if (!el) return;
+    const val = data[key];
+    if (val !== null && val !== undefined) {
+      el.textContent = val.toFixed(2);
+      el.className = "field-value";
     } else {
-      soh_el.textContent = "n/a";
-      soh_el.className = "field-null";
+      el.textContent = "n/a";
+      el.className = "field-null";
     }
-  }
+  });
 
-  const soh_activo_el = document.getElementById("dval-soh_activo");
-  if (soh_activo_el) {
-    const activo = data.soh_activo;
-    if (activo === true) {
-      soh_activo_el.textContent = "● Midiendo";
-      soh_activo_el.style.color = "#27ae60";
-    } else if (activo === false) {
-      soh_activo_el.textContent = "○ En espera";
-      soh_activo_el.style.color = "#aaa";
-    }
-  }
-
-  const soh_soc_inicio_el = document.getElementById("dval-soh_soc_inicio");
-  if (soh_soc_inicio_el) {
-    const v = data.soh_soc_inicio;
-    soh_soc_inicio_el.textContent = (v !== null && v !== undefined) ? v.toFixed(1) : "n/a";
-  }
-
-  const soh_q_el = document.getElementById("dval-soh_Q_SOH");
-  if (soh_q_el) {
-    const v = data.soh_Q_SOH;
-    soh_q_el.textContent = (v !== null && v !== undefined) ? v.toFixed(4) : "n/a";
-  }
+  // Entradas MQTT auxiliar
+  const volt_a_el = document.getElementById("dval-in-volt_a");
+  const curr_a_el = document.getElementById("dval-in-curr_a");
+  if (volt_a_el && data.volt_a != null) volt_a_el.textContent = data.volt_a.toFixed(3);
+  if (curr_a_el && data.curr_a != null) curr_a_el.textContent = data.curr_a.toFixed(2);
 
   // Variables MQTT de entrada para resistencia
   const volt_p_el = document.getElementById("dval-in-volt_p");
