@@ -1,15 +1,26 @@
+"""
+fenix_backend.py  –  Escudería Fénix
+- Escucha MQTT y guarda en InfluxDB
+- Empuja cada snapshot a fenix_api via HTTP POST (RAM)
+
+Uso:
+    pip install paho-mqtt influxdb-client requests
+    python fenix_backend.py
+"""
+
 import json
+import requests
 from datetime import datetime, timezone, timedelta
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 # ─── Configuración MQTT ───────────────────────────────────────────────────────
-MQTT_HOST    = "localhost"
-MQTT_PORT    = 1883
-MQTT_USER    = "fenix25"
-MQTT_PASS    = "pswTeleFenix"
-MQTT_TOPIC   = "fenix/mgt/snapshot"
+MQTT_HOST  = "localhost"
+MQTT_PORT  = 1883
+MQTT_USER  = "fenix25"
+MQTT_PASS  = "pswTeleFenix"
+MQTT_TOPIC = "fenix/mgt/snapshot"
 
 # ─── Configuración InfluxDB ───────────────────────────────────────────────────
 INFLUX_URL    = "http://localhost:8086"
@@ -17,73 +28,119 @@ INFLUX_TOKEN  = "LIYzY_Q_DaHCXNDQ3fpkfnTxh9Lx_-wITjXy-3jlGyccx0LpB0yozjM-dpVf6_0
 INFLUX_ORG    = "Escuderia Fenix UPIITA"
 INFLUX_BUCKET = "Telemetria"
 
+# ─── URL interna de fenix_api ─────────────────────────────────────────────────
+API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
+
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
 
-# ─── Callback MQTT ────────────────────────────────────────────────────────────
+# ─── Callbacks MQTT ───────────────────────────────────────────────────────────
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("Conectado al broker MQTT")
         client.subscribe(MQTT_TOPIC)
         print(f"Suscrito a {MQTT_TOPIC}")
     else:
-        print(f"Error de conexion: {rc}")
+        print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())
 
-        # Parsear timestamp
-        ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone(timedelta(hours=-6)))
+        # ── 1. Guardar en InfluxDB ────────────────────────────────────────────
+        ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
+            tzinfo=timezone(timedelta(hours=-6))
+        )
 
-        # Construir punto InfluxDB
         point = (
             Point("vehicle_telemetry")
             .tag("vehicle_id", str(data.get("veh_id", 25)))
             .tag("session_id",  str(data.get("sess_id", 0)))
             .time(ts, WritePrecision.MS)
-            .field("curr_rms",   float(data.get("curr_rms",  0)))
-            .field("speed_v",    float(data.get("speed_v",   0)))
-            .field("odo_veh",    float(data.get("odo_veh",   0)))
-            .field("tmp_mot",    float(data.get("tmp_mot",   0)))
-            .field("tmp_cont",   float(data.get("tmp_cont",  0)))
-            .field("tmp_cap",    float(data.get("tmp_cap",   0)))
-            .field("mot_torq",   float(data.get("mot_torq",  0)))
-            .field("batt_curr",  float(data.get("batt_curr", 0)))
-            .field("rpm",        float(data.get("rpm",       0)))
-            .field("throttle",   float(data.get("throttle",  0)))
-            .field("brake",      float(data.get("brake",     0)))
-            .field("cont_st",    float(data.get("cont_st",   0)))
-            .field("ksy_v",      float(data.get("ksy_v",     0)))
-            .field("volt_p",     float(data.get("volt_p",    0)))
-            .field("curr_p",     float(data.get("curr_p",    0)))
-            .field("soc",        float(data.get("soc",       0)))
-            .field("tmp_max",    float(data.get("tmp_max",   0)))
-            .field("tmp_min",    float(data.get("tmp_min",   0)))
-            .field("gps_lat",    float(data.get("gps_lat",   0)))
-            .field("gps_lon",    float(data.get("gps_lon",   0)))
-            .field("acc_x",      float(data.get("acc_x",     0)))
-            .field("acc_y",      float(data.get("acc_y",     0)))
-            .field("acc_z",      float(data.get("acc_z",     0)))
-            .field("gyro_x",     float(data.get("gyro_x",    0)))
-            .field("gyro_y",     float(data.get("gyro_y",    0)))
-            .field("gyro_z",     float(data.get("gyro_z",    0)))
-            .field("volt_a",     float(data.get("volt_a",    0)))
-            .field("curr_a",     float(data.get("curr_a",    0)))
+            .field("curr_rms",  float(data.get("curr_rms",  0)))
+            .field("speed_v",   float(data.get("speed_v",   0)))
+            .field("odo_veh",   float(data.get("odo_veh",   0)))
+            .field("tmp_mot",   float(data.get("tmp_mot",   0)))
+            .field("tmp_cont",  float(data.get("tmp_cont",  0)))
+            .field("tmp_cap",   float(data.get("tmp_cap",   0)))
+            .field("mot_torq",  float(data.get("mot_torq",  0)))
+            .field("batt_curr", float(data.get("batt_curr", 0)))
+            .field("rpm",       float(data.get("rpm",       0)))
+            .field("throttle",  float(data.get("throttle",  0)))
+            .field("brake",     float(data.get("brake",     0)))
+            .field("cont_st",   float(data.get("cont_st",   0)))
+            .field("ksy_v",     float(data.get("ksy_v",     0)))
+            .field("volt_p",    float(data.get("volt_p",    0)))
+            .field("curr_p",    float(data.get("curr_p",    0)))
+            .field("soc",       float(data.get("soc",       0)))
+            .field("tmp_max",   float(data.get("tmp_max",   0)))
+            .field("tmp_min",   float(data.get("tmp_min",   0)))
+            .field("gps_lat",   float(data.get("gps_lat",   0)))
+            .field("gps_lon",   float(data.get("gps_lon",   0)))
+            .field("acc_x",     float(data.get("acc_x",     0)))
+            .field("acc_y",     float(data.get("acc_y",     0)))
+            .field("acc_z",     float(data.get("acc_z",     0)))
+            .field("gyro_x",    float(data.get("gyro_x",    0)))
+            .field("gyro_y",    float(data.get("gyro_y",    0)))
+            .field("gyro_z",    float(data.get("gyro_z",    0)))
+            .field("volt_a",    float(data.get("volt_a",    0)))
+            .field("curr_a",    float(data.get("curr_a",    0)))
         )
 
-        # Celdas de voltaje
-        cell_volts = data.get("cell_volts", [])
-        for i, v in enumerate(cell_volts):
+        for i, v in enumerate(data.get("cell_volts", [])):
             point = point.field(f"cell_{i+1}", float(v))
 
-        # Escribir en InfluxDB
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
-        print(f"INFLUXDB sess={data.get('sess_id')} t={data.get('times')} Snapshot guardado en InfluxDB")
+        print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
+
+        # ── 2. Empaquetar snapshot para fenix_api ─────────────────────────────
+        snapshot = {
+            "timestamp":  data.get("times"),
+            "vehicle_id": str(data.get("veh_id", 25)),
+            "session_id": str(data.get("sess_id", 0)),
+            "data": {
+                "curr_rms":  float(data.get("curr_rms",  0)),
+                "speed_v":   float(data.get("speed_v",   0)),
+                "odo_veh":   float(data.get("odo_veh",   0)),
+                "tmp_mot":   float(data.get("tmp_mot",   0)),
+                "tmp_cont":  float(data.get("tmp_cont",  0)),
+                "tmp_cap":   float(data.get("tmp_cap",   0)),
+                "mot_torq":  float(data.get("mot_torq",  0)),
+                "batt_curr": float(data.get("batt_curr", 0)),
+                "rpm":       float(data.get("rpm",       0)),
+                "throttle":  float(data.get("throttle",  0)),
+                "brake":     float(data.get("brake",     0)),
+                "cont_st":   float(data.get("cont_st",   0)),
+                "ksy_v":     float(data.get("ksy_v",     0)),
+                "volt_p":    float(data.get("volt_p",    0)),
+                "curr_p":    float(data.get("curr_p",    0)),
+                "soc":       float(data.get("soc",       0)),
+                "tmp_max":   float(data.get("tmp_max",   0)),
+                "tmp_min":   float(data.get("tmp_min",   0)),
+                "gps_lat":   float(data.get("gps_lat",   0)),
+                "gps_lon":   float(data.get("gps_lon",   0)),
+                "acc_x":     float(data.get("acc_x",     0)),
+                "acc_y":     float(data.get("acc_y",     0)),
+                "acc_z":     float(data.get("acc_z",     0)),
+                "gyro_x":    float(data.get("gyro_x",    0)),
+                "gyro_y":    float(data.get("gyro_y",    0)),
+                "gyro_z":    float(data.get("gyro_z",    0)),
+                "volt_a":    float(data.get("volt_a",    0)),
+                "curr_a":    float(data.get("curr_a",    0)),
+                "cells": {f"cell_{i+1}": float(v)
+                          for i, v in enumerate(data.get("cell_volts", []))},
+            }
+        }
+
+        # ── 3. Empujar a fenix_api ────────────────────────────────────────────
+        try:
+            requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
+        except Exception as api_err:
+            print(f"[API push] {api_err}")
 
     except Exception as e:
-        print(f"[ERROR] {e}")
+        print(f"[ERROR on_message] {e}")
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
