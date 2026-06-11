@@ -36,6 +36,8 @@ E_NOM           = 5210.0  # Wh  — energía nominal 16S LiFePO4 100Ah
 Q_NOM           = 100.0   # Ah  — capacidad nominal
 I_MIN           = 10.0    # A   — umbral mínimo corriente
 T_REPOSO        = 60.0    # s   — segundos en reposo para actualizar V_rest
+T_GAP_MAX       = 600.0   # s   — gap máximo sin descarga para SOH (10 min)
+SOC_MIN_DELTA   = 30.0    # %   — descarga mínima para calcular SOH
 DT              = 0.1     # s   — intervalo entre snapshots (10 Hz)
 
 # ─── Acumuladores por sesión (RAM) ────────────────────────────────────────────
@@ -49,6 +51,13 @@ _v_rest_pack      = None          # V — voltaje paquete en reposo
 _v_rest_cells     = [None] * 16   # V — voltaje por celda en reposo
 _t_reposo_inicio  = None          # timestamp cuando empieza el reposo
 _en_reposo        = False         # True cuando |curr_p| < I_MIN
+
+# ─── Variables SOH (RAM) ─────────────────────────────────────────────────────
+_soh_c            = None    # % — último SOH calculado
+_soh_Q_SOH        = 0.0     # Ah — Coulombs acumulados para medición SOH
+_soh_soc_inicio   = None    # % — SOC al inicio del intervalo SOH
+_soh_t_ultimo     = None    # timestamp del último snapshot con |curr_p| > I_MIN
+_soh_activo       = False   # True cuando hay un intervalo SOH en curso
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
@@ -107,10 +116,11 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "E_HV_rest":  round(E_HV_rest, 2),
         "r_pack":     round(r_pack,  6) if r_pack  is not None else None,
         "r_cells":    r_cells,
-        # Acumulativas — se asignan en on_message
+        # Acumulativas y SOH — se asignan en on_message
         "E_HV":    None,
         "Q_HV":    None,
         "E_regen": None,
+        "soh_c":   None,
     }
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
@@ -125,6 +135,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 def on_message(client, userdata, msg):
     global _session_id_prev, _E_HV, _Q_HV, _E_regen
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
+    global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
 
     try:
         data = json.loads(msg.payload.decode())
@@ -142,6 +153,11 @@ def on_message(client, userdata, msg):
             _E_HV    = 0.0
             _Q_HV    = 0.0
             _E_regen = 0.0
+            # Reiniciar SOH
+            _soh_Q_SOH      = 0.0
+            _soh_soc_inicio = None
+            _soh_t_ultimo   = None
+            _soh_activo     = False
 
         # ── 2. Lógica de reposo para V_rest (60 segundos) ─────────────────────
         now = time.time()
@@ -174,7 +190,41 @@ def on_message(client, userdata, msg):
         derived["Q_HV"]    = round(_Q_HV,    4)
         derived["E_regen"] = round(_E_regen, 3)
 
-        # ── 5. Guardar en InfluxDB ────────────────────────────────────────────
+        # ── 5. Lógica SOH ─────────────────────────────────────────────────────
+        if curr_p < -I_MIN:
+            # Hay descarga activa
+            if not _soh_activo:
+                # Inicio de nuevo intervalo SOH
+                _soh_activo     = True
+                _soh_Q_SOH      = 0.0
+                _soh_soc_inicio = soc
+                print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%")
+
+            # Verificar gap — si el último snapshot con descarga fue hace más de 10 min
+            if _soh_t_ultimo is not None and (now - _soh_t_ultimo) > T_GAP_MAX:
+                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — intervalo inválido, reiniciando")
+                _soh_activo     = False
+                _soh_Q_SOH      = 0.0
+                _soh_soc_inicio = soc
+            else:
+                # Acumular Coulombs para SOH
+                _soh_Q_SOH += abs(curr_p) * DT / 3600.0
+
+            _soh_t_ultimo = now
+
+            # Verificar si ya se descargó el 30%
+            if _soh_soc_inicio is not None:
+                delta_soc = _soh_soc_inicio - soc
+                if delta_soc >= SOC_MIN_DELTA:
+                    Q_teorico = Q_NOM * (delta_soc / 100.0)
+                    _soh_c    = round((_soh_Q_SOH / Q_teorico) * 100.0, 2)
+                    print(f"[SOH] Calculado — ΔSoC={delta_soc:.1f}% Q_real={_soh_Q_SOH:.3f}Ah Q_teo={Q_teorico:.3f}Ah SOH={_soh_c:.2f}%")
+                    # Reiniciar para el siguiente intervalo
+                    _soh_activo     = False
+                    _soh_Q_SOH      = 0.0
+                    _soh_soc_inicio = None
+
+        derived["soh_c"] = round(_soh_c, 2) if _soh_c is not None else None
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
             tzinfo=timezone(timedelta(hours=-6))
         )
@@ -226,6 +276,7 @@ def on_message(client, userdata, msg):
         if derived["p_regen"] is not None: point = point.field("p_regen", derived["p_regen"])
         if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
         if derived["r_pack"]  is not None: point = point.field("r_pack",  derived["r_pack"])
+        if derived["soh_c"]   is not None: point = point.field("soh_c",   derived["soh_c"])
 
         for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
@@ -288,6 +339,7 @@ def on_message(client, userdata, msg):
                 "E_HV_rest":  derived["E_HV_rest"],
                 "r_pack":     derived["r_pack"],
                 "r_cells":    derived["r_cells"],
+                "soh_c":      derived["soh_c"],
                 "v_rest_pack": _v_rest_pack,
                 "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
             }

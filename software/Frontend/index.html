@@ -128,6 +128,19 @@
         </div>
       </div>
 
+      <!-- SOH -->
+      <div class="card" style="border-left: 4px solid #9b59b6;">
+        <div class="card-title" style="color:#9b59b6;">Estado de Salud (SOH)</div>
+        <div class="field-row">
+          <span class="field-label">SOH por capacidad</span>
+          <span><span class="field-value" id="dval-soh_c">—</span><span class="field-unit">%</span></span>
+        </div>
+        <div class="derived-note">
+          Válido cuando ΔSoC ≥ 30% en misma sesión<br>
+          sin gaps &gt; 10 min sin descarga
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -343,6 +356,19 @@ function updateDashboard(payload) {
       el.className = "field-null";
     }
   });
+
+  // SOH
+  const soh_el = document.getElementById("dval-soh_c");
+  if (soh_el) {
+    const soh = data.soh_c;
+    if (soh !== null && soh !== undefined) {
+      soh_el.textContent = soh.toFixed(2);
+      soh_el.className = "field-value";
+    } else {
+      soh_el.textContent = "n/a";
+      soh_el.className = "field-null";
+    }
+  }
 
   // Variables MQTT de entrada para resistencia
   const volt_p_el = document.getElementById("dval-in-volt_p");
