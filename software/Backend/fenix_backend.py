@@ -78,6 +78,7 @@ _Q_HV             = 0.0
 _E_regen          = 0.0
 _E_aux            = 0.0   # Wh — energía auxiliar acumulada
 _Q_aux            = 0.0   # Ah — carga auxiliar acumulada
+_soc0_aux         = None  # % — SOC inicial auxiliar (OCV al inicio de sesión)
 
 # ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
 _v_rest_pack      = None          # V — voltaje paquete en reposo
@@ -171,7 +172,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
-    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux
+    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux, _soc0_aux
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
 
@@ -193,6 +194,7 @@ def on_message(client, userdata, msg):
             _E_regen = 0.0
             _E_aux   = 0.0
             _Q_aux   = 0.0
+            _soc0_aux = None
             # Reiniciar SOH
             _soh_Q_SOH      = 0.0
             _soh_soc_inicio = None
@@ -236,13 +238,21 @@ def on_message(client, userdata, msg):
         p_aux     = volt_a * curr_a
         _E_aux   += p_aux   * DT / 3600.0
         _Q_aux   += curr_a  * DT / 3600.0
-        soc0_aux  = ocv_to_soc_aux(volt_a)
-        soc_aux   = max(0.0, soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0)
+
+        # SOC0 se estima una sola vez por sesión con OCV (corriente baja)
+        if _soc0_aux is None and curr_a < 2.0:
+            _soc0_aux = ocv_to_soc_aux(volt_a)
+            print(f"[AUX] SOC0 estimado = {_soc0_aux:.1f}% (volt_a={volt_a:.3f}V)", flush=True)
+
+        if _soc0_aux is not None:
+            soc_aux = max(0.0, _soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0)
+        else:
+            soc_aux = None
 
         derived["p_aux"]   = round(p_aux,   2)
         derived["E_aux"]   = round(_E_aux,  3)
         derived["Q_aux"]   = round(_Q_aux,  4)
-        derived["soc_aux"] = round(soc_aux, 2)
+        derived["soc_aux"] = round(soc_aux, 2) if soc_aux is not None else None
 
         # ── 5. Lógica SOH ─────────────────────────────────────────────────────
         if curr_p < -I_MIN:
