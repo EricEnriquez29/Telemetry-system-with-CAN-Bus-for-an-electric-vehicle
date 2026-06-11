@@ -87,6 +87,13 @@
 
   <!-- Pestaña 3: Derivadas Prueba -->
   <div id="tab-3" style="display:none;">
+
+    <!-- Gráfica auxiliar -->
+    <div class="chart-section" style="border-left: 4px solid #f39c12;">
+      <div class="chart-title" style="color:#f39c12;">Sistema Auxiliar — 15 s</div>
+      <div class="chart-container"><canvas id="chart-aux"></canvas></div>
+    </div>
+
     <div id="derived-grid">
 
       <!-- Variables MQTT de entrada auxiliar -->
@@ -271,6 +278,38 @@ function pushDataset(chart, datasetIndex, timestamp, value) {
   while (ds.data.length > 0 && ds.data[0].x < cutoff) ds.data.shift();
 }
 
+// ── Gráfica Sistema Auxiliar ──────────────────────────────────────────────────
+const ctxAux = document.getElementById("chart-aux").getContext("2d");
+const chartAux = new Chart(ctxAux, {
+  type: "line",
+  data: { datasets: [
+    { label: "Voltaje (V)",  data: [], borderColor: "#f39c12", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yVolt" },
+    { label: "Corriente (A)",data: [], borderColor: "#3498db", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yCurr" },
+    { label: "SOC (%)",      data: [], borderColor: "#27ae60", backgroundColor: "rgba(39,174,96,0.06)", borderWidth: 2, pointRadius: 0, fill: true, tension: 0, yAxisID: "yPct" },
+    { label: "Q_aux (Ah)",   data: [], borderColor: "#9b59b6", borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yQ" },
+  ]},
+  options: {
+    animation: false, responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, labels: { color: "#aaa", boxWidth: 12, font: { family: "'Share Tech Mono'" } } } },
+    scales: {
+      x: X_OPTS,
+      yVolt: { position: "left",  title: { display: true, text: "V",  color: "#f39c12", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#f39c12", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: 11, max: 15 },
+      yCurr: { position: "right", title: { display: true, text: "A",  color: "#3498db", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#3498db", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0,  max: 20  },
+      yPct:  { position: "right", title: { display: true, text: "%",  color: "#27ae60", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#27ae60", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0,  max: 100 },
+      yQ:    { position: "right", title: { display: true, text: "Ah", color: "#9b59b6", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#9b59b6", font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0  },
+    }
+  }
+});
+
+function updateAuxChart(timestamp, data) {
+  const vals = [data.volt_a, data.curr_a, data.soc_aux, data.Q_aux];
+  vals.forEach((val, idx) => {
+    if (val === null || val === undefined) return;
+    pushDataset(chartAux, idx, timestamp, val);
+  });
+  chartAux.update("none");
+}
+
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 
@@ -361,6 +400,9 @@ function updateDashboard(payload) {
       el.className = "field-null";
     }
   });
+
+  // Gráfica auxiliar
+  updateAuxChart(payload.timestamp, data);
 
   // Entradas MQTT auxiliar
   const volt_a_el = document.getElementById("dval-in-volt_a");
