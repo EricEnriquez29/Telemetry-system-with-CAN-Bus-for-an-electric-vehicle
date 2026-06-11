@@ -49,15 +49,14 @@ def compute_derived(data: dict) -> dict:
     # Potencia mecánica: P_mec = τ_est × (2π × rpm / 60) [W]
     p_mec = tau_est * (2 * math.pi * rpm / 60)
 
-    # Potencia eléctrica HV: P_HV = volt_p × curr_p [W]
-    # curr_p positivo = regeneración (BMS Daly), negativo = tracción
-    p_hv = volt_p * curr_p
+    # Potencia eléctrica HV: solo en descarga (curr_p < -5A), valor positivo
+    p_hv = (volt_p * abs(curr_p)) if curr_p < -5.0 else None
 
-    # Potencia regenerativa: válida solo cuando curr_p > 5A (umbral anti-ruido)
+    # Potencia regenerativa: válida solo cuando curr_p > 5A
     p_regen = (volt_p * curr_p) if curr_p > 5.0 else None
 
     # Eficiencia: válida solo cuando |P_HV| > 300W y curr_p < -5A (tracción real)
-    if abs(p_hv) > 300 and curr_p < -5.0:
+    if p_hv is not None and abs(p_hv) > 300:
         eta = (p_mec / abs(p_hv)) * 100
     else:
         eta = None
