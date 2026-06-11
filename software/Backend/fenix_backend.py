@@ -171,7 +171,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
-    global _session_id_prev, _E_HV, _Q_HV, _E_regen
+    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
 
