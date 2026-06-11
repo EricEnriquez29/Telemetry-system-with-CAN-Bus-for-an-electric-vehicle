@@ -198,11 +198,11 @@ def on_message(client, userdata, msg):
                 _soh_activo     = True
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
-                print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%")
+                print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%", flush=True)
 
             # Verificar gap — si el último snapshot con descarga fue hace más de 10 min
             if _soh_t_ultimo is not None and (now - _soh_t_ultimo) > T_GAP_MAX:
-                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — intervalo inválido, reiniciando")
+                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — intervalo inválido, reiniciando", flush=True)
                 _soh_activo     = False
                 _soh_Q_SOH      = 0.0
                 _soh_soc_inicio = soc
@@ -218,7 +218,7 @@ def on_message(client, userdata, msg):
                 if delta_soc >= SOC_MIN_DELTA:
                     Q_teorico = Q_NOM * (delta_soc / 100.0)
                     _soh_c    = round((_soh_Q_SOH / Q_teorico) * 100.0, 2)
-                    print(f"[SOH] Calculado — ΔSoC={delta_soc:.1f}% Q_real={_soh_Q_SOH:.3f}Ah Q_teo={Q_teorico:.3f}Ah SOH={_soh_c:.2f}%")
+                    print(f"[SOH] Calculado — ΔSoC={delta_soc:.1f}% Q_real={_soh_Q_SOH:.3f}Ah Q_teo={Q_teorico:.3f}Ah SOH={_soh_c:.2f}%", flush=True)
                     # Reiniciar para el siguiente intervalo
                     _soh_activo     = False
                     _soh_Q_SOH      = 0.0
