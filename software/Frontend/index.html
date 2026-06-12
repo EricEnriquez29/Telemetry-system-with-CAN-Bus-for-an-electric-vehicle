@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sistema de Telemetria — Escudería Fénix UPIITA</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
@@ -119,30 +118,24 @@
   <div id="tab-0">
     <div id="principal-row">
 
-      <!-- Gauge Throttle -->
-      <div style="display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0;">
-        <div style="position:relative; width:280px; height:180px;">
-          <div id="gauge-throttle"></div>
-          <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); background:#aaaaaa; border:3px solid #555; padding:4px;">
-            <div style="border:2px solid #666; padding:4px 16px; background:#bbbbbb; width:160px; text-align:center;">
-              <span id="lcd-throttle" style="font-size:34px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
-            </div>
+      <!-- Display LCD Throttle -->
+      <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0;">
+        <div style="background:#aaaaaa; border:3px solid #555; padding:5px;">
+          <div style="border:2px solid #666; padding:8px 20px; background:#bbbbbb; width:180px; text-align:center;">
+            <span id="lcd-throttle" style="font-size:48px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
           </div>
         </div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Acelerador</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Acelerador %</div>
       </div>
 
-      <!-- Gauge Brake -->
-      <div style="display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0;">
-        <div style="position:relative; width:280px; height:180px;">
-          <div id="gauge-brake"></div>
-          <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); background:#aaaaaa; border:3px solid #555; padding:4px;">
-            <div style="border:2px solid #666; padding:4px 16px; background:#bbbbbb; width:160px; text-align:center;">
-              <span id="lcd-brake" style="font-size:34px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
-            </div>
+      <!-- Display LCD Brake -->
+      <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0;">
+        <div style="background:#aaaaaa; border:3px solid #555; padding:5px;">
+          <div style="border:2px solid #666; padding:8px 20px; background:#bbbbbb; width:180px; text-align:center;">
+            <span id="lcd-brake" style="font-size:48px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
           </div>
         </div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Freno Regen</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Freno Regen %</div>
       </div>
 
       <!-- Gráfica throttle -->
