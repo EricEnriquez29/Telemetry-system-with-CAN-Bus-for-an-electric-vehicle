@@ -98,20 +98,8 @@
   <div id="tab-0">
     <div id="gauges-row">
       <div class="gauge-card">
-        <canvas id="g-rpm"></canvas>
-        <div class="gauge-label">Motor RPM</div>
-      </div>
-      <div class="gauge-card">
-        <canvas id="g-vel"></canvas>
-        <div class="gauge-label">Velocidad</div>
-      </div>
-      <div class="gauge-card">
-        <canvas id="g-curr"></canvas>
-        <div class="gauge-label">Corriente Paquete</div>
-      </div>
-      <div class="gauge-card">
-        <canvas id="g-pow"></canvas>
-        <div class="gauge-label">Potencia HV</div>
+        <canvas id="g-throttle"></canvas>
+        <div class="gauge-label">Acelerador</div>
       </div>
     </div>
   </div>
@@ -196,60 +184,28 @@ function switchTab(i) {
 }
 
 // ── Gauges ────────────────────────────────────────────────────────────────────
-var GAUGE_BASE = {
-  width: 220, height: 220,
+var gThrottle = new RadialGauge({
+  renderTo: 'g-throttle',
+  width: 250, height: 250,
   colorPlate: '#0d0d0d', colorPlateEnd: '#0d0d0d',
   borders: false,
   strokeTicks: true,
   colorMajorTicks: '#ccc', colorMinorTicks: '#555',
-  colorNumbers: '#ddd', colorUnits: '#aaa', colorTitle: '#fff',
+  colorNumbers: '#ddd', colorUnits: '#aaa',
   needleType: 'arrow', needleWidth: 3,
   colorNeedle: 'rgba(239,94,32,1)', colorNeedleEnd: 'rgba(239,94,32,0.7)',
   needleCircleSize: 10, needleCircleOuter: true, needleCircleInner: false,
   colorNeedleCircleOuter: '#555', colorNeedleCircleOuterEnd: '#333',
-  valueBox: true, fontValue: 'Led', animatedValue: true,
+  valueBox: true, fontValue: 'Led',
+  animatedValue: false,
   colorValueBoxBackground: '#0a0a0a',
   colorValueText: '#ef5e20',
   colorValueTextShadow: 'rgba(239,94,32,0.3)',
-  animationRule: 'linear', animationDuration: 200,
+  units: '%', minValue: 0, maxValue: 100,
+  majorTicks: ['0','20','40','60','80','100'], minorTicks: 4,
+  highlights: [{ from: 80, to: 100, color: 'rgba(200,0,0,0.45)' }],
   value: 0
-};
-
-function createGauge(canvasId, opts) {
-  return new RadialGauge(Object.assign({}, GAUGE_BASE, { renderTo: canvasId }, opts)).draw();
-}
-
-var gRpm = createGauge('g-rpm', {
-  units: 'RPM', minValue: 0, maxValue: 5000,
-  majorTicks: ['0','1000','2000','3000','4000','5000'], minorTicks: 5,
-  highlights: [{ from: 4000, to: 5000, color: 'rgba(200,0,0,0.45)' }],
-  colorNeedle: 'rgba(231,76,60,1)', colorNeedleEnd: 'rgba(231,76,60,0.7)',
-  colorValueText: '#e74c3c', colorValueTextShadow: 'rgba(231,76,60,0.3)'
-});
-
-var gVel = createGauge('g-vel', {
-  units: 'km/h', minValue: 0, maxValue: 80,
-  majorTicks: ['0','10','20','30','40','50','60','70','80'], minorTicks: 2,
-  highlights: [{ from: 64, to: 80, color: 'rgba(200,0,0,0.45)' }],
-  colorNeedle: 'rgba(52,152,219,1)', colorNeedleEnd: 'rgba(52,152,219,0.7)',
-  colorValueText: '#3498db', colorValueTextShadow: 'rgba(52,152,219,0.3)'
-});
-
-var gCurr = createGauge('g-curr', {
-  units: 'A', minValue: 0, maxValue: 200,
-  majorTicks: ['0','50','100','150','200'], minorTicks: 5,
-  highlights: [{ from: 160, to: 200, color: 'rgba(200,0,0,0.45)' }],
-  colorNeedle: 'rgba(243,156,18,1)', colorNeedleEnd: 'rgba(243,156,18,0.7)',
-  colorValueText: '#f39c12', colorValueTextShadow: 'rgba(243,156,18,0.3)'
-});
-
-var gPow = createGauge('g-pow', {
-  units: 'kW', minValue: 0, maxValue: 12,
-  majorTicks: ['0','2','4','6','8','10','12'], minorTicks: 4,
-  highlights: [{ from: 9.6, to: 12, color: 'rgba(200,0,0,0.45)' }],
-  colorNeedle: 'rgba(39,174,96,1)', colorNeedleEnd: 'rgba(39,174,96,0.7)',
-  colorValueText: '#27ae60', colorValueTextShadow: 'rgba(39,174,96,0.3)'
-});
+}).draw();
 
 // ── Tarjetas pestaña Prueba ───────────────────────────────────────────────────
 const CATEGORIES = [
@@ -395,14 +351,8 @@ function updateDashboard(payload) {
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // ── Gauges pestaña Principal ──────────────────────────────────────────────
-  if (data.rpm     != null) gRpm.value  = Math.abs(data.rpm);
-  if (data.speed_v != null) gVel.value  = data.speed_v;
-  if (data.curr_p  != null) gCurr.value = Math.abs(data.curr_p);
-  const pHV = (data.p_hv != null)
-    ? data.p_hv
-    : (data.volt_p != null && data.curr_p != null ? data.volt_p * Math.abs(data.curr_p) : 0);
-  gPow.value = Math.max(0, pHV / 1000);
+  // ── Gauge throttle pestaña Principal ─────────────────────────────────────
+  if (data.throttle != null) gThrottle.value = data.throttle;
 
   // ── Variables originales (pestaña Prueba) ─────────────────────────────────
   CATEGORIES.forEach(cat => {
