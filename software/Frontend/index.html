@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sistema de Telemetria — Escudería Fénix UPIITA</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gauge.js@1.3.7/dist/gauge.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
@@ -118,14 +118,39 @@
   <!-- Pestaña 0: Principal -->
   <div id="tab-0">
     <div id="principal-row">
-      <div class="gauge-card">
-        <canvas id="g-throttle"></canvas>
-        <div class="gauge-label">Acelerador</div>
+
+      <!-- Gauge Throttle -->
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0;">
+        <div style="position:relative; width:280px; height:180px;">
+          <div id="gauge-throttle"></div>
+          <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); background:#aaaaaa; border:3px solid #555; padding:4px;">
+            <div style="border:2px solid #666; padding:4px 16px; background:#bbbbbb; width:160px; text-align:center;">
+              <span id="lcd-throttle" style="font-size:34px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Acelerador</div>
       </div>
+
+      <!-- Gauge Brake -->
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0;">
+        <div style="position:relative; width:280px; height:180px;">
+          <div id="gauge-brake"></div>
+          <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); background:#aaaaaa; border:3px solid #555; padding:4px;">
+            <div style="border:2px solid #666; padding:4px 16px; background:#bbbbbb; width:160px; text-align:center;">
+              <span id="lcd-brake" style="font-size:34px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Freno Regen</div>
+      </div>
+
+      <!-- Gráfica throttle -->
       <div id="throttle-chart-wrap">
         <div id="throttle-chart-title">Throttle — 15 s</div>
         <div id="throttle-chart-container"><canvas id="chart-throttle"></canvas></div>
       </div>
+
     </div>
   </div>
 
@@ -211,56 +236,52 @@ function switchTab(i) {
 // ── Gauges ────────────────────────────────────────────────────────────────────
 // ── Gauge throttle — Gauge.js ────────────────────────────────────────────────
 var throttleCanvas = document.getElementById('g-throttle');
-throttleCanvas.width  = 260;
-throttleCanvas.height = 260;
+throttleCanvas.width  = 240;
+throttleCanvas.height = 240;
 
 var gThrottle = new Gauge(throttleCanvas).setOptions({
-  angle:          -0.25,
-  lineWidth:       0.30,
-  radiusScale:     0.9,
+  angle:        -0.25,
+  lineWidth:     0.28,
+  radiusScale:   1.0,
   pointer: {
-    length:        0.60,
-    strokeWidth:   0.04,
-    color:         '#ef5e20'
+    length:      0.6,
+    strokeWidth: 0.038,
+    color:       '#ef5e20'
   },
-  limitMax:        false,
-  limitMin:        false,
-  colorStart:      '#27ae60',
-  colorStop:       '#e74c3c',
-  strokeColor:     '#2a2a2a',
-  generateGradient: true,
-  highDpiSupport:  true,
+  limitMax:      false,
+  limitMin:      false,
+  strokeColor:   '#2a2a2a',
+  generateGradient: false,
+  highDpiSupport: true,
   staticZones: [
     { strokeStyle: '#27ae60', min: 0,  max: 60  },
     { strokeStyle: '#f39c12', min: 60, max: 80  },
     { strokeStyle: '#e74c3c', min: 80, max: 100 }
   ],
   staticLabels: {
-    font:   '11px Share Tech Mono, monospace',
-    labels: [0, 20, 40, 60, 80, 100],
-    color:  '#aaa',
-    fractionDigits: 0
+    font:             '11px Share Tech Mono, monospace',
+    labels:           [0, 20, 40, 60, 80, 100],
+    color:            '#aaaaaa',
+    fractionDigits:   0
   },
   renderTicks: {
-    divisions:     5,
-    divWidth:      1.1,
-    divLength:     0.7,
-    divColor:      '#555',
-    subDivisions:  4,
-    subLength:     0.4,
-    subWidth:      0.6,
-    subColor:      '#333'
+    divisions:    5,
+    divWidth:     1.0,
+    divLength:    0.6,
+    divColor:     '#666',
+    subDivisions: 4,
+    subLength:    0.3,
+    subWidth:     0.5,
+    subColor:     '#333'
   }
 });
 
-gThrottle.maxValue = 100;
+gThrottle.maxValue     = 100;
 gThrottle.setMinValue(0);
 gThrottle.animationSpeed = 32;
 gThrottle.set(0);
 
-var throttleVal = 0;
 function drawThrottle(val) {
-  throttleVal = val;
   gThrottle.set(val);
 }
 
@@ -430,8 +451,9 @@ function updateDashboard(payload) {
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // ── Gauge + gráfica throttle pestaña Principal ───────────────────────────
+  // ── Gauges throttle y brake pestaña Principal ────────────────────────────
   if (data.throttle != null) drawThrottle(data.throttle);
+  if (data.brake    != null) drawBrake(data.brake);
   pushDataset(chartThrottle, 0, payload.timestamp, data.throttle || 0);
   chartThrottle.update("none");
 
