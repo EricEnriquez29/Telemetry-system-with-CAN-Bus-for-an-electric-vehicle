@@ -116,35 +116,7 @@
 
   <!-- Pestaña 0: Principal -->
   <div id="tab-0">
-    <div id="principal-row">
-
-      <!-- Display LCD Throttle -->
-      <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0;">
-        <div style="background:#aaaaaa; border:3px solid #555; padding:5px;">
-          <div style="border:2px solid #666; padding:8px 20px; background:#bbbbbb; width:180px; text-align:center;">
-            <span id="lcd-throttle" style="font-size:48px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
-          </div>
-        </div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Acelerador %</div>
-      </div>
-
-      <!-- Display LCD Brake -->
-      <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0;">
-        <div style="background:#aaaaaa; border:3px solid #555; padding:5px;">
-          <div style="border:2px solid #666; padding:8px 20px; background:#bbbbbb; width:180px; text-align:center;">
-            <span id="lcd-brake" style="font-size:48px; font-family:'Orbitron',monospace; font-weight:700; color:#1a1a1a; letter-spacing:3px; line-height:1;">000</span>
-          </div>
-        </div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888;">Freno Regen %</div>
-      </div>
-
-      <!-- Gráfica throttle -->
-      <div id="throttle-chart-wrap">
-        <div id="throttle-chart-title">Throttle — 15 s</div>
-        <div id="throttle-chart-container"><canvas id="chart-throttle"></canvas></div>
-      </div>
-
-    </div>
+    <div class="empty-tab">— Página principal — en construcción —</div>
   </div>
 
   <!-- Pestaña 1: Tabla de vueltas -->
@@ -444,11 +416,7 @@ function updateDashboard(payload) {
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // ── Gauges throttle y brake pestaña Principal ────────────────────────────
-  if (data.throttle != null) drawThrottle(data.throttle);
-  if (data.brake    != null) drawBrake(data.brake);
-  pushDataset(chartThrottle, 0, payload.timestamp, data.throttle || 0);
-  chartThrottle.update("none");
+  // ── Principal — en construcción ─────────────────────────────────────────
 
   // ── Variables originales (pestaña Prueba) ─────────────────────────────────
   CATEGORIES.forEach(cat => {
