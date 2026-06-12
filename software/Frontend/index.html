@@ -7,6 +7,7 @@
   <title>Sistema de Telemetria — Escudería Fénix UPIITA</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -52,6 +53,27 @@
     @media (max-width: 700px) { #derived-grid { grid-template-columns: 1fr; } }
     .value-positive { color: #27ae60; }
     .value-negative { color: #e74c3c; }
+
+    /* ── Pestaña Principal — Gauges ── */
+    #gauges-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { #gauges-row { grid-template-columns: repeat(2, 1fr); } }
+    .gauge-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .gauge-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
@@ -65,16 +87,33 @@
   </div>
 
   <div class="tabs-bar">
-    <div class="tab" onclick="switchTab(0)">Principal</div>
+    <div class="tab active" onclick="switchTab(0)">Principal</div>
     <div class="tab" onclick="switchTab(1)">Tabla de Vueltas</div>
     <div class="tab" onclick="switchTab(2)">Ploteo</div>
     <div class="tab" onclick="switchTab(3)">Derivadas Prueba</div>
-    <div class="tab active" onclick="switchTab(4)">Prueba</div>
+    <div class="tab" onclick="switchTab(4)">Prueba</div>
   </div>
 
   <!-- Pestaña 0: Principal -->
-  <div id="tab-0" style="display:none;">
-    <div class="empty-tab">— Pestaña principal — en construcción —</div>
+  <div id="tab-0">
+    <div id="gauges-row">
+      <div class="gauge-card">
+        <canvas id="g-rpm"></canvas>
+        <div class="gauge-label">Motor RPM</div>
+      </div>
+      <div class="gauge-card">
+        <canvas id="g-vel"></canvas>
+        <div class="gauge-label">Velocidad</div>
+      </div>
+      <div class="gauge-card">
+        <canvas id="g-curr"></canvas>
+        <div class="gauge-label">Corriente Paquete</div>
+      </div>
+      <div class="gauge-card">
+        <canvas id="g-pow"></canvas>
+        <div class="gauge-label">Potencia HV</div>
+      </div>
+    </div>
   </div>
 
   <!-- Pestaña 1: Tabla de vueltas -->
@@ -89,49 +128,20 @@
 
   <!-- Pestaña 3: Derivadas Prueba — Dinámica Vehicular -->
   <div id="tab-3" style="display:none;">
-
     <div id="derived-grid">
-
-      <!-- Entradas IMU crudas -->
       <div class="card" style="border-left:4px solid #3498db;">
         <div class="card-title" style="color:#3498db;">Entradas IMU — MPU-6050 (crudas)</div>
-        <div class="field-row">
-          <span class="field-label">Acc X</span>
-          <span><span class="field-value" id="dval-in-acc_x">—</span><span class="field-unit">g</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Acc Y</span>
-          <span><span class="field-value" id="dval-in-acc_y">—</span><span class="field-unit">g</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Acc Z</span>
-          <span><span class="field-value" id="dval-in-acc_z">—</span><span class="field-unit">g</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gyro X</span>
-          <span><span class="field-value" id="dval-in-gyro_x">—</span><span class="field-unit">°/s</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gyro Y</span>
-          <span><span class="field-value" id="dval-in-gyro_y">—</span><span class="field-unit">°/s</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gyro Z</span>
-          <span><span class="field-value" id="dval-in-gyro_z">—</span><span class="field-unit">°/s</span></span>
-        </div>
+        <div class="field-row"><span class="field-label">Acc X</span><span><span class="field-value" id="dval-in-acc_x">—</span><span class="field-unit">g</span></span></div>
+        <div class="field-row"><span class="field-label">Acc Y</span><span><span class="field-value" id="dval-in-acc_y">—</span><span class="field-unit">g</span></span></div>
+        <div class="field-row"><span class="field-label">Acc Z</span><span><span class="field-value" id="dval-in-acc_z">—</span><span class="field-unit">g</span></span></div>
+        <div class="field-row"><span class="field-label">Gyro X</span><span><span class="field-value" id="dval-in-gyro_x">—</span><span class="field-unit">°/s</span></span></div>
+        <div class="field-row"><span class="field-label">Gyro Y</span><span><span class="field-value" id="dval-in-gyro_y">—</span><span class="field-unit">°/s</span></span></div>
+        <div class="field-row"><span class="field-label">Gyro Z</span><span><span class="field-value" id="dval-in-gyro_z">—</span><span class="field-unit">°/s</span></span></div>
       </div>
-
-      <!-- Orientación estimada -->
       <div class="card" style="border-left:4px solid #ef5e20;">
         <div class="card-title" style="color:#ef5e20;">Orientación — Filtro Complementario (α = 0.98)</div>
-        <div class="field-row">
-          <span class="field-label">Roll φ</span>
-          <span><span class="field-value" id="dval-phi">—</span><span class="field-unit">°</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Pitch θ</span>
-          <span><span class="field-value" id="dval-theta">—</span><span class="field-unit">°</span></span>
-        </div>
+        <div class="field-row"><span class="field-label">Roll φ</span><span><span class="field-value" id="dval-phi">—</span><span class="field-unit">°</span></span></div>
+        <div class="field-row"><span class="field-label">Pitch θ</span><span><span class="field-value" id="dval-theta">—</span><span class="field-unit">°</span></span></div>
         <div class="derived-note">
           98% giroscopio + 2% acelerómetro<br>
           τ ≈ 4.9 s — corrección de deriva cada ~5 s<br><br>
@@ -139,60 +149,31 @@
           φ esperado ≈ 0.57°&nbsp;&nbsp;&nbsp;θ esperado ≈ 9.65°
         </div>
       </div>
-
-      <!-- Aceleraciones compensadas -->
       <div class="card" style="border-left:4px solid #27ae60;">
         <div class="card-title" style="color:#27ae60;">Aceleraciones Compensadas por Gravedad</div>
-        <div class="field-row">
-          <span class="field-label">Gx — longitudinal</span>
-          <span><span class="field-value" id="dval-Gx">—</span><span class="field-unit">G</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gy — lateral</span>
-          <span><span class="field-value" id="dval-Gy">—</span><span class="field-unit">G</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gz — vertical</span>
-          <span><span class="field-value" id="dval-Gz">—</span><span class="field-unit">G</span></span>
-        </div>
+        <div class="field-row"><span class="field-label">Gx — longitudinal</span><span><span class="field-value" id="dval-Gx">—</span><span class="field-unit">G</span></span></div>
+        <div class="field-row"><span class="field-label">Gy — lateral</span><span><span class="field-value" id="dval-Gy">—</span><span class="field-unit">G</span></span></div>
+        <div class="field-row"><span class="field-label">Gz — vertical</span><span><span class="field-value" id="dval-Gz">—</span><span class="field-unit">G</span></span></div>
         <div class="derived-note">
           acc crudo (m/s²) − componente gravitacional proyectada<br>
           dividido entre 9.81 m/s² para expresar en G<br><br>
           En reposo plano: Gx ≈ 0.00 &nbsp; Gy ≈ 0.00 &nbsp; Gz ≈ 0.00
         </div>
       </div>
-
-      <!-- Valores esperados en reposo -->
       <div class="card" style="border-left:4px solid #8e44ad;">
         <div class="card-title" style="color:#8e44ad;">Referencia — Valores Esperados en Reposo</div>
-        <div class="field-row">
-          <span class="field-label">φ esperado</span>
-          <span><span class="field-value" style="color:#8e44ad;">0.57</span><span class="field-unit">°</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">θ esperado</span>
-          <span><span class="field-value" style="color:#8e44ad;">9.65</span><span class="field-unit">°</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gx esperado</span>
-          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gy esperado</span>
-          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Gz esperado</span>
-          <span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span>
-        </div>
+        <div class="field-row"><span class="field-label">φ esperado</span><span><span class="field-value" style="color:#8e44ad;">0.57</span><span class="field-unit">°</span></span></div>
+        <div class="field-row"><span class="field-label">θ esperado</span><span><span class="field-value" style="color:#8e44ad;">9.65</span><span class="field-unit">°</span></span></div>
+        <div class="field-row"><span class="field-label">Gx esperado</span><span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span></div>
+        <div class="field-row"><span class="field-label">Gy esperado</span><span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span></div>
+        <div class="field-row"><span class="field-label">Gz esperado</span><span><span class="field-value" style="color:#8e44ad;">0.00</span><span class="field-unit">G</span></span></div>
         <div class="derived-note">Calculados con acc_x=−0.17, acc_y=0.01, acc_z=1.00</div>
       </div>
-
     </div>
   </div>
 
   <!-- Pestaña 4: Prueba -->
-  <div id="tab-4">
+  <div id="tab-4" style="display:none;">
     <div class="chart-section" style="border-left: 4px solid #e74c3c;">
       <div class="chart-title" style="color:#e74c3c;">RPM / Throttle / Brake — 15 s</div>
       <div class="chart-container"><canvas id="chart-control"></canvas></div>
@@ -205,6 +186,7 @@
   </div>
 
 <script>
+// ── Tabs ──────────────────────────────────────────────────────────────────────
 const tabEls = document.querySelectorAll('.tab');
 function switchTab(i) {
   tabEls.forEach((t, j) => {
@@ -213,6 +195,63 @@ function switchTab(i) {
   });
 }
 
+// ── Gauges ────────────────────────────────────────────────────────────────────
+var GAUGE_BASE = {
+  width: 220, height: 220,
+  colorPlate: '#0d0d0d', colorPlateEnd: '#0d0d0d',
+  borders: false,
+  strokeTicks: true,
+  colorMajorTicks: '#ccc', colorMinorTicks: '#555',
+  colorNumbers: '#ddd', colorUnits: '#aaa', colorTitle: '#fff',
+  needleType: 'arrow', needleWidth: 3,
+  colorNeedle: 'rgba(239,94,32,1)', colorNeedleEnd: 'rgba(239,94,32,0.7)',
+  needleCircleSize: 10, needleCircleOuter: true, needleCircleInner: false,
+  colorNeedleCircleOuter: '#555', colorNeedleCircleOuterEnd: '#333',
+  valueBox: true, fontValue: 'Led', animatedValue: true,
+  colorValueBoxBackground: '#0a0a0a',
+  colorValueText: '#ef5e20',
+  colorValueTextShadow: 'rgba(239,94,32,0.3)',
+  animationRule: 'linear', animationDuration: 200,
+  value: 0
+};
+
+function createGauge(canvasId, opts) {
+  return new RadialGauge(Object.assign({}, GAUGE_BASE, { renderTo: canvasId }, opts)).draw();
+}
+
+var gRpm = createGauge('g-rpm', {
+  units: 'RPM', minValue: 0, maxValue: 5000,
+  majorTicks: ['0','1000','2000','3000','4000','5000'], minorTicks: 5,
+  highlights: [{ from: 4000, to: 5000, color: 'rgba(200,0,0,0.45)' }],
+  colorNeedle: 'rgba(231,76,60,1)', colorNeedleEnd: 'rgba(231,76,60,0.7)',
+  colorValueText: '#e74c3c', colorValueTextShadow: 'rgba(231,76,60,0.3)'
+});
+
+var gVel = createGauge('g-vel', {
+  units: 'km/h', minValue: 0, maxValue: 80,
+  majorTicks: ['0','10','20','30','40','50','60','70','80'], minorTicks: 2,
+  highlights: [{ from: 64, to: 80, color: 'rgba(200,0,0,0.45)' }],
+  colorNeedle: 'rgba(52,152,219,1)', colorNeedleEnd: 'rgba(52,152,219,0.7)',
+  colorValueText: '#3498db', colorValueTextShadow: 'rgba(52,152,219,0.3)'
+});
+
+var gCurr = createGauge('g-curr', {
+  units: 'A', minValue: 0, maxValue: 200,
+  majorTicks: ['0','50','100','150','200'], minorTicks: 5,
+  highlights: [{ from: 160, to: 200, color: 'rgba(200,0,0,0.45)' }],
+  colorNeedle: 'rgba(243,156,18,1)', colorNeedleEnd: 'rgba(243,156,18,0.7)',
+  colorValueText: '#f39c12', colorValueTextShadow: 'rgba(243,156,18,0.3)'
+});
+
+var gPow = createGauge('g-pow', {
+  units: 'kW', minValue: 0, maxValue: 12,
+  majorTicks: ['0','2','4','6','8','10','12'], minorTicks: 4,
+  highlights: [{ from: 9.6, to: 12, color: 'rgba(200,0,0,0.45)' }],
+  colorNeedle: 'rgba(39,174,96,1)', colorNeedleEnd: 'rgba(39,174,96,0.7)',
+  colorValueText: '#27ae60', colorValueTextShadow: 'rgba(39,174,96,0.3)'
+});
+
+// ── Tarjetas pestaña Prueba ───────────────────────────────────────────────────
 const CATEGORIES = [
   { title: "Velocidad & Motor", color: "#e74c3c", fields: [
       { key: "speed_v",  label: "Velocidad",        unit: "km/h" },
@@ -293,6 +332,7 @@ CATEGORIES.forEach(cat => {
   grid.appendChild(card);
 });
 
+// ── Gráfica RPM/Throttle/Brake ────────────────────────────────────────────────
 const WINDOW_MS = 15000;
 const X_OPTS = {
   type: "time",
@@ -328,6 +368,7 @@ function pushDataset(chart, datasetIndex, timestamp, value) {
   while (ds.data.length > 0 && ds.data[0].x < cutoff) ds.data.shift();
 }
 
+// ── WebSocket ─────────────────────────────────────────────────────────────────
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 
@@ -353,6 +394,15 @@ function updateDashboard(payload) {
   const data = payload.data || {};
   document.getElementById("status-bar").textContent =
     `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
+
+  // ── Gauges pestaña Principal ──────────────────────────────────────────────
+  if (data.rpm     != null) gRpm.value  = Math.abs(data.rpm);
+  if (data.speed_v != null) gVel.value  = data.speed_v;
+  if (data.curr_p  != null) gCurr.value = Math.abs(data.curr_p);
+  const pHV = (data.p_hv != null)
+    ? data.p_hv
+    : (data.volt_p != null && data.curr_p != null ? data.volt_p * Math.abs(data.curr_p) : 0);
+  gPow.value = Math.max(0, pHV / 1000);
 
   // ── Variables originales (pestaña Prueba) ─────────────────────────────────
   CATEGORIES.forEach(cat => {
