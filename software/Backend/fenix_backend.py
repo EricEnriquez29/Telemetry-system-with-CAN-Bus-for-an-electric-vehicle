@@ -4,11 +4,13 @@ fenix_backend.py  –  Escudería Fénix
 - Calcula variables derivadas del tren motriz
 - Calcula orientación (Roll/Pitch) y aceleraciones compensadas (dinámica vehicular)
 - Empuja cada snapshot a fenix_api via HTTP POST (RAM)
+- Watchdog: si no llegan datos MQTT en 5s, envía snapshot con todo en cero
 """
 
 import json
 import math
 import time
+import threading
 import requests
 from datetime import datetime, timezone, timedelta
 import paho.mqtt.client as mqtt
@@ -32,42 +34,33 @@ INFLUX_BUCKET = "Telemetria"
 API_INTERNAL_URL = "http://localhost:8050/internal/snapshot"
 
 # ─── Constantes del motor y paquete ──────────────────────────────────────────
-KT              = 0.143   # Nm/A — constante de torque ME MAX 6kW
-E_NOM           = 5210.0  # Wh  — energía nominal 16S LiFePO4 100Ah
-Q_NOM           = 100.0   # Ah  — capacidad nominal HV
-I_MIN           = 10.0    # A   — umbral mínimo corriente
-T_REPOSO        = 60.0    # s   — segundos en reposo para actualizar V_rest
-T_GAP_MAX       = 600.0   # s   — gap máximo sin descarga para SOH (10 min)
-SOC_MIN_DELTA   = 30.0    # %   — descarga mínima para calcular SOH
-DT              = 0.1     # s   — intervalo entre snapshots (10 Hz)
+KT              = 0.143
+E_NOM           = 5210.0
+Q_NOM           = 100.0
+I_MIN           = 10.0
+T_REPOSO        = 60.0
+T_GAP_MAX       = 600.0
+SOC_MIN_DELTA   = 30.0
+DT              = 0.1
 
-# ─── Constantes batería auxiliar (LiFePO4 4S Humsienk 100Ah) ─────────────────
-Q_NOM_AUX = 100.0   # Ah
-E_NOM_AUX = 1280.0  # Wh (12.8V × 100Ah)
+# ─── Watchdog ─────────────────────────────────────────────────────────────────
+WATCHDOG_TIMEOUT = 5.0   # segundos sin datos MQTT → enviar ceros
+_watchdog_timer  = None
 
-# ─── Constantes IMU ───────────────────────────────────────────────────────────
-ALPHA_CF = 0.98   # Coeficiente filtro complementario
-G_CONST  = 9.81   # m/s²
+# ─── Constantes batería auxiliar ─────────────────────────────────────────────
+Q_NOM_AUX = 100.0
+E_NOM_AUX = 1280.0
+ALPHA_CF  = 0.98
+G_CONST   = 9.81
 
-# Curva OCV vs SOC para LiFePO4 4S (celdas EVE 2.8V-3.65V)
 AUX_OCV_TABLE = [
-    (11.2, 0.0),
-    (12.0, 5.0),
-    (12.8, 10.0),
-    (13.2, 20.0),
-    (13.3, 40.0),
-    (13.4, 60.0),
-    (13.6, 80.0),
-    (14.2, 95.0),
-    (14.6, 100.0),
+    (11.2, 0.0), (12.0, 5.0), (12.8, 10.0), (13.2, 20.0),
+    (13.3, 40.0), (13.4, 60.0), (13.6, 80.0), (14.2, 95.0), (14.6, 100.0),
 ]
 
 def ocv_to_soc_aux(v: float) -> float:
-    """Interpola el SOC de la batería auxiliar dado su voltaje en circuito abierto."""
-    if v <= AUX_OCV_TABLE[0][0]:
-        return 0.0
-    if v >= AUX_OCV_TABLE[-1][0]:
-        return 100.0
+    if v <= AUX_OCV_TABLE[0][0]:  return 0.0
+    if v >= AUX_OCV_TABLE[-1][0]: return 100.0
     for i in range(len(AUX_OCV_TABLE) - 1):
         v0, s0 = AUX_OCV_TABLE[i]
         v1, s1 = AUX_OCV_TABLE[i + 1]
@@ -86,26 +79,79 @@ _soc0_aux         = None
 _aux_muestras     = []
 _aux_ultimo_t     = None
 
-# ─── Variables de reposo para resistencia interna (RAM) ──────────────────────
 _v_rest_pack      = None
 _v_rest_cells     = [None] * 16
 _t_reposo_inicio  = None
 _en_reposo        = False
 
-# ─── Variables SOH (RAM) ─────────────────────────────────────────────────────
 _soh_c            = None
 _soh_Q_SOH        = 0.0
 _soh_soc_inicio   = None
 _soh_t_ultimo     = None
 _soh_activo       = False
 
-# ─── Variables filtro complementario IMU (RAM) ───────────────────────────────
-_phi_rad   = 0.0   # Roll acumulado [rad]
-_theta_rad = 0.0   # Pitch acumulado [rad]
+_phi_rad   = 0.0
+_theta_rad = 0.0
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
+
+
+# ─── Watchdog ─────────────────────────────────────────────────────────────────
+def send_zero_snapshot():
+    """Envía snapshot con todo en cero cuando no hay datos MQTT."""
+    print("[WD] Sin datos MQTT — enviando snapshot cero", flush=True)
+    ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    snapshot = {
+        "timestamp":  ts_now,
+        "vehicle_id": "25",
+        "session_id": _session_id_prev or "0",
+        "data": {
+            "curr_rms": 0.0, "speed_v": 0.0,  "odo_veh":  0.0,
+            "tmp_mot":  0.0, "tmp_cont": 0.0,  "tmp_cap":  0.0,
+            "mot_torq": 0.0, "batt_curr": 0.0, "rpm":      0.0,
+            "throttle": 0.0, "brake":    0.0,  "cont_st":  0.0,
+            "ksy_v":    0.0, "volt_p":   0.0,  "curr_p":   0.0,
+            "soc":      0.0, "tmp_max":  0.0,  "tmp_min":  0.0,
+            "gps_lat":  0.0, "gps_lon":  0.0,
+            "acc_x":    0.0, "acc_y":    0.0,  "acc_z":    0.0,
+            "gyro_x":   0.0, "gyro_y":   0.0,  "gyro_z":   0.0,
+            "volt_a":   0.0, "curr_a":   0.0,
+            "cells": {f"cell_{i+1}": 0.0 for i in range(16)},
+            "tau_est": 0.0, "p_mec": 0.0, "p_hv": None,
+            "p_regen": None, "eta": None,
+            "E_HV":    round(_E_HV,    3),
+            "Q_HV":    round(_Q_HV,    4),
+            "E_regen": round(_E_regen, 3),
+            "Q_HV_rest": 0.0, "E_HV_rest": 0.0,
+            "r_pack": None,
+            "r_cells": {f"r_cell_{i+1}": None for i in range(16)},
+            "soh_c":   round(_soh_c, 2) if _soh_c is not None else None,
+            "soh_activo": False, "soh_Q_SOH": 0.0, "soh_soc_inicio": None,
+            "p_aux": 0.0,
+            "E_aux": round(_E_aux, 3),
+            "Q_aux": round(_Q_aux, 4),
+            "soc_aux": None,
+            "v_rest_pack": _v_rest_pack, "t_reposo_s": 0,
+            "phi": 0.0, "theta": 0.0,
+            "Gx":  0.0, "Gy":    0.0, "Gz": 0.0,
+        }
+    }
+    try:
+        requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
+    except Exception as e:
+        print(f"[WD] Error POST: {e}", flush=True)
+
+
+def reset_watchdog():
+    """Reinicia el timer del watchdog. Llamar en cada on_message."""
+    global _watchdog_timer
+    if _watchdog_timer is not None:
+        _watchdog_timer.cancel()
+    _watchdog_timer = threading.Timer(WATCHDOG_TIMEOUT, send_zero_snapshot)
+    _watchdog_timer.daemon = True
+    _watchdog_timer.start()
 
 
 # ─── Cálculo de variables derivadas ──────────────────────────────────────────
@@ -117,34 +163,23 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
     volt_p     = float(data.get("volt_p",  0))
     cell_volts = data.get("cell_volts", [])
 
-    # ── Torque estimado ────────────────────────────────────────────────────
     tau_est = KT * curr_rms
+    p_mec   = tau_est * (2 * math.pi * rpm / 60)
+    p_hv    = (volt_p * abs(curr_p)) if curr_p < -I_MIN else None
+    p_regen = (volt_p * curr_p)      if curr_p >  I_MIN else None
 
-    # ── Potencia mecánica ──────────────────────────────────────────────────
-    p_mec = tau_est * (2 * math.pi * rpm / 60)
-
-    # ── Potencia eléctrica HV (solo descarga) ─────────────────────────────
-    p_hv = (volt_p * abs(curr_p)) if curr_p < -I_MIN else None
-
-    # ── Potencia regenerativa (solo regen) ────────────────────────────────
-    p_regen = (volt_p * curr_p) if curr_p > I_MIN else None
-
-    # ── Eficiencia ────────────────────────────────────────────────────────
     if p_hv is not None and p_hv > 300:
         eta = min((p_mec / p_hv) * 100, 100.0)
     else:
         eta = None
 
-    # ── Capacidad y energía restante ──────────────────────────────────────
     Q_HV_rest = Q_NOM * (soc / 100.0)
     E_HV_rest = E_NOM * (soc / 100.0)
 
-    # ── Resistencia interna paquete ───────────────────────────────────────
     r_pack = None
     if _v_rest_pack is not None and abs(curr_p) > I_MIN:
         r_pack = (_v_rest_pack - volt_p) / abs(curr_p)
 
-    # ── Resistencia interna por celda ─────────────────────────────────────
     r_cells = {}
     for i, v_load in enumerate(cell_volts):
         v_rest = _v_rest_cells[i] if i < len(_v_rest_cells) else None
@@ -153,49 +188,31 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         else:
             r_cells[f"r_cell_{i+1}"] = None
 
-    # ── Orientación — filtro complementario ───────────────────────────────
-    # El MPU-6050 entrega acc en g y gyro en °/s
     acc_x  = float(data.get("acc_x",  0))
     acc_y  = float(data.get("acc_y",  0))
     acc_z  = float(data.get("acc_z",  0))
     gyro_x = float(data.get("gyro_x", 0))
     gyro_y = float(data.get("gyro_y", 0))
 
-    # Ángulos del acelerómetro [rad]
     phi_acc   = math.atan2(acc_y, acc_z)
     theta_acc = math.atan2(-acc_x, math.sqrt(acc_y**2 + acc_z**2))
 
-    # Integración del giroscopio: gyro en °/s → rad/s → integrar con DT
-    gyro_x_rad = math.radians(gyro_x)
-    gyro_y_rad = math.radians(gyro_y)
+    phi_giro   = _phi_rad   + math.radians(gyro_x) * DT
+    theta_giro = _theta_rad + math.radians(gyro_y) * DT
 
-    phi_giro   = _phi_rad   + gyro_x_rad * DT
-    theta_giro = _theta_rad + gyro_y_rad * DT
-
-    # Filtro complementario [rad]
     _phi_rad   = ALPHA_CF * phi_giro   + (1 - ALPHA_CF) * phi_acc
     _theta_rad = ALPHA_CF * theta_giro + (1 - ALPHA_CF) * theta_acc
 
-    # Convertir a grados
     phi_deg   = math.degrees(_phi_rad)
     theta_deg = math.degrees(_theta_rad)
 
-    # ── Aceleraciones compensadas por gravedad ────────────────────────────
-    # acc_x/y/z viene en g → convertir a m/s² multiplicando por G_CONST
-    # Calcular componente gravitacional proyectada en cada eje del vehículo
     gx = -G_CONST * math.sin(_theta_rad)
     gy =  G_CONST * math.sin(_phi_rad) * math.cos(_theta_rad)
     gz =  G_CONST * math.cos(_phi_rad) * math.cos(_theta_rad)
 
-    # Aceleración dinámica real [m/s²]
-    ax_veh = (acc_x * G_CONST) - gx
-    ay_veh = (acc_y * G_CONST) - gy
-    az_veh = (acc_z * G_CONST) - gz
-
-    # Expresar en G (dividir entre 9.81)
-    Gx = ax_veh / G_CONST
-    Gy = ay_veh / G_CONST
-    Gz = az_veh / G_CONST
+    Gx = ((acc_x * G_CONST) - gx) / G_CONST
+    Gy = ((acc_y * G_CONST) - gy) / G_CONST
+    Gz = ((acc_z * G_CONST) - gz) / G_CONST
 
     return {
         "tau_est":    round(tau_est, 4),
@@ -207,23 +224,13 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "E_HV_rest":  round(E_HV_rest, 2),
         "r_pack":     round(r_pack,  6) if r_pack  is not None else None,
         "r_cells":    r_cells,
-        # Orientación
         "phi":        round(phi_deg,   4),
         "theta":      round(theta_deg, 4),
-        # Aceleraciones compensadas
         "Gx":         round(Gx, 4),
         "Gy":         round(Gy, 4),
         "Gz":         round(Gz, 4),
-        # Acumulativas y SOH — se asignan en on_message
-        "E_HV":    None,
-        "Q_HV":    None,
-        "E_regen": None,
-        "soh_c":   None,
-        # Auxiliar — se asignan en on_message
-        "p_aux":      None,
-        "E_aux":      None,
-        "Q_aux":      None,
-        "soc_aux":    None,
+        "E_HV": None, "Q_HV": None, "E_regen": None, "soh_c": None,
+        "p_aux": None, "E_aux": None, "Q_aux": None, "soc_aux": None,
     }
 
 
@@ -237,10 +244,14 @@ def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Error de conexion MQTT: rc={rc}")
 
 def on_message(client, userdata, msg):
-    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux, _soc0_aux, _aux_muestras, _aux_ultimo_t
+    global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux
+    global _soc0_aux, _aux_muestras, _aux_ultimo_t
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
     global _phi_rad, _theta_rad
+
+    # ── Watchdog: llegó un mensaje, reiniciar timer ───────────────────────────
+    reset_watchdog()
 
     try:
         data = json.loads(msg.payload.decode())
@@ -255,29 +266,17 @@ def on_message(client, userdata, msg):
         if new_session_id != _session_id_prev:
             print(f"[Sesión] {_session_id_prev} → {new_session_id} — reiniciando acumuladores")
             _session_id_prev = new_session_id
-            _E_HV    = 0.0
-            _Q_HV    = 0.0
-            _E_regen = 0.0
-            _E_aux        = 0.0
-            _Q_aux        = 0.0
-            _soc0_aux     = None
-            _aux_muestras = []
-            _aux_ultimo_t = None
-            # Reiniciar SOH
-            _soh_Q_SOH      = 0.0
-            _soh_soc_inicio = None
-            _soh_t_ultimo   = None
-            _soh_activo     = False
-            # Reiniciar filtro complementario IMU
-            _phi_rad   = 0.0
-            _theta_rad = 0.0
+            _E_HV = _Q_HV = _E_regen = _E_aux = _Q_aux = 0.0
+            _soc0_aux = None; _aux_muestras = []; _aux_ultimo_t = None
+            _soh_Q_SOH = 0.0; _soh_soc_inicio = None
+            _soh_t_ultimo = None; _soh_activo = False
+            _phi_rad = 0.0; _theta_rad = 0.0
 
-        # ── 2. Lógica de reposo para V_rest (60 segundos) ─────────────────────
+        # ── 2. Lógica de reposo para V_rest ──────────────────────────────────
         now = time.time()
         if abs(curr_p) < I_MIN:
             if not _en_reposo:
-                _en_reposo        = True
-                _t_reposo_inicio  = now
+                _en_reposo = True; _t_reposo_inicio = now
             else:
                 if (now - _t_reposo_inicio) >= T_REPOSO:
                     _v_rest_pack  = volt_p
@@ -307,7 +306,6 @@ def on_message(client, userdata, msg):
         _E_aux += p_aux  * DT / 3600.0
         _Q_aux += curr_a * DT / 3600.0
 
-        # SOC0 auxiliar — 4 muestras a 1Hz, usar la de menor corriente
         if _soc0_aux is None and len(_aux_muestras) < 4:
             if _aux_ultimo_t is None or (now - _aux_ultimo_t) >= 1.0:
                 if curr_a > 0.0 and volt_a > 10.0:
@@ -317,17 +315,12 @@ def on_message(client, userdata, msg):
                 else:
                     print(f"[AUX] Muestra descartada — curr_a={curr_a:.2f}A volt_a={volt_a:.3f}V", flush=True)
                     _aux_ultimo_t = now
-
             if len(_aux_muestras) == 4:
                 min_curr, volt_ocv = min(_aux_muestras, key=lambda x: x[0])
                 _soc0_aux = ocv_to_soc_aux(volt_ocv)
-                print(f"[AUX] SOC0 = {_soc0_aux:.1f}% (volt_ocv={volt_ocv:.3f}V, curr_min={min_curr:.2f}A)", flush=True)
+                print(f"[AUX] SOC0 = {_soc0_aux:.1f}%", flush=True)
 
-        if _soc0_aux is not None:
-            soc_aux = max(0.0, _soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0)
-        else:
-            soc_aux = None
-
+        soc_aux = max(0.0, _soc0_aux - (_Q_aux / Q_NOM_AUX) * 100.0) if _soc0_aux is not None else None
         derived["p_aux"]   = round(p_aux,   2)
         derived["E_aux"]   = round(_E_aux,  3)
         derived["Q_aux"]   = round(_Q_aux,  4)
@@ -336,34 +329,24 @@ def on_message(client, userdata, msg):
         # ── 6. Lógica SOH ─────────────────────────────────────────────────────
         if curr_p < -I_MIN:
             if not _soh_activo:
-                _soh_activo     = True
-                _soh_Q_SOH      = 0.0
-                _soh_soc_inicio = soc
+                _soh_activo = True; _soh_Q_SOH = 0.0; _soh_soc_inicio = soc
                 print(f"[SOH] Inicio intervalo — SOC_inicio={soc:.1f}%", flush=True)
             elif _soh_soc_inicio is not None and _soh_soc_inicio < 1.0 and soc > 1.0:
-                _soh_soc_inicio = soc
-                _soh_Q_SOH      = 0.0
+                _soh_soc_inicio = soc; _soh_Q_SOH = 0.0
                 print(f"[SOH] SOC_inicio corregido a {soc:.1f}%", flush=True)
-
             if _soh_t_ultimo is not None and (now - _soh_t_ultimo) > T_GAP_MAX:
-                print(f"[SOH] Gap de {now - _soh_t_ultimo:.0f}s superado — reiniciando", flush=True)
-                _soh_activo     = False
-                _soh_Q_SOH      = 0.0
-                _soh_soc_inicio = soc
+                print(f"[SOH] Gap superado — reiniciando", flush=True)
+                _soh_activo = False; _soh_Q_SOH = 0.0; _soh_soc_inicio = soc
             else:
                 _soh_Q_SOH += abs(curr_p) * DT / 3600.0
-
             _soh_t_ultimo = now
-
             if _soh_soc_inicio is not None:
                 delta_soc = _soh_soc_inicio - soc
                 if delta_soc >= SOC_MIN_DELTA:
                     Q_teorico = Q_NOM * (delta_soc / 100.0)
                     _soh_c    = round((_soh_Q_SOH / Q_teorico) * 100.0, 2)
-                    print(f"[SOH] Calculado — ΔSoC={delta_soc:.1f}% Q_real={_soh_Q_SOH:.3f}Ah Q_teo={Q_teorico:.3f}Ah SOH={_soh_c:.2f}%", flush=True)
-                    _soh_activo     = False
-                    _soh_Q_SOH      = 0.0
-                    _soh_soc_inicio = None
+                    print(f"[SOH] SOH={_soh_c:.2f}%", flush=True)
+                    _soh_activo = False; _soh_Q_SOH = 0.0; _soh_soc_inicio = None
 
         derived["soh_c"] = round(_soh_c, 2) if _soh_c is not None else None
 
@@ -405,7 +388,6 @@ def on_message(client, userdata, msg):
             .field("gyro_z",    float(data.get("gyro_z",    0)))
             .field("volt_a",    float(data.get("volt_a",    0)))
             .field("curr_a",    float(data.get("curr_a",    0)))
-            # Derivadas siempre presentes
             .field("tau_est",   derived["tau_est"])
             .field("p_mec",     derived["p_mec"])
             .field("E_HV",      derived["E_HV"])
@@ -416,7 +398,6 @@ def on_message(client, userdata, msg):
             .field("p_aux",     derived["p_aux"])
             .field("E_aux",     derived["E_aux"])
             .field("Q_aux",     derived["Q_aux"])
-            # Orientación y aceleraciones compensadas
             .field("phi",       derived["phi"])
             .field("theta",     derived["theta"])
             .field("Gx",        derived["Gx"])
@@ -424,10 +405,7 @@ def on_message(client, userdata, msg):
             .field("Gz",        derived["Gz"])
         )
 
-        if derived["soc_aux"] is not None:
-            point = point.field("soc_aux", derived["soc_aux"])
-
-        # Campos condicionales
+        if derived["soc_aux"] is not None: point = point.field("soc_aux", derived["soc_aux"])
         if derived["p_hv"]    is not None: point = point.field("p_hv",    derived["p_hv"])
         if derived["p_regen"] is not None: point = point.field("p_regen", derived["p_regen"])
         if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
@@ -436,12 +414,9 @@ def on_message(client, userdata, msg):
 
         for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
-
         for i in range(16):
-            key = f"r_cell_{i+1}"
-            val = derived["r_cells"].get(key)
-            if val is not None:
-                point = point.field(key, val)
+            val = derived["r_cells"].get(f"r_cell_{i+1}")
+            if val is not None: point = point.field(f"r_cell_{i+1}", val)
 
         write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
         print(f"[InfluxDB] sess={data.get('sess_id')} t={data.get('times')} guardado")
@@ -481,7 +456,6 @@ def on_message(client, userdata, msg):
                 "volt_a":    float(data.get("volt_a",    0)),
                 "curr_a":    float(data.get("curr_a",    0)),
                 "cells": {f"cell_{i+1}": float(v) for i, v in enumerate(cell_volts)},
-                # Derivadas tren motriz
                 "tau_est":    derived["tau_est"],
                 "p_mec":      derived["p_mec"],
                 "p_hv":       derived["p_hv"],
@@ -498,15 +472,12 @@ def on_message(client, userdata, msg):
                 "soh_activo": _soh_activo,
                 "soh_Q_SOH":  round(_soh_Q_SOH, 4),
                 "soh_soc_inicio": _soh_soc_inicio,
-                # Auxiliar
                 "p_aux":      derived["p_aux"],
                 "E_aux":      derived["E_aux"],
                 "Q_aux":      derived["Q_aux"],
                 "soc_aux":    derived["soc_aux"],
-                # Reposo
                 "v_rest_pack": _v_rest_pack,
                 "t_reposo_s":  round(time.time() - _t_reposo_inicio, 1) if _en_reposo and _t_reposo_inicio else 0,
-                # Orientación y aceleraciones compensadas
                 "phi":        derived["phi"],
                 "theta":      derived["theta"],
                 "Gx":         derived["Gx"],
@@ -515,7 +486,6 @@ def on_message(client, userdata, msg):
             }
         }
 
-        # ── 9. Empujar a fenix_api ────────────────────────────────────────────
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
@@ -534,6 +504,10 @@ def main():
 
     print("Conectando al broker MQTT...")
     client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+
+    # Iniciar watchdog desde el arranque
+    reset_watchdog()
+
     client.loop_forever()
 
 if __name__ == "__main__":

@@ -8,14 +8,12 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0d0d0d; color: #f0f0f0;
-      font-family: 'Share Tech Mono', monospace;
-      padding: 24px; min-height: 100vh;
-    }
+    body { background: #0d0d0d; color: #f0f0f0; font-family: 'Share Tech Mono', monospace; padding: 24px; min-height: 100vh; }
     #header { text-align: center; border-bottom: 2px solid #ef5e20; padding-bottom: 14px; margin-bottom: 0; }
     #title { font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #ef5e20; text-transform: uppercase; }
     #subheader { display: flex; justify-content: center; align-items: center; gap: 24px; padding: 8px 0; margin-bottom: 16px; font-size: 12px; color: #aaa; border-bottom: 1px solid #1a1a1a; }
@@ -43,81 +41,39 @@
     #cells-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; margin-bottom: 16px; }
     #cells-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
     .cell-card { background: #222; border-radius: 6px; padding: 8px 10px; text-align: center; }
-    .cell-name  { font-size: 10px; color: #666; margin-bottom: 4px; }
+    .cell-name { font-size: 10px; color: #666; margin-bottom: 4px; }
     .cell-value { font-size: 15px; }
-    .cell-ok    { color: #f0f0f0; }
-    .cell-warn  { color: #e74c3c; }
+    .cell-ok { color: #f0f0f0; }
+    .cell-warn { color: #e74c3c; }
     .empty-tab { color: #444; font-size: 12px; text-align: center; padding: 60px; border: 1px dashed #2a2a2a; border-radius: 10px; letter-spacing: 1px; }
     .derived-note { font-size: 11px; color: #555; margin-top: 8px; letter-spacing: 0.5px; }
     #derived-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
     @media (max-width: 700px) { #derived-grid { grid-template-columns: 1fr; } }
-    .value-positive { color: #27ae60; }
-    .value-negative { color: #e74c3c; }
 
-    /* ── Pestaña Principal ── */
-    #principal-row {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      margin-bottom: 24px;
-      min-width: 0;
-    }
-    .gauge-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex-shrink: 0;
-      gap: 6px;
-    }
-    .gauge-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #888;
-    }
-    #throttle-chart-wrap {
-      flex: 1;
-      min-width: 0;
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 16px;
-      border-left: 4px solid #ef5e20;
-    }
-    #throttle-chart-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #ef5e20;
-      margin-bottom: 12px;
-    }
-    #throttle-chart-container {
-      position: relative;
-      height: 220px;
-      width: 100%;
-    }
+    /* ── Principal ── */
+    #principal-row { display: flex; align-items: stretch; gap: 16px; margin-bottom: 24px; min-width: 0; }
+    #throttle-chart-wrap { flex: 1; min-width: 0; background: #1a1a1a; border-radius: 10px; padding: 16px; border-left: 4px solid #ef5e20; }
+    #throttle-chart-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #ef5e20; margin-bottom: 12px; }
+    #throttle-chart-container { position: relative; height: 220px; width: 100%; }
+    #map-wrap { flex: 1; min-width: 0; background: #1a1a1a; border-radius: 10px; padding: 16px; border-left: 4px solid #27ae60; display: flex; flex-direction: column; }
+    #map-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    #map-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #27ae60; }
+    #map-center-btn { font-family: 'Share Tech Mono', monospace; font-size: 10px; padding: 3px 10px; background: transparent; color: #27ae60; border: 1px solid #27ae60; cursor: pointer; letter-spacing: 1px; border-radius: 3px; }
+    #map-center-btn:hover { background: #27ae6022; }
+    #map { flex: 1; border-radius: 6px; min-height: 220px; }
+    .leaflet-control-zoom a { background: #1a1a1a !important; color: #aaa !important; border-color: #333 !important; }
+    .leaflet-control-zoom a:hover { background: #2a2a2a !important; color: #fff !important; }
   </style>
 </head>
 <body>
 
   <!-- Pantalla de carga -->
-  <div id="loading-screen" style="
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    background:#0d0d0d; z-index:9999;
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:24px;
-  ">
+  <div id="loading-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#0d0d0d;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;">
     <canvas id="loading-canvas" width="160" height="160"></canvas>
-    <div style="
-      font-family:'Orbitron',sans-serif;
-      font-size:16px; font-weight:700;
-      letter-spacing:4px; text-transform:uppercase;
-      color:#ef5e20;
-    ">Cargando interfaz</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#ef5e20;">Cargando interfaz</div>
   </div>
 
-  <div id="header">
-    <div id="title">Sistema de Telemetria de Escudería Fénix UPIITA</div>
-  </div>
+  <div id="header"><div id="title">Sistema de Telemetria de Escudería Fénix UPIITA</div></div>
   <div id="subheader">
     <div id="ws-indicator"><div id="ws-dot"></div><span id="ws-label">Desconectado</span></div>
     <div id="status-bar">Sin datos</div>
@@ -135,10 +91,10 @@
   <div id="tab-0">
     <div id="principal-row">
 
-      <!-- Gauge Throttle Plotly -->
-      <div style="display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0;">
-        <div id="gauge-throttle" style="width:320px; height:220px;"></div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#888; margin-top:-8px;">Acelerador</div>
+      <!-- Gauge Throttle -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+        <div id="gauge-throttle" style="width:280px;height:220px;"></div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-top:-4px;">Acelerador</div>
       </div>
 
       <!-- Gráfica throttle -->
@@ -147,20 +103,25 @@
         <div id="throttle-chart-container"><canvas id="chart-throttle"></canvas></div>
       </div>
 
+      <!-- Mapa GPS -->
+      <div id="map-wrap">
+        <div id="map-header">
+          <div id="map-title">GPS — Posición en pista</div>
+          <button id="map-center-btn" onclick="centerMap()">⊙ Centrar</button>
+        </div>
+        <div id="map"></div>
+      </div>
+
     </div>
   </div>
 
   <!-- Pestaña 1: Tabla de vueltas -->
-  <div id="tab-1" style="display:none;">
-    <div class="empty-tab">— Tabla de vueltas — en construcción —</div>
-  </div>
+  <div id="tab-1" style="display:none;"><div class="empty-tab">— Tabla de vueltas — en construcción —</div></div>
 
   <!-- Pestaña 2: Ploteo -->
-  <div id="tab-2" style="display:none;">
-    <div class="empty-tab">— Ploteo — en construcción —</div>
-  </div>
+  <div id="tab-2" style="display:none;"><div class="empty-tab">— Ploteo — en construcción —</div></div>
 
-  <!-- Pestaña 3: Derivadas Prueba — Dinámica Vehicular -->
+  <!-- Pestaña 3: Derivadas Prueba -->
   <div id="tab-3" style="display:none;">
     <div id="derived-grid">
       <div class="card" style="border-left:4px solid #3498db;">
@@ -176,23 +137,14 @@
         <div class="card-title" style="color:#ef5e20;">Orientación — Filtro Complementario (α = 0.98)</div>
         <div class="field-row"><span class="field-label">Roll φ</span><span><span class="field-value" id="dval-phi">—</span><span class="field-unit">°</span></span></div>
         <div class="field-row"><span class="field-label">Pitch θ</span><span><span class="field-value" id="dval-theta">—</span><span class="field-unit">°</span></span></div>
-        <div class="derived-note">
-          98% giroscopio + 2% acelerómetro<br>
-          τ ≈ 4.9 s — corrección de deriva cada ~5 s<br><br>
-          En reposo con acc_x=−0.17, acc_y=0.01, acc_z=1.00:<br>
-          φ esperado ≈ 0.57°&nbsp;&nbsp;&nbsp;θ esperado ≈ 9.65°
-        </div>
+        <div class="derived-note">98% giroscopio + 2% acelerómetro<br>τ ≈ 4.9 s — corrección de deriva cada ~5 s</div>
       </div>
       <div class="card" style="border-left:4px solid #27ae60;">
         <div class="card-title" style="color:#27ae60;">Aceleraciones Compensadas por Gravedad</div>
         <div class="field-row"><span class="field-label">Gx — longitudinal</span><span><span class="field-value" id="dval-Gx">—</span><span class="field-unit">G</span></span></div>
         <div class="field-row"><span class="field-label">Gy — lateral</span><span><span class="field-value" id="dval-Gy">—</span><span class="field-unit">G</span></span></div>
         <div class="field-row"><span class="field-label">Gz — vertical</span><span><span class="field-value" id="dval-Gz">—</span><span class="field-unit">G</span></span></div>
-        <div class="derived-note">
-          acc crudo (m/s²) − componente gravitacional proyectada<br>
-          dividido entre 9.81 m/s² para expresar en G<br><br>
-          En reposo plano: Gx ≈ 0.00 &nbsp; Gy ≈ 0.00 &nbsp; Gz ≈ 0.00
-        </div>
+        <div class="derived-note">En reposo plano: Gx ≈ 0.00 &nbsp; Gy ≈ 0.00 &nbsp; Gz ≈ 0.00</div>
       </div>
       <div class="card" style="border-left:4px solid #8e44ad;">
         <div class="card-title" style="color:#8e44ad;">Referencia — Valores Esperados en Reposo</div>
@@ -208,7 +160,7 @@
 
   <!-- Pestaña 4: Prueba -->
   <div id="tab-4" style="display:none;">
-    <div class="chart-section" style="border-left: 4px solid #e74c3c;">
+    <div class="chart-section" style="border-left:4px solid #e74c3c;">
       <div class="chart-title" style="color:#e74c3c;">RPM / Throttle / Brake — 15 s</div>
       <div class="chart-container"><canvas id="chart-control"></canvas></div>
     </div>
@@ -223,349 +175,229 @@
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const tabEls = document.querySelectorAll('.tab');
 function switchTab(i) {
-  tabEls.forEach((t, j) => {
-    t.classList.toggle('active', i === j);
-    document.getElementById('tab-' + j).style.display = i === j ? 'block' : 'none';
+  tabEls.forEach((t,j) => {
+    t.classList.toggle('active', i===j);
+    document.getElementById('tab-'+j).style.display = i===j ? 'block' : 'none';
   });
+  if (i===0) setTimeout(()=>gpsMap.invalidateSize(), 100);
 }
 
-// ── Gauge Throttle — Plotly ──────────────────────────────────────────────────
-Plotly.newPlot('gauge-throttle', [{
-  type: "indicator",
-  mode: "gauge+number",
-  value: 0,
-  number: { font: { size: 36, color: "#ef5e20", family: "Orbitron" }, suffix: "%" },
-  gauge: {
-    axis: {
-      range: [0, 100],
-      tickwidth: 1,
-      tickcolor: "#666",
-      tickfont: { color: "#aaa", size: 11, family: "Share Tech Mono" },
-      dtick: 20
-    },
-    bar: { color: "#ef5e20", thickness: 0.25 },
-    bgcolor: "#111",
-    borderwidth: 2,
-    bordercolor: "#333",
-    steps: [
-      { range: [0,  60], color: "#1a2a1a" },
-      { range: [60, 80], color: "#2a2a1a" },
-      { range: [80,100], color: "#2a1a1a" }
-    ],
-    threshold: {
-      line: { color: "#ef5e20", width: 3 },
-      thickness: 0.75,
-      value: 80
-    }
+// ── Gauge Throttle — Plotly ───────────────────────────────────────────────────
+Plotly.newPlot('gauge-throttle',[{
+  type:"indicator", mode:"gauge+number", value:0,
+  number:{font:{size:32,color:"#ef5e20",family:"Orbitron"},suffix:"%"},
+  gauge:{
+    axis:{range:[0,100],tickwidth:1,tickcolor:"#666",tickfont:{color:"#aaa",size:10,family:"Share Tech Mono"},dtick:20},
+    bar:{color:"#ef5e20",thickness:0.25}, bgcolor:"#111", borderwidth:2, bordercolor:"#333",
+    steps:[{range:[0,60],color:"#1a2a1a"},{range:[60,80],color:"#2a2a1a"},{range:[80,100],color:"#2a1a1a"}],
+    threshold:{line:{color:"#ef5e20",width:3},thickness:0.75,value:80}
   }
-}], {
-  width: 320, height: 220,
-  margin: { t: 20, r: 20, l: 20, b: 10 },
-  paper_bgcolor: "#0d0d0d",
-  font: { color: "#aaa", family: "Share Tech Mono" }
-}, { displayModeBar: false });
+}],{width:280,height:220,margin:{t:20,r:15,l:15,b:10},paper_bgcolor:"#0d0d0d",font:{color:"#aaa",family:"Share Tech Mono"}},{displayModeBar:false});
 
 // ── Gráfica throttle ──────────────────────────────────────────────────────────
 const ctxThrottle = document.getElementById("chart-throttle").getContext("2d");
-const chartThrottle = new Chart(ctxThrottle, {
-  type: "line",
-  data: { datasets: [
-    { label: "Throttle %", data: [], borderColor: "#ef5e20", backgroundColor: "rgba(239,94,32,0.08)", borderWidth: 2, pointRadius: 0, fill: true, tension: 0, yAxisID: "yPct" }
-  ]},
-  options: {
-    animation: false, responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: {
-        type: "time",
-        time: { unit: "second", displayFormats: { second: "HH:mm:ss" } },
-        ticks: { color: "#aaa", maxTicksLimit: 10, font: { family: "'Share Tech Mono'" } },
-        grid: { color: "#222" }
-      },
-      yPct: { position: "left", min: 0, max: 100,
-        title: { display: true, text: "%", color: "#ef5e20", font: { family: "'Share Tech Mono'" } },
-        ticks: { color: "#ef5e20", font: { family: "'Share Tech Mono'" } },
-        grid: { color: "#222" }
-      }
+const chartThrottle = new Chart(ctxThrottle,{
+  type:"line",
+  data:{datasets:[{label:"Throttle %",data:[],borderColor:"#ef5e20",backgroundColor:"rgba(239,94,32,0.08)",borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:"yPct"}]},
+  options:{animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{type:"time",time:{unit:"second",displayFormats:{second:"HH:mm:ss"}},ticks:{color:"#aaa",maxTicksLimit:10,font:{family:"'Share Tech Mono'"}},grid:{color:"#222"}},
+      yPct:{position:"left",min:0,max:100,title:{display:true,text:"%",color:"#ef5e20",font:{family:"'Share Tech Mono'"}},ticks:{color:"#ef5e20",font:{family:"'Share Tech Mono'"}},grid:{color:"#222"}}
     }
   }
 });
 
 function drawThrottle(val) {
-  Plotly.update('gauge-throttle', { value: val }, {}, [0]);
-  pushDataset(chartThrottle, 0, window._lastTimestamp || new Date().toISOString(), val);
+  Plotly.update('gauge-throttle',{value:val},{},[0]);
+  pushDataset(chartThrottle,0,window._lastTimestamp||new Date().toISOString(),val);
   chartThrottle.update("none");
 }
-function drawBrake(val) {}
+
+// ── Mapa GPS — Leaflet ────────────────────────────────────────────────────────
+var GPS_CENTER = [20.736972, -103.484194];
+var gpsMap = L.map('map',{zoomControl:true,attributionControl:false}).setView(GPS_CENTER,18);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(gpsMap);
+
+// Capa de calles encima del satelital
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.7}).addTo(gpsMap);
+
+// Marcador kart
+var gpsMarker = L.circleMarker(GPS_CENTER,{
+  radius:7, color:'#fff', fillColor:'#ef5e20', fillOpacity:1, weight:2
+}).addTo(gpsMap);
+
+function centerMap() {
+  gpsMap.setView(gpsMarker.getLatLng(), gpsMap.getZoom(), {animate:true,duration:0.5});
+}
+
+function updateMap(lat, lon) {
+  if (lat===0 && lon===0) return;
+  gpsMarker.setLatLng([lat, lon]);
+}
 
 // ── Tarjetas pestaña Prueba ───────────────────────────────────────────────────
-const CATEGORIES = [
-  { title: "Velocidad & Motor", color: "#e74c3c", fields: [
-      { key: "speed_v",  label: "Velocidad",        unit: "km/h" },
-      { key: "rpm",      label: "RPM",               unit: "rpm"  },
-      { key: "mot_torq", label: "Torque Motor",      unit: "Nm"   },
-      { key: "curr_rms", label: "Corriente RMS",     unit: "A"    },
-  ]},
-  { title: "Batería HV", color: "#27ae60", fields: [
-      { key: "soc",       label: "Estado de Carga",   unit: "%"  },
-      { key: "volt_p",    label: "Voltaje Paquete",   unit: "V"  },
-      { key: "curr_p",    label: "Corriente Paquete", unit: "A"  },
-      { key: "batt_curr", label: "Corriente Batería", unit: "A"  },
-      { key: "tmp_max",   label: "Temp. Max Celda",   unit: "°C" },
-      { key: "tmp_min",   label: "Temp. Min Celda",   unit: "°C" },
-  ]},
-  { title: "Temperaturas", color: "#e67e22", fields: [
-      { key: "tmp_mot",  label: "Motor",       unit: "°C" },
-      { key: "tmp_cont", label: "Controlador", unit: "°C" },
-      { key: "tmp_cap",  label: "Capacitores", unit: "°C" },
-  ]},
-  { title: "Auxiliar", color: "#8e44ad", fields: [
-      { key: "volt_a",  label: "Voltaje Aux",        unit: "V" },
-      { key: "curr_a",  label: "Corriente Aux",      unit: "A" },
-      { key: "ksy_v",   label: "Voltaje KSY",        unit: "V" },
-      { key: "cont_st", label: "Estado Controlador", unit: ""  },
-  ]},
-  { title: "Controles", color: "#2980b9", fields: [
-      { key: "throttle", label: "Acelerador",  unit: "%" },
-      { key: "brake",    label: "Freno Regen", unit: "%" },
-      { key: "odo_veh",  label: "Odómetro",    unit: "m" },
-  ]},
-  { title: "GPS", color: "#16a085", fields: [
-      { key: "gps_lat", label: "Latitud",  unit: "°" },
-      { key: "gps_lon", label: "Longitud", unit: "°" },
-  ]},
-  { title: "IMU — Acelerómetro", color: "#d35400", fields: [
-      { key: "acc_x", label: "Acc X", unit: "g" },
-      { key: "acc_y", label: "Acc Y", unit: "g" },
-      { key: "acc_z", label: "Acc Z", unit: "g" },
-  ]},
-  { title: "IMU — Giroscopio", color: "#c0392b", fields: [
-      { key: "gyro_x", label: "Gyro X", unit: "°/s" },
-      { key: "gyro_y", label: "Gyro Y", unit: "°/s" },
-      { key: "gyro_z", label: "Gyro Z", unit: "°/s" },
-  ]},
+const CATEGORIES=[
+  {title:"Velocidad & Motor",color:"#e74c3c",fields:[
+    {key:"speed_v",label:"Velocidad",unit:"km/h"},{key:"rpm",label:"RPM",unit:"rpm"},
+    {key:"mot_torq",label:"Torque Motor",unit:"Nm"},{key:"curr_rms",label:"Corriente RMS",unit:"A"}]},
+  {title:"Batería HV",color:"#27ae60",fields:[
+    {key:"soc",label:"Estado de Carga",unit:"%"},{key:"volt_p",label:"Voltaje Paquete",unit:"V"},
+    {key:"curr_p",label:"Corriente Paquete",unit:"A"},{key:"batt_curr",label:"Corriente Batería",unit:"A"},
+    {key:"tmp_max",label:"Temp. Max Celda",unit:"°C"},{key:"tmp_min",label:"Temp. Min Celda",unit:"°C"}]},
+  {title:"Temperaturas",color:"#e67e22",fields:[
+    {key:"tmp_mot",label:"Motor",unit:"°C"},{key:"tmp_cont",label:"Controlador",unit:"°C"},{key:"tmp_cap",label:"Capacitores",unit:"°C"}]},
+  {title:"Auxiliar",color:"#8e44ad",fields:[
+    {key:"volt_a",label:"Voltaje Aux",unit:"V"},{key:"curr_a",label:"Corriente Aux",unit:"A"},
+    {key:"ksy_v",label:"Voltaje KSY",unit:"V"},{key:"cont_st",label:"Estado Controlador",unit:""}]},
+  {title:"Controles",color:"#2980b9",fields:[
+    {key:"throttle",label:"Acelerador",unit:"%"},{key:"brake",label:"Freno Regen",unit:"%"},{key:"odo_veh",label:"Odómetro",unit:"m"}]},
+  {title:"GPS",color:"#16a085",fields:[{key:"gps_lat",label:"Latitud",unit:"°"},{key:"gps_lon",label:"Longitud",unit:"°"}]},
+  {title:"IMU — Acelerómetro",color:"#d35400",fields:[
+    {key:"acc_x",label:"Acc X",unit:"g"},{key:"acc_y",label:"Acc Y",unit:"g"},{key:"acc_z",label:"Acc Z",unit:"g"}]},
+  {title:"IMU — Giroscopio",color:"#c0392b",fields:[
+    {key:"gyro_x",label:"Gyro X",unit:"°/s"},{key:"gyro_y",label:"Gyro Y",unit:"°/s"},{key:"gyro_z",label:"Gyro Z",unit:"°/s"}]},
 ];
 
-const grid = document.getElementById("grid");
-CATEGORIES.forEach(cat => {
-  const card = document.createElement("div");
-  card.className = "card";
-  card.style.borderLeft = `4px solid ${cat.color}`;
-  const titleEl = document.createElement("div");
-  titleEl.className = "card-title";
-  titleEl.style.color = cat.color;
-  titleEl.textContent = cat.title;
-  card.appendChild(titleEl);
-  cat.fields.forEach(f => {
-    const row = document.createElement("div");
-    row.className = "field-row";
-    const label = document.createElement("span");
-    label.className = "field-label";
-    label.textContent = f.label;
-    const valWrap = document.createElement("span");
-    const valEl = document.createElement("span");
-    valEl.className = "field-value";
-    valEl.id = `val-${f.key}`;
-    valEl.textContent = "—";
-    const unitEl = document.createElement("span");
-    unitEl.className = "field-unit";
-    unitEl.textContent = f.unit;
-    valWrap.appendChild(valEl);
-    valWrap.appendChild(unitEl);
-    row.appendChild(label);
-    row.appendChild(valWrap);
-    card.appendChild(row);
+const grid=document.getElementById("grid");
+CATEGORIES.forEach(cat=>{
+  const card=document.createElement("div"); card.className="card"; card.style.borderLeft=`4px solid ${cat.color}`;
+  const titleEl=document.createElement("div"); titleEl.className="card-title"; titleEl.style.color=cat.color; titleEl.textContent=cat.title; card.appendChild(titleEl);
+  cat.fields.forEach(f=>{
+    const row=document.createElement("div"); row.className="field-row";
+    const label=document.createElement("span"); label.className="field-label"; label.textContent=f.label;
+    const valWrap=document.createElement("span");
+    const valEl=document.createElement("span"); valEl.className="field-value"; valEl.id=`val-${f.key}`; valEl.textContent="—";
+    const unitEl=document.createElement("span"); unitEl.className="field-unit"; unitEl.textContent=f.unit;
+    valWrap.appendChild(valEl); valWrap.appendChild(unitEl); row.appendChild(label); row.appendChild(valWrap); card.appendChild(row);
   });
   grid.appendChild(card);
 });
 
 // ── Gráfica RPM/Throttle/Brake ────────────────────────────────────────────────
-const WINDOW_MS = 15000;
-const X_OPTS = {
-  type: "time",
-  time: { unit: "second", displayFormats: { second: "HH:mm:ss" } },
-  ticks: { color: "#aaa", maxTicksLimit: 15, font: { family: "'Share Tech Mono'" } },
-  grid: { color: "#222" },
-};
+const WINDOW_MS=15000;
+const X_OPTS={type:"time",time:{unit:"second",displayFormats:{second:"HH:mm:ss"}},ticks:{color:"#aaa",maxTicksLimit:15,font:{family:"'Share Tech Mono'"}},grid:{color:"#222"}};
 
-const ctxControl = document.getElementById("chart-control").getContext("2d");
-const chartControl = new Chart(ctxControl, {
-  type: "line",
-  data: { datasets: [
-    { label: "RPM",      data: [], borderColor: "#e74c3c", backgroundColor: "rgba(231,76,60,0.06)",  borderWidth: 2, pointRadius: 0, fill: true,  tension: 0, yAxisID: "yRpm"     },
-    { label: "Throttle", data: [], borderColor: "#27ae60", backgroundColor: "rgba(39,174,96,0.0)",   borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent" },
-    { label: "Brake",    data: [], borderColor: "#e67e22", backgroundColor: "rgba(230,126,34,0.0)",  borderWidth: 2, pointRadius: 0, fill: false, tension: 0, yAxisID: "yPercent" },
+const ctxControl=document.getElementById("chart-control").getContext("2d");
+const chartControl=new Chart(ctxControl,{
+  type:"line",
+  data:{datasets:[
+    {label:"RPM",data:[],borderColor:"#e74c3c",backgroundColor:"rgba(231,76,60,0.06)",borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:"yRpm"},
+    {label:"Throttle",data:[],borderColor:"#27ae60",backgroundColor:"rgba(39,174,96,0.0)",borderWidth:2,pointRadius:0,fill:false,tension:0,yAxisID:"yPercent"},
+    {label:"Brake",data:[],borderColor:"#e67e22",backgroundColor:"rgba(230,126,34,0.0)",borderWidth:2,pointRadius:0,fill:false,tension:0,yAxisID:"yPercent"},
   ]},
-  options: {
-    animation: false, responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: true, labels: { color: "#aaa", boxWidth: 12, font: { family: "'Share Tech Mono'" } } } },
-    scales: {
-      x: X_OPTS,
-      yRpm:     { position: "left",  title: { display: true, text: "RPM", color: "#e74c3c", font: { family: "'Share Tech Mono'" } }, ticks: { color: "#e74c3c", font: { family: "'Share Tech Mono'" } }, grid: { color: "#222" }, min: 0, max: 5000 },
-      yPercent: { position: "right", title: { display: true, text: "%",   color: "#aaa",    font: { family: "'Share Tech Mono'" } }, ticks: { color: "#aaa",    font: { family: "'Share Tech Mono'" } }, grid: { drawOnChartArea: false }, min: 0, max: 100 },
+  options:{animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,labels:{color:"#aaa",boxWidth:12,font:{family:"'Share Tech Mono'"}}}},
+    scales:{
+      x:X_OPTS,
+      yRpm:{position:"left",title:{display:true,text:"RPM",color:"#e74c3c",font:{family:"'Share Tech Mono'"}},ticks:{color:"#e74c3c",font:{family:"'Share Tech Mono'"}},grid:{color:"#222"},min:0,max:5000},
+      yPercent:{position:"right",title:{display:true,text:"%",color:"#aaa",font:{family:"'Share Tech Mono'"}},ticks:{color:"#aaa",font:{family:"'Share Tech Mono'"}},grid:{drawOnChartArea:false},min:0,max:100},
     }
   }
 });
 
-function pushDataset(chart, datasetIndex, timestamp, value) {
-  const now = new Date(timestamp.replace(" ", "T")).getTime() || Date.now();
-  const ds  = chart.data.datasets[datasetIndex];
-  ds.data.push({ x: now, y: value });
-  const cutoff = now - WINDOW_MS;
-  while (ds.data.length > 0 && ds.data[0].x < cutoff) ds.data.shift();
+function pushDataset(chart,datasetIndex,timestamp,value){
+  const now=new Date(timestamp.replace(" ","T")).getTime()||Date.now();
+  const ds=chart.data.datasets[datasetIndex];
+  ds.data.push({x:now,y:value});
+  const cutoff=now-WINDOW_MS;
+  while(ds.data.length>0&&ds.data[0].x<cutoff) ds.data.shift();
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
-const WS_URL = "ws://23.94.237.163:8050/ws";
-let ws = null;
+const WS_URL="ws://23.94.237.163:8050/ws";
+let ws=null;
 
-function connect() {
-  ws = new WebSocket(WS_URL);
-  ws.onopen = () => {
-    document.getElementById("ws-dot").classList.add("connected");
-    document.getElementById("ws-label").textContent = "Conectado";
-  };
-  ws.onmessage = (event) => {
-    const payload = JSON.parse(event.data);
-    updateDashboard(payload);
-  };
-  ws.onclose = () => {
-    document.getElementById("ws-dot").classList.remove("connected");
-    document.getElementById("ws-label").textContent = "Reconectando...";
-    setTimeout(connect, 2000);
-  };
-  ws.onerror = () => ws.close();
+function connect(){
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{document.getElementById("ws-dot").classList.add("connected");document.getElementById("ws-label").textContent="Conectado";};
+  ws.onmessage=(event)=>{const payload=JSON.parse(event.data);updateDashboard(payload);};
+  ws.onclose=()=>{document.getElementById("ws-dot").classList.remove("connected");document.getElementById("ws-label").textContent="Reconectando...";setTimeout(connect,2000);};
+  ws.onerror=()=>ws.close();
 }
 
-function updateDashboard(payload) {
-  const data = payload.data || {};
-  document.getElementById("status-bar").textContent =
-    `Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
+function updateDashboard(payload){
+  const data=payload.data||{};
+  document.getElementById("status-bar").textContent=`Vehículo ${payload.vehicle_id}  •  Sesión ${payload.session_id}  •  Último: ${payload.timestamp}`;
 
-  // ── Gauge y gráfica throttle ────────────────────────────────────────────────
-  window._lastTimestamp = payload.timestamp;
-  if (data.throttle != null) drawThrottle(data.throttle);
+  window._lastTimestamp=payload.timestamp;
+  if(data.throttle!=null) drawThrottle(data.throttle);
 
-  // ── Variables originales (pestaña Prueba) ─────────────────────────────────
-  CATEGORIES.forEach(cat => {
-    cat.fields.forEach(f => {
-      const el = document.getElementById(`val-${f.key}`);
-      if (!el) return;
-      let val = data[f.key];
-      if (val !== undefined && val !== null) {
-        if (f.key === "rpm") val = Math.abs(val);
-        el.textContent = typeof val === "number" ? val.toFixed(2) : val;
-      } else {
-        el.textContent = "—";
-      }
+  // GPS
+  if(data.gps_lat!=null&&data.gps_lon!=null) updateMap(data.gps_lat,data.gps_lon);
+
+  CATEGORIES.forEach(cat=>{
+    cat.fields.forEach(f=>{
+      const el=document.getElementById(`val-${f.key}`);
+      if(!el) return;
+      let val=data[f.key];
+      if(val!==undefined&&val!==null){
+        if(f.key==="rpm") val=Math.abs(val);
+        el.textContent=typeof val==="number"?val.toFixed(2):val;
+      } else { el.textContent="—"; }
     });
   });
 
-  // ── Gráfica RPM/Throttle/Brake ────────────────────────────────────────────
-  pushDataset(chartControl, 0, payload.timestamp, data.rpm      || 0);
-  pushDataset(chartControl, 1, payload.timestamp, data.throttle || 0);
-  pushDataset(chartControl, 2, payload.timestamp, data.brake    || 0);
+  pushDataset(chartControl,0,payload.timestamp,data.rpm||0);
+  pushDataset(chartControl,1,payload.timestamp,data.throttle||0);
+  pushDataset(chartControl,2,payload.timestamp,data.brake||0);
   chartControl.update("none");
 
-  // ── Celdas ────────────────────────────────────────────────────────────────
-  const cells = data.cells || {};
-  const cellKeys = Object.keys(cells).sort((a, b) =>
-    parseInt(a.replace("cell_", "")) - parseInt(b.replace("cell_", ""))
-  );
-  if (cellKeys.length > 0) {
-    document.getElementById("cells-section").style.display = "block";
-    const cellGrid = document.getElementById("cells-grid");
-    cellKeys.forEach(key => {
-      const val = cells[key];
-      let card = document.getElementById(`cell-${key}`);
-      if (!card) {
-        card = document.createElement("div");
-        card.className = "cell-card";
-        card.id = `cell-${key}`;
-        const nameEl = document.createElement("div");
-        nameEl.className = "cell-name";
-        nameEl.textContent = key.replace("_", " ").toUpperCase();
-        const valEl = document.createElement("div");
-        valEl.className = "cell-value";
-        valEl.id = `cellval-${key}`;
-        card.appendChild(nameEl);
-        card.appendChild(valEl);
-        cellGrid.appendChild(card);
+  const cells=data.cells||{};
+  const cellKeys=Object.keys(cells).sort((a,b)=>parseInt(a.replace("cell_",""))-parseInt(b.replace("cell_","")));
+  if(cellKeys.length>0){
+    document.getElementById("cells-section").style.display="block";
+    const cellGrid=document.getElementById("cells-grid");
+    cellKeys.forEach(key=>{
+      const val=cells[key];
+      let card=document.getElementById(`cell-${key}`);
+      if(!card){
+        card=document.createElement("div"); card.className="cell-card"; card.id=`cell-${key}`;
+        const nameEl=document.createElement("div"); nameEl.className="cell-name"; nameEl.textContent=key.replace("_"," ").toUpperCase();
+        const valEl=document.createElement("div"); valEl.className="cell-value"; valEl.id=`cellval-${key}`;
+        card.appendChild(nameEl); card.appendChild(valEl); cellGrid.appendChild(card);
       }
-      const valEl = document.getElementById(`cellval-${key}`);
-      valEl.textContent = `${val.toFixed(3)} V`;
-      valEl.className = "cell-value " + ((val < 3.0 || val > 4.2) ? "cell-warn" : "cell-ok");
+      const valEl=document.getElementById(`cellval-${key}`);
+      valEl.textContent=`${val.toFixed(3)} V`;
+      valEl.className="cell-value "+((val<3.0||val>4.2)?"cell-warn":"cell-ok");
     });
   }
 
-  // ── Entradas IMU crudas (pestaña Derivadas Prueba) ────────────────────────
-  ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"].forEach(key => {
-    const el = document.getElementById(`dval-in-${key}`);
-    if (!el) return;
-    const val = data[key];
-    if (val != null) el.textContent = val.toFixed(3);
+  ["acc_x","acc_y","acc_z","gyro_x","gyro_y","gyro_z"].forEach(key=>{
+    const el=document.getElementById(`dval-in-${key}`);
+    if(!el) return;
+    const val=data[key];
+    if(val!=null) el.textContent=val.toFixed(3);
   });
 
-  // ── Orientación y aceleraciones compensadas ───────────────────────────────
-  ["phi", "theta", "Gx", "Gy", "Gz"].forEach(key => {
-    const el = document.getElementById(`dval-${key}`);
-    if (!el) return;
-    const val = data[key];
-    if (val != null) {
-      el.textContent = val.toFixed(4);
-      el.className = "field-value";
-    } else {
-      el.textContent = "n/a";
-      el.className = "field-null";
-    }
+  ["phi","theta","Gx","Gy","Gz"].forEach(key=>{
+    const el=document.getElementById(`dval-${key}`);
+    if(!el) return;
+    const val=data[key];
+    if(val!=null){el.textContent=val.toFixed(4);el.className="field-value";}
+    else{el.textContent="n/a";el.className="field-null";}
   });
 }
 
 // ── Pantalla de carga ─────────────────────────────────────────────────────────
-(function() {
-  var cv  = document.getElementById('loading-canvas');
-  var ctx = cv.getContext('2d');
-  var t   = 0;
-  var raf;
-
-  function drawLoader() {
-    ctx.clearRect(0, 0, 160, 160);
-    var cx = 80, cy = 80;
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 56, t, t + Math.PI * 1.5);
-    ctx.strokeStyle = '#ef5e20';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 38, -t * 0.7, -t * 0.7 + Math.PI * 1.1);
-    ctx.strokeStyle = '#ef5e20';
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.5;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ef5e20';
-    ctx.fill();
-
-    t += 0.04;
-    raf = requestAnimationFrame(drawLoader);
+(function(){
+  var cv=document.getElementById('loading-canvas'),ctx=cv.getContext('2d'),t=0,raf;
+  function drawLoader(){
+    ctx.clearRect(0,0,160,160);
+    var cx=80,cy=80;
+    ctx.beginPath();ctx.arc(cx,cy,56,t,t+Math.PI*1.5);ctx.strokeStyle='#ef5e20';ctx.lineWidth=3.5;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,38,-t*0.7,-t*0.7+Math.PI*1.1);ctx.strokeStyle='#ef5e20';ctx.lineWidth=3;ctx.globalAlpha=0.5;ctx.lineCap='round';ctx.stroke();ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fillStyle='#ef5e20';ctx.fill();
+    t+=0.04; raf=requestAnimationFrame(drawLoader);
   }
-
   drawLoader();
-
-  setTimeout(function() {
+  setTimeout(function(){
     cancelAnimationFrame(raf);
-    var screen = document.getElementById('loading-screen');
-    screen.style.transition = 'opacity 0.4s ease';
-    screen.style.opacity = '0';
-    setTimeout(function() { screen.style.display = 'none'; }, 400);
-  }, 2000);
+    var screen=document.getElementById('loading-screen');
+    screen.style.transition='opacity 0.4s ease';screen.style.opacity='0';
+    setTimeout(function(){screen.style.display='none';},400);
+  },2000);
 })();
 
 connect();
