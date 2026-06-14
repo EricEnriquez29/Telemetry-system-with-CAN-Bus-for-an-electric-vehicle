@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="logofenix.png">
   <title>Fénix — Página Principal (Demo 44 var)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
@@ -143,7 +144,7 @@
 </div>
 <div class="subheader">
   <div class="ws-ind"><div class="ws-dot" id="ws-dot"></div><span id="ws-label">Conectando…</span></div>
-  <div>Vehículo 25 · Sesión 1 · Último: <span id="sub-ts">—</span></div>
+  <div>Vehículo <span id="sub-veh">—</span> · Sesión <span id="sub-sess">—</span> · Último: <span id="sub-ts">—</span></div>
   <div id="sub-clock">--:--:--</div>
 </div>
 
@@ -425,8 +426,8 @@ function drawBattery(percent){
   var innerPad=4,gap=1.5;
   var usableW=w-innerPad*2-gap*(segments-1);
   var segW=usableW/segments;
-  var active=Math.ceil(percent/10);
-  var col=percent>60?"#4caf50":percent>30?"#c2a838":"#cc4055";
+  var active=Math.floor(percent/10);
+  var col="#39FF14";
   for(var i=0;i<segments;i++){
     var sx=x+innerPad+i*(segW+gap),sy=y+innerPad,sh=h-innerPad*2;
     if(i<active){
@@ -589,6 +590,8 @@ function updateDashboard(payload){
 
   // ── Header ──
   document.getElementById('sub-ts').textContent = ts;
+  document.getElementById('sub-veh').textContent = payload.vehicle_id != null ? payload.vehicle_id : '—';
+  document.getElementById('sub-sess').textContent = payload.session_id != null ? payload.session_id : '—';
 
   // ── Rev lights + gauges ──
   updateRev(rpm/5000);
