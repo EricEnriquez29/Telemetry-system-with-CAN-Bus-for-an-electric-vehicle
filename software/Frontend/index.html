@@ -124,6 +124,11 @@
     .leaflet-control-zoom a{background:#0d0d0d!important;color:#aaa!important;border-color:#333!important;}
 
     .cells-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;padding:4px 6px;}
+    .diag-panel{margin:4px 8px 6px;padding:6px 8px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:4px;}
+    .diag-row{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);padding:2px 0;letter-spacing:0.5px;}
+    .diag-row span:last-child{color:var(--text);}
+    .diag-on{color:var(--green)!important;}
+    .diag-off{color:var(--muted)!important;}
     .cell-item{background:#0d0d0d;border:1px solid #1a1a1a;padding:3px;text-align:center;}
     .ci-n{font-size:7px;color:var(--muted);}
     .ci-v{font-size:10px;color:var(--green);}
@@ -171,20 +176,27 @@
   <div class="sidebar">
 
     <div class="sec src">Controlador / Motor</div>
-    <div class="row"><span class="rl-key">Torque</span><span class="rl-val" id="d-torq" style="color:var(--orange)">0<span class="rl-unit">Nm</span></span></div>
+    <div class="row"><span class="rl-key">Eficiencia Motor</span><span class="rl-val" id="d-eta" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
     <div class="row"><span class="rl-key">Corriente RMS</span><span class="rl-val" id="d-irms" style="color:var(--yellow)">0<span class="rl-unit">A</span></span></div>
     <div class="row"><span class="rl-key">KSY</span><span class="rl-val" id="d-ksy" style="color:var(--text)">12.3<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Corriente Batt</span><span class="rl-val" id="d-bcurr" style="color:var(--blue)">0<span class="rl-unit">A</span></span></div>
+    <div class="subsec">Acumulables</div>
+    <div class="row"><span class="rl-key">E. Consumida</span><span class="rl-val" id="d-ehv" style="color:var(--orange)">0<span class="rl-unit">Wh</span></span></div>
+    <div class="row"><span class="rl-key">Q. Consumida</span><span class="rl-val" id="d-qhv" style="color:var(--orange)">0<span class="rl-unit">Ah</span></span></div>
+    <div class="row"><span class="rl-key">E. Regenerada</span><span class="rl-val" id="d-eregen" style="color:var(--green)">0<span class="rl-unit">Wh</span></span></div>
+    <div class="row"><span class="rl-key">E. Restante</span><span class="rl-val" id="d-ehvrest" style="color:var(--cyan)">0<span class="rl-unit">Wh</span></span></div>
+    <div class="row"><span class="rl-key">Q. Restante</span><span class="rl-val" id="d-qhvrest" style="color:var(--cyan)">0<span class="rl-unit">Ah</span></span></div>
 
     <div class="sec src">MCA — Auxiliar</div>
     <div class="row"><span class="rl-key">Voltaje Aux</span><span class="rl-val" id="d-vaux" style="color:var(--text)">0<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Corriente Aux</span><span class="rl-val" id="d-iaux" style="color:var(--text)">0<span class="rl-unit">A</span></span></div>
+    <div class="row"><span class="rl-key">SOC Aux</span><span class="rl-val" id="d-socaux" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
+    <div class="row"><span class="rl-key">P. Aux</span><span class="rl-val" id="d-paux" style="color:var(--yellow)">0<span class="rl-unit">W</span></span></div>
+    <div class="row"><span class="rl-key">E. Aux</span><span class="rl-val" id="d-eaux" style="color:var(--orange)">0<span class="rl-unit">Wh</span></span></div>
+    <div class="row"><span class="rl-key">Q. Aux</span><span class="rl-val" id="d-qaux" style="color:var(--orange)">0<span class="rl-unit">Ah</span></span></div>
 
     <div class="sec src">MDV — MPU-6050</div>
-    <div class="subsec">Acelerómetro</div>
-    <div class="row"><span class="rl-key">Acc X</span><span class="rl-val" id="d-ax" style="color:var(--red)">0<span class="rl-unit">g</span></span></div>
-    <div class="row"><span class="rl-key">Acc Y</span><span class="rl-val" id="d-ay" style="color:var(--blue)">0<span class="rl-unit">g</span></span></div>
-    <div class="row"><span class="rl-key">Acc Z</span><span class="rl-val" id="d-az" style="color:var(--green)">0<span class="rl-unit">g</span></span></div>
+    <div id="gmeter-slot"></div>
     <div class="subsec">Giroscopio</div>
     <div class="row"><span class="rl-key">Gyro X</span><span class="rl-val" id="d-gx" style="color:var(--red)">0<span class="rl-unit">°/s</span></span></div>
     <div class="row"><span class="rl-key">Gyro Y</span><span class="rl-val" id="d-gy" style="color:var(--blue)">0<span class="rl-unit">°/s</span></span></div>
@@ -304,6 +316,22 @@
     <div class="cells-grid" id="cells"></div>
     <div class="subsec">Paquete</div>
     <div class="row"><span class="rl-key">Voltaje Pack</span><span class="rl-val" id="d-volt" style="color:var(--yellow)">0<span class="rl-unit">V</span></span></div>
+    <div class="row"><span class="rl-key">Eficiencia HV</span><span class="rl-val" id="d-etabat" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
+
+    <div id="sag-slot"></div>
+
+    <div class="subsec">Salud de Batería</div>
+    <div class="row"><span class="rl-key">SOH</span><span class="rl-val" id="d-sohc" style="color:var(--cyan)">—<span class="rl-unit">%</span></span></div>
+    <div class="row"><span class="rl-key">R. Pack</span><span class="rl-val" id="d-rpack" style="color:var(--text)">—<span class="rl-unit">mΩ</span></span></div>
+    <div class="row"><span class="rl-key">V. Reposo</span><span class="rl-val" id="d-vrest" style="color:var(--text)">—<span class="rl-unit">V</span></span></div>
+    <div class="diag-panel">
+      <div class="diag-row"><span>Cálculo SOH</span><span id="d-sohact" class="diag-off">inactivo</span></div>
+      <div class="diag-row"><span>SOC inicio</span><span id="d-sohsoc">—</span></div>
+      <div class="diag-row"><span>Q acumulada</span><span id="d-sohq">—</span></div>
+      <div class="diag-row"><span>T. reposo</span><span id="d-treposo">0 s</span></div>
+    </div>
+    <div class="subsec">R. Interna Celdas (mΩ)</div>
+    <div class="cells-grid" id="rcells"></div>
   </div>
 </div>
 </div><!-- /tab-0 -->
@@ -389,6 +417,8 @@ function setThermo(prefix,val,max){
 // ── Celdas ──
 var cg=document.getElementById('cells');
 for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="cv'+i+'">—</div>';cg.appendChild(d);}
+var rcg=document.getElementById('rcells');
+for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="rc'+i+'">—</div>';rcg.appendChild(d);}
 
 // ── Charts ──
 var WMS=15000;
@@ -615,22 +645,64 @@ function updateDashboard(payload){
   document.getElementById('tbn-thr').textContent=thr.toFixed(0)+'%';
   document.getElementById('tbn-brk').textContent=brk.toFixed(0)+'%';
 
-  // ── Sidebar izquierda (Controlador/Motor, MCA, MDV) ──
-  document.getElementById('d-torq').innerHTML=torq.toFixed(2)+'<span class="rl-unit">Nm</span>';
+  // ── Derivadas necesarias del snapshot ──
+  var p_mec=num(d.p_mec), p_hv=d.p_hv;          // p_hv puede ser null
+  var v_rest=d.v_rest_pack;                       // null si no hay reposo medido
+  // Eficiencia de motor (eta = p_mec/p_hv), solo válida en tracción
+  var eta=null;
+  if(p_hv!=null && p_hv>50){ eta=Math.min(100,(p_mec/p_hv)*100); }
+  // Eficiencia de batería HV (volt_p / v_rest_pack)
+  var etabat=null;
+  if(v_rest!=null && v_rest>1){ etabat=Math.min(100,(volt_p/v_rest)*100); }
+
+  // ── Sidebar izquierda: Controlador/Motor ──
+  document.getElementById('d-eta').innerHTML=(eta!=null?eta.toFixed(1):'—')+'<span class="rl-unit">%</span>';
   document.getElementById('d-irms').innerHTML=curr_rms.toFixed(1)+'<span class="rl-unit">A</span>';
   document.getElementById('d-ksy').innerHTML=ksy.toFixed(1)+'<span class="rl-unit">V</span>';
   document.getElementById('d-bcurr').innerHTML=batt_curr.toFixed(1)+'<span class="rl-unit">A</span>';
+  document.getElementById('d-ehv').innerHTML=num(d.E_HV).toFixed(1)+'<span class="rl-unit">Wh</span>';
+  document.getElementById('d-qhv').innerHTML=num(d.Q_HV).toFixed(2)+'<span class="rl-unit">Ah</span>';
+  document.getElementById('d-eregen').innerHTML=num(d.E_regen).toFixed(1)+'<span class="rl-unit">Wh</span>';
+  document.getElementById('d-ehvrest').innerHTML=num(d.E_HV_rest).toFixed(1)+'<span class="rl-unit">Wh</span>';
+  document.getElementById('d-qhvrest').innerHTML=num(d.Q_HV_rest).toFixed(2)+'<span class="rl-unit">Ah</span>';
+
+  // ── MCA — Auxiliar ──
   document.getElementById('d-vaux').innerHTML=vaux.toFixed(1)+'<span class="rl-unit">V</span>';
   document.getElementById('d-iaux').innerHTML=iaux.toFixed(1)+'<span class="rl-unit">A</span>';
-  document.getElementById('d-ax').innerHTML=num(d.acc_x).toFixed(3)+'<span class="rl-unit">g</span>';
-  document.getElementById('d-ay').innerHTML=num(d.acc_y).toFixed(3)+'<span class="rl-unit">g</span>';
-  document.getElementById('d-az').innerHTML=num(d.acc_z).toFixed(3)+'<span class="rl-unit">g</span>';
+  document.getElementById('d-socaux').innerHTML=(d.soc_aux!=null?num(d.soc_aux).toFixed(1):'—')+'<span class="rl-unit">%</span>';
+  document.getElementById('d-paux').innerHTML=num(d.p_aux).toFixed(1)+'<span class="rl-unit">W</span>';
+  document.getElementById('d-eaux').innerHTML=num(d.E_aux).toFixed(1)+'<span class="rl-unit">Wh</span>';
+  document.getElementById('d-qaux').innerHTML=num(d.Q_aux).toFixed(2)+'<span class="rl-unit">Ah</span>';
+
+  // ── MDV — Giroscopio ──
   document.getElementById('d-gx').innerHTML=num(d.gyro_x).toFixed(2)+'<span class="rl-unit">°/s</span>';
   document.getElementById('d-gy').innerHTML=num(d.gyro_y).toFixed(2)+'<span class="rl-unit">°/s</span>';
   document.getElementById('d-gz').innerHTML=num(d.gyro_z).toFixed(2)+'<span class="rl-unit">°/s</span>';
 
-  // ── Voltaje Pack (sidebar derecha) ──
+  // ── Sidebar derecha: Batería HV ──
   document.getElementById('d-volt').innerHTML=volt_p.toFixed(1)+'<span class="rl-unit">V</span>';
+  document.getElementById('d-etabat').innerHTML=(etabat!=null?etabat.toFixed(1):'—')+'<span class="rl-unit">%</span>';
+
+  // Salud de batería
+  document.getElementById('d-sohc').innerHTML=(d.soh_c!=null?num(d.soh_c).toFixed(1):'—')+'<span class="rl-unit">%</span>';
+  document.getElementById('d-rpack').innerHTML=(d.r_pack!=null?(num(d.r_pack)*1000).toFixed(1):'—')+'<span class="rl-unit">mΩ</span>';
+  document.getElementById('d-vrest').innerHTML=(v_rest!=null?num(v_rest).toFixed(1):'—')+'<span class="rl-unit">V</span>';
+  // Panel diagnóstico SOH
+  var sohAct=d.soh_activo===true;
+  var elAct=document.getElementById('d-sohact');
+  elAct.textContent=sohAct?'activo':'inactivo';
+  elAct.className=sohAct?'diag-on':'diag-off';
+  document.getElementById('d-sohsoc').textContent=(d.soh_soc_inicio!=null?num(d.soh_soc_inicio).toFixed(1)+' %':'—');
+  document.getElementById('d-sohq').textContent=(d.soh_Q_SOH!=null?num(d.soh_Q_SOH).toFixed(3)+' Ah':'—');
+  document.getElementById('d-treposo').textContent=num(d.t_reposo_s).toFixed(0)+' s';
+  // Resistencias de celda
+  var rcells=d.r_cells||{};
+  for(var i=1;i<=16;i++){
+    var rv=rcells['r_cell_'+i];
+    var rel=document.getElementById('rc'+i);
+    if(rv!=null){ rel.textContent=(rv*1000).toFixed(1); rel.className='ci-v'; }
+    else{ rel.textContent='—'; rel.className='ci-v'; }
+  }
 
   // ── Mapa GPS ──
   updateMap(num(d.gps_lat), num(d.gps_lon));
