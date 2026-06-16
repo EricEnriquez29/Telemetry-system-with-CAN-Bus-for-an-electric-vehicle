@@ -908,7 +908,16 @@ function updateDashboard(payload){
   }
 
   // ── Gráficas (ventana 15s) ──
+  push(cA,0,tms,spd); push(cA,1,tms,rpm/50); push(cA,2,tms,thr);
+  push(cTM,0,tms,torq); push(cTM,1,tms,p_mec); push(cTM,2,tms,(p_hv!=null?p_hv:0));
+  push(cPWR,0,tms,(p_hv!=null?p_hv:0)); push(cPWR,1,tms,Math.abs(curr_p)); push(cPWR,2,tms,thr);
+  cA.update('none'); cTM.update('none'); cPWR.update('none');
 
+  // ── G-meter Potencia Mecánica vs RPM (color = eficiencia total TME) ──
+  var eta_total=null;
+  if(eta!=null && etabat!=null){ eta_total=(eta/100)*(etabat/100)*100; }
+  else if(eta!=null){ eta_total=eta; }
+  drawPMRPM(rpm, p_mec, eta_total);
 }
 
 connect();
