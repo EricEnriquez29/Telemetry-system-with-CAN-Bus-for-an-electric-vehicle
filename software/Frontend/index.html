@@ -125,6 +125,9 @@
 
     .cells-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;padding:4px 6px;}
     .diag-panel{margin:4px 8px 6px;padding:6px 8px;background:#0a0a0a;border:1px solid #1a1a1a;border-radius:4px;}
+    .gm-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;}
+    .gm-gz{font-size:10px;color:var(--muted);letter-spacing:0.5px;}
+    .gm-gz span{color:var(--cyan);font-weight:600;}
     .diag-row{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);padding:2px 0;letter-spacing:0.5px;}
     .diag-row span:last-child{color:var(--text);}
     .diag-on{color:var(--green)!important;}
@@ -196,7 +199,12 @@
     <div class="row"><span class="rl-key">Q. Aux</span><span class="rl-val" id="d-qaux" style="color:var(--orange)">0<span class="rl-unit">Ah</span></span></div>
 
     <div class="sec src">MDV — MPU-6050</div>
-    <div id="gmeter-slot"></div>
+    <div id="gmeter-slot">
+      <div class="gm-wrap">
+        <canvas id="gmeter-canvas" style="width:150px;height:150px;"></canvas>
+        <div class="gm-gz">Gz: <span id="gm-gz-val">0.00</span> G</div>
+      </div>
+    </div>
     <div class="subsec">Giroscopio</div>
     <div class="row"><span class="rl-key">Gyro X</span><span class="rl-val" id="d-gx" style="color:var(--red)">0<span class="rl-unit">°/s</span></span></div>
     <div class="row"><span class="rl-key">Gyro Y</span><span class="rl-val" id="d-gy" style="color:var(--blue)">0<span class="rl-unit">°/s</span></span></div>
@@ -318,7 +326,12 @@
     <div class="row"><span class="rl-key">Voltaje Pack</span><span class="rl-val" id="d-volt" style="color:var(--yellow)">0<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Eficiencia HV</span><span class="rl-val" id="d-etabat" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
 
-    <div id="sag-slot"></div>
+    <div id="sag-slot">
+      <div class="subsec">Sag — Voltaje vs Corriente</div>
+      <div class="gm-wrap">
+        <canvas id="sag-canvas" style="width:150px;height:150px;"></canvas>
+      </div>
+    </div>
 
     <div class="subsec">Salud de Batería</div>
     <div class="row"><span class="rl-key">SOH</span><span class="rl-val" id="d-sohc" style="color:var(--cyan)">—<span class="rl-unit">%</span></span></div>
@@ -582,6 +595,79 @@ function drawContactor(cerrado){
 }
 drawContactor(true);
 
+// ── G-meter Gx/Gy (HiDPI 3x) ──
+var gmCv=document.getElementById('gmeter-canvas'),gmCtx=gmCv.getContext('2d');
+var GM_SZ=150,GM_SCALE=3,GM_GMAX=2.0;  // rango ±2G
+gmCv.width=GM_SZ*GM_SCALE;gmCv.height=GM_SZ*GM_SCALE;gmCtx.scale(GM_SCALE,GM_SCALE);
+var gmTrail=[];
+function drawGMeter(gx,gy){
+  var W=GM_SZ,H=GM_SZ,cx=W/2,cy=H/2,R=W/2-10;
+  gmCtx.clearRect(0,0,W,H);
+  // anillos
+  gmCtx.strokeStyle='#1a1a1a';gmCtx.lineWidth=1;
+  for(var r=1;r<=2;r++){
+    gmCtx.beginPath();gmCtx.arc(cx,cy,R*r/2,0,Math.PI*2);gmCtx.stroke();
+  }
+  // cruz
+  gmCtx.beginPath();gmCtx.moveTo(cx-R,cy);gmCtx.lineTo(cx+R,cy);
+  gmCtx.moveTo(cx,cy-R);gmCtx.lineTo(cx,cy+R);gmCtx.stroke();
+  // etiquetas
+  gmCtx.fillStyle='#444';gmCtx.font='7px Share Tech Mono';gmCtx.textAlign='center';
+  gmCtx.fillText('ACEL',cx,cy-R-2);gmCtx.fillText('FRENO',cx,cy+R+7);
+  gmCtx.textAlign='left';gmCtx.fillText('DER',cx+R-12,cy-3);
+  gmCtx.textAlign='right';gmCtx.fillText('IZQ',cx-R+12,cy-3);
+  // posición: gx longitudinal (Y, acel arriba), gy lateral (X)
+  var px=cx+(gy/GM_GMAX)*R, py=cy-(gx/GM_GMAX)*R;
+  px=Math.max(cx-R,Math.min(cx+R,px)); py=Math.max(cy-R,Math.min(cy+R,py));
+  // estela
+  gmTrail.push([px,py]); if(gmTrail.length>15) gmTrail.shift();
+  for(var i=0;i<gmTrail.length;i++){
+    var a=i/gmTrail.length;
+    gmCtx.beginPath();gmCtx.arc(gmTrail[i][0],gmTrail[i][1],2,0,Math.PI*2);
+    gmCtx.fillStyle='rgba(58,168,189,'+(a*0.4)+')';gmCtx.fill();
+  }
+  // bolita
+  gmCtx.beginPath();gmCtx.arc(px,py,5,0,Math.PI*2);
+  gmCtx.fillStyle='#3aa8bd';gmCtx.shadowColor='#3aa8bd';gmCtx.shadowBlur=8;gmCtx.fill();gmCtx.shadowBlur=0;
+}
+drawGMeter(0,0);
+
+// ── Sag meter: Voltaje (Y) vs Corriente (X) ──
+var sagCv=document.getElementById('sag-canvas'),sagCtx=sagCv.getContext('2d');
+var SAG_SZ=150,SAG_SCALE=3;
+var SAG_VMIN=40,SAG_VMAX=60,SAG_IMAX=200;  // rangos ejes
+sagCv.width=SAG_SZ*SAG_SCALE;sagCv.height=SAG_SZ*SAG_SCALE;sagCtx.scale(SAG_SCALE,SAG_SCALE);
+var sagTrail=[];
+function drawSag(volt,curr){
+  var W=SAG_SZ,H=SAG_SZ,pad=22;
+  sagCtx.clearRect(0,0,W,H);
+  // ejes
+  sagCtx.strokeStyle='#1a1a1a';sagCtx.lineWidth=1;
+  sagCtx.beginPath();sagCtx.moveTo(pad,5);sagCtx.lineTo(pad,H-pad);sagCtx.lineTo(W-5,H-pad);sagCtx.stroke();
+  // etiquetas ejes
+  sagCtx.fillStyle='#555';sagCtx.font='7px Share Tech Mono';
+  sagCtx.textAlign='right';
+  sagCtx.fillText(SAG_VMAX+'V',pad-2,12);sagCtx.fillText(SAG_VMIN+'V',pad-2,H-pad);
+  sagCtx.textAlign='center';
+  sagCtx.fillText('0',pad,H-pad+9);sagCtx.fillText(SAG_IMAX+'A',W-12,H-pad+9);
+  sagCtx.save();sagCtx.translate(8,H/2);sagCtx.rotate(-Math.PI/2);sagCtx.fillText('Voltaje',0,0);sagCtx.restore();
+  sagCtx.fillText('Corriente',(pad+W)/2,H-4);
+  // mapear punto
+  var ix=Math.abs(curr)/SAG_IMAX, vy=(volt-SAG_VMIN)/(SAG_VMAX-SAG_VMIN);
+  ix=Math.max(0,Math.min(1,ix)); vy=Math.max(0,Math.min(1,vy));
+  var px=pad+ix*(W-5-pad), py=(H-pad)-vy*(H-pad-5);
+  // estela
+  sagTrail.push([px,py]); if(sagTrail.length>20) sagTrail.shift();
+  sagCtx.strokeStyle='rgba(194,168,56,0.3)';sagCtx.lineWidth=1;sagCtx.beginPath();
+  for(var i=0;i<sagTrail.length;i++){ if(i===0)sagCtx.moveTo(sagTrail[i][0],sagTrail[i][1]);else sagCtx.lineTo(sagTrail[i][0],sagTrail[i][1]); }
+  sagCtx.stroke();
+  // bolita: color según cuánto sag (verde poco, rojo mucho)
+  var col = vy>0.7?'#3ba776':vy>0.4?'#c2a838':'#cc4055';
+  sagCtx.beginPath();sagCtx.arc(px,py,5,0,Math.PI*2);
+  sagCtx.fillStyle=col;sagCtx.shadowColor=col;sagCtx.shadowBlur=8;sagCtx.fill();sagCtx.shadowBlur=0;
+}
+drawSag(SAG_VMAX,0);
+
 // ── WebSocket — datos reales del servidor ──
 const WS_URL = "ws://23.94.237.163:8050/ws";
 const KT = 0.143;  // constante de torque (Nm/A) — igual que el backend
@@ -679,9 +765,17 @@ function updateDashboard(payload){
   document.getElementById('d-gy').innerHTML=num(d.gyro_y).toFixed(2)+'<span class="rl-unit">°/s</span>';
   document.getElementById('d-gz').innerHTML=num(d.gyro_z).toFixed(2)+'<span class="rl-unit">°/s</span>';
 
+  // ── G-meter (aceleraciones compensadas Gx/Gy/Gz) ──
+  var Gx=num(d.Gx), Gy=num(d.Gy), Gz=num(d.Gz);
+  drawGMeter(Gx,Gy);
+  document.getElementById('gm-gz-val').textContent=Gz.toFixed(2);
+
   // ── Sidebar derecha: Batería HV ──
   document.getElementById('d-volt').innerHTML=volt_p.toFixed(1)+'<span class="rl-unit">V</span>';
   document.getElementById('d-etabat').innerHTML=(etabat!=null?etabat.toFixed(1):'—')+'<span class="rl-unit">%</span>';
+
+  // ── Sag meter: voltaje vs corriente ──
+  drawSag(volt_p, curr_p);
 
   // Salud de batería
   document.getElementById('d-sohc').innerHTML=(d.soh_c!=null?num(d.soh_c).toFixed(1):'—')+'<span class="rl-unit">%</span>';
