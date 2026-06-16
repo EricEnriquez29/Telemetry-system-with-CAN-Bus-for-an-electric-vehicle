@@ -51,8 +51,8 @@ float current_aux = -1;
 // ─────────────────────────────────────────
 //  WIFI
 // ─────────────────────────────────────────
-const char* WIFI_SSID = "INFINITUMA0AA_2.4";
-const char* WIFI_PASS = "hd5319GRBe";
+const char* WIFI_SSID = "ARRIS-FED2";
+const char* WIFI_PASS = "C704208B40622E42";
 
 // ─────────────────────────────────────────
 //  TIMESTAMP
