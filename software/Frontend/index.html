@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#080808;--col1:#0d0d0d;--sep:#1e1e1e;--border:#222;--text:#ccc;--muted:#444;
+    :root{--bg:#080808;--col1:#0d0d0d;--sep:#1e1e1e;--border:#222;--text:#f0f0f0;--muted:#b0b0b0;
       --orange:#ef5e20;--cyan:#3aa8bd;--green:#3ba776;--red:#cc4055;--yellow:#c2a838;--purple:#a85cc0;--blue:#4a90b8;--white:#e8e8e8;}
     *{margin:0;padding:0;box-sizing:border-box;}
     body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
@@ -33,7 +33,7 @@
     .menu-item{padding:14px 18px;font-size:13px;color:#888;cursor:pointer;border-bottom:1px solid #161616;letter-spacing:1px;text-transform:uppercase;transition:background 0.15s,color 0.15s;}
     .menu-item:hover{background:#161616;color:#ccc;}
     .menu-item.active{color:var(--orange);border-left:3px solid var(--orange);background:#120c08;}
-    .empty-tab{color:#444;font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
+    .empty-tab{color:#888;font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
     .ws-ind{display:flex;align-items:center;gap:8px;}
     .ws-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;transition:background 0.3s;}
     .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
@@ -48,7 +48,7 @@
     .sec{padding:5px 10px 3px;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;background:#0a0a0a;border-top:1px solid var(--sep);border-bottom:1px solid var(--sep);}
     .sec.src{color:var(--orange);font-weight:700;background:#120c08;border-top:1px solid #2a1a0a;border-bottom:1px solid #2a1a0a;letter-spacing:3px;}
     .sec:first-child{border-top:none;}
-    .subsec{padding:3px 10px;font-size:8px;color:#333;letter-spacing:1px;text-transform:uppercase;background:#070707;}
+    .subsec{padding:3px 10px;font-size:8px;color:#999;letter-spacing:1px;text-transform:uppercase;background:#070707;}
     .row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 10px;border-bottom:1px solid #0d0d0d;}
     .row:hover{background:#0f0f0f;}
     .rl-key{font-size:11px;color:var(--muted);}
@@ -114,9 +114,10 @@
     .cb-title{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;display:flex;justify-content:space-between;}
     .cb-tag{color:var(--orange);}
     .chart-wrap{flex:1;position:relative;min-height:100px;}
-    .pmrpm-wrap{padding:4px 0;}
-    .pmrpm-legend{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted);padding:4px 2px 0;}
-    .pmrpm-bar{flex:0 0 120px;height:8px;border-radius:4px;background:linear-gradient(to right,#2266cc,#3ba776,#c2a838,#cc4055);}
+    .pmrpm-wrap{padding:4px 0;display:flex;align-items:stretch;gap:8px;}
+    .pmrpm-legend{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--text);padding:4px 4px 0;}
+    .pmrpm-bar{flex:1;width:10px;border-radius:5px;background:linear-gradient(to top,#2266cc,#3ba776,#c2a838,#cc4055);}
+    .pmrpm-cap{margin-top:2px;writing-mode:vertical-rl;color:var(--muted);letter-spacing:1px;}
 
     /* Mapa */
     .map-box{padding:6px;}
@@ -311,11 +312,12 @@
       <div class="chart-block">
         <div class="cb-title"><span>Potencia Mecánica vs RPM — color = Eficiencia TME</span><span class="cb-tag">EN VIVO</span></div>
         <div class="pmrpm-wrap">
-          <canvas id="pmrpm-canvas" style="width:100%;height:220px;"></canvas>
+          <canvas id="pmrpm-canvas" style="flex:1;height:220px;"></canvas>
           <div class="pmrpm-legend">
-            <span>η TME:</span>
+            <span>100%</span>
             <div class="pmrpm-bar"></div>
-            <span>60%</span><span style="margin-left:auto">100%</span>
+            <span>60%</span>
+            <span class="pmrpm-cap">η TME</span>
           </div>
         </div>
       </div>
@@ -453,8 +455,8 @@ for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-ite
 
 // ── Charts ──
 var WMS=15000;
-function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#333'}}},scales}});}
-var sx={type:'time',time:{unit:'second',displayFormats:{second:'HH:mm:ss'}},ticks:{color:'#1e1e1e',maxTicksLimit:6,font:{size:8}},grid:{color:'#0d0d0d'}};
+function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}}},scales}});}
+var sx={type:'time',time:{unit:'second',displayFormats:{second:'HH:mm:ss'}},ticks:{color:'#888',maxTicksLimit:6,font:{size:8}},grid:{color:'#0d0d0d'}};
 var cA=mkChart('chart-a',[
   {label:'Vel km/h',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yL'},
   {label:'RPM/50',data:[],borderColor:'#cc4055',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yL'},
@@ -635,7 +637,7 @@ function drawGMeter(gx,gy){
   gmCtx.beginPath();gmCtx.moveTo(cx-R,cy);gmCtx.lineTo(cx+R,cy);
   gmCtx.moveTo(cx,cy-R);gmCtx.lineTo(cx,cy+R);gmCtx.stroke();
   // etiquetas
-  gmCtx.fillStyle='#444';gmCtx.font='7px Share Tech Mono';gmCtx.textAlign='center';
+  gmCtx.fillStyle='#999';gmCtx.font='7px Share Tech Mono';gmCtx.textAlign='center';
   gmCtx.fillText('ACEL',cx,cy-R-2);gmCtx.fillText('FRENO',cx,cy+R+7);
   gmCtx.textAlign='left';gmCtx.fillText('DER',cx+R-12,cy-3);
   gmCtx.textAlign='right';gmCtx.fillText('IZQ',cx-R+12,cy-3);
@@ -668,7 +670,7 @@ function drawSag(volt,curr){
   sagCtx.strokeStyle='#1a1a1a';sagCtx.lineWidth=1;
   sagCtx.beginPath();sagCtx.moveTo(pad,5);sagCtx.lineTo(pad,H-pad);sagCtx.lineTo(W-5,H-pad);sagCtx.stroke();
   // etiquetas ejes
-  sagCtx.fillStyle='#555';sagCtx.font='7px Share Tech Mono';
+  sagCtx.fillStyle='#999';sagCtx.font='7px Share Tech Mono';
   sagCtx.textAlign='right';
   sagCtx.fillText(SAG_VMAX+'V',pad-2,12);sagCtx.fillText(SAG_VMIN+'V',pad-2,H-pad);
   sagCtx.textAlign='center';
@@ -727,7 +729,7 @@ function drawPMRPM(rpm,pmec,eta){
   pmCtx.strokeStyle='#1a1a1a';pmCtx.lineWidth=1;
   pmCtx.beginPath();pmCtx.moveTo(pad,8);pmCtx.lineTo(pad,H-pad);pmCtx.lineTo(W-8,H-pad);pmCtx.stroke();
   // grid
-  pmCtx.fillStyle='#444';pmCtx.font='8px Share Tech Mono';
+  pmCtx.fillStyle='#999';pmCtx.font='8px Share Tech Mono';
   pmCtx.textAlign='right';
   for(var p=0;p<=PM_PMAX;p+=2000){var y=(H-pad)-(p/PM_PMAX)*(H-pad-8);pmCtx.fillText(p+'',pad-3,y+3);}
   pmCtx.textAlign='center';
