@@ -168,15 +168,15 @@
   <div style="
     font-family:'Orbitron',sans-serif; font-size:15px; font-weight:700;
     letter-spacing:5px; text-transform:uppercase; color:#ef5e20;
-  ">Escudería Fénix</div>
+  ">Cargando sistema...</div>
 </div>
 
 <div class="title-bar">
-  <div class="title">Sistema de Telemetria de Escudería Fénix UPIITA</div>
+  <div class="title">Sistema de Telemetria de Escudería Fénix </div>
 </div>
 <div class="subheader">
   <div class="ws-ind"><div class="ws-dot" id="ws-dot"></div><span id="ws-label">Conectando…</span></div>
-  <div>Vehículo <span id="sub-veh">—</span> · Sesión <span id="sub-sess">—</span> · Último: <span id="sub-ts">—</span></div>
+  <div>Vehículo <span id="sub-veh">—</span> · Sesión <span id="sub-sess">—</span> · Último dato: <span id="sub-ts">—</span></div>
   <div id="sub-clock">--:--:--</div>
 </div>
 
@@ -205,7 +205,7 @@
     <div class="sec src">Controlador / Motor</div>
     <div class="row"><span class="rl-key">Eficiencia Motor</span><span class="rl-val" id="d-eta" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
     <div class="row"><span class="rl-key">Corriente RMS</span><span class="rl-val" id="d-irms" style="color:var(--yellow)">0<span class="rl-unit">A</span></span></div>
-    <div class="row"><span class="rl-key">KSY</span><span class="rl-val" id="d-ksy" style="color:var(--text)">12.3<span class="rl-unit">V</span></span></div>
+    <div class="row"><span class="rl-key">KSI voltaje</span><span class="rl-val" id="d-ksy" style="color:var(--text)">12.3<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Corriente Batt</span><span class="rl-val" id="d-bcurr" style="color:var(--blue)">0<span class="rl-unit">A</span></span></div>
     <div class="subsec">Acumulables</div>
     <div class="row"><span class="rl-key">E. Consumida</span><span class="rl-val" id="d-ehv" style="color:var(--orange)">0<span class="rl-unit">Wh</span></span></div>
@@ -214,7 +214,7 @@
     <div class="row"><span class="rl-key">E. Restante</span><span class="rl-val" id="d-ehvrest" style="color:var(--cyan)">0<span class="rl-unit">Wh</span></span></div>
     <div class="row"><span class="rl-key">Q. Restante</span><span class="rl-val" id="d-qhvrest" style="color:var(--cyan)">0<span class="rl-unit">Ah</span></span></div>
 
-    <div class="sec src">MCA — Auxiliar</div>
+    <div class="sec src">Modulo de consumo auxiliar</div>
     <div class="row"><span class="rl-key">Voltaje Aux</span><span class="rl-val" id="d-vaux" style="color:var(--text)">0<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Corriente Aux</span><span class="rl-val" id="d-iaux" style="color:var(--text)">0<span class="rl-unit">A</span></span></div>
     <div class="row"><span class="rl-key">SOC Aux</span><span class="rl-val" id="d-socaux" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
@@ -222,14 +222,14 @@
     <div class="row"><span class="rl-key">E. Aux</span><span class="rl-val" id="d-eaux" style="color:var(--orange)">0<span class="rl-unit">Wh</span></span></div>
     <div class="row"><span class="rl-key">Q. Aux</span><span class="rl-val" id="d-qaux" style="color:var(--orange)">0<span class="rl-unit">Ah</span></span></div>
 
-    <div class="sec src">MDV — MPU-6050</div>
+    <div class="sec src">Modulo de dinamica vehicular</div>
     <div id="gmeter-slot">
       <div class="gm-wrap">
         <canvas id="gmeter-canvas" style="width:150px;height:150px;"></canvas>
         <div class="gm-gz">Gz: <span id="gm-gz-val">0.00</span> G</div>
       </div>
     </div>
-    <div class="subsec">Giroscopio</div>
+    <div class="subsec">Giroscopio </div>
     <div class="row"><span class="rl-key">Gyro X</span><span class="rl-val" id="d-gx" style="color:var(--red)">0<span class="rl-unit">°/s</span></span></div>
     <div class="row"><span class="rl-key">Gyro Y</span><span class="rl-val" id="d-gy" style="color:var(--blue)">0<span class="rl-unit">°/s</span></span></div>
     <div class="row"><span class="rl-key">Gyro Z</span><span class="rl-val" id="d-gz" style="color:var(--green)">0<span class="rl-unit">°/s</span></span></div>
@@ -272,10 +272,10 @@
     <div class="soc-row">
       <div class="odo-box">
         <canvas id="odo-canvas" style="width:102px;height:31px;"></canvas>
-        <div class="odo-lbl">ODÓMETRO (m)</div>
+        <div class="odo-lbl">ODÓMETRO </div>
       </div>
       <div class="soc-center">
-        <div class="soc-cap">BATERÍA HV — SOC</div>
+        <div class="soc-cap"> State of charge </div>
         <canvas id="batt-canvas" style="width:122px;height:77px;"></canvas>
       </div>
       <div class="contactor">
@@ -289,48 +289,41 @@
       <div class="thermo">
         <div class="thermo-tube"><div class="thermo-fill" id="th-mot" style="width:0%"></div></div>
         <div class="thermo-val" id="tv-mot" style="color:var(--orange)">0°</div>
-        <div class="thermo-lbl">Motor</div>
+        <div class="thermo-lbl">Temperatura de motor</div>
       </div>
       <div class="thermo">
         <div class="thermo-tube"><div class="thermo-fill" id="th-cont" style="width:0%"></div></div>
         <div class="thermo-val" id="tv-cont" style="color:var(--blue)">0°</div>
-        <div class="thermo-lbl">Controlador</div>
+        <div class="thermo-lbl">Temperatura de controlador</div>
       </div>
       <div class="thermo">
         <div class="thermo-tube"><div class="thermo-fill" id="th-cap" style="width:0%"></div></div>
         <div class="thermo-val" id="tv-cap" style="color:var(--yellow)">0°</div>
-        <div class="thermo-lbl">Capacitores</div>
+        <div class="thermo-lbl">Temperatura del banco de capacitores</div>
       </div>
       <div class="thermo">
         <div class="thermo-tube"><div class="thermo-fill" id="th-batt" style="width:0%"></div></div>
         <div class="thermo-val" id="tv-batt" style="color:var(--red)">0°</div>
-        <div class="thermo-lbl">Bat. Max</div>
+        <div class="thermo-lbl">Temperatura de la bateria HV</div>
       </div>
-    </div>
-
-    <!-- Sectores -->
-    <div class="sectors">
-      <div class="sector"><div class="sec-lbl">S1</div><div class="sec-val sec-best">0:23.374</div></div>
-      <div class="sector"><div class="sec-lbl">S2</div><div class="sec-val">0:48.775</div></div>
-      <div class="sector"><div class="sec-lbl">S3</div><div class="sec-val sec-slow">0:31.207</div></div>
     </div>
 
     <!-- Charts -->
     <div class="charts">
       <div class="chart-block">
-        <div class="cb-title"><span>Velocidad / RPM / Throttle</span><span class="cb-tag">15S · 10HZ</span></div>
+        <div class="cb-title"><span>Velocidad / RPM / Throttle</span><span class="cb-tag"></span></div>
         <div class="chart-wrap"><canvas id="chart-a"></canvas></div>
       </div>
       <div class="chart-block">
-        <div class="cb-title"><span>Torque / P. Mecánica / P. Eléctrica</span><span class="cb-tag">15S</span></div>
+        <div class="cb-title"><span>Torque / P. Mecánica / P. Eléctrica</span><span class="cb-tag"></span></div>
         <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
       </div>
       <div class="chart-block">
-        <div class="cb-title"><span>P. HV / Corriente / Throttle</span><span class="cb-tag">15S</span></div>
+        <div class="cb-title"><span>P. HV / Corriente / Throttle</span><span class="cb-tag"></span></div>
         <div class="chart-wrap"><canvas id="chart-pwr"></canvas></div>
       </div>
       <div class="chart-block">
-        <div class="cb-title"><span>Potencia Mecánica vs RPM — color = Eficiencia TME</span><span class="cb-tag">EN VIVO</span></div>
+        <div class="cb-title"><span>Potencia Mecánica vs RPM // Color = Eficiencia TME</span><span class="cb-tag"></span></div>
         <div class="pmrpm-wrap">
           <canvas id="pmrpm-canvas" style="flex:1;height:220px;"></canvas>
           <div class="pmrpm-legend">
@@ -349,7 +342,7 @@
     <!-- Mapa arriba -->
     <div class="sec">GPS — Posición en pista</div>
     <div class="map-box">
-      <div class="map-head"><span class="map-title-t">Kartódromo</span><button class="map-btn" onclick="centerMap()">⊙ Centrar</button></div>
+      <div class="map-head"><span class="map-title-t">Pista</span><button class="map-btn" onclick="centerMap()">⊙ Centrar</button></div>
       <div id="map"></div>
     </div>
 
@@ -362,7 +355,7 @@
     </div>
     <div class="subsec">Celdas individuales (16S)</div>
     <div class="cells-grid" id="cells"></div>
-    <div class="subsec">Paquete</div>
+    <div class="subsec">Paquete de bat</div>
     <div class="row"><span class="rl-key">Voltaje Pack</span><span class="rl-val" id="d-volt" style="color:var(--yellow)">0<span class="rl-unit">V</span></span></div>
     <div class="row"><span class="rl-key">Eficiencia HV</span><span class="rl-val" id="d-etabat" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
 
