@@ -151,6 +151,22 @@
 </head>
 <body>
 
+<!-- Pantalla de carga -->
+<div id="loading-screen" style="
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:#0d0d0d; z-index:9999;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:24px;
+">
+  <canvas id="loading-canvas" width="160" height="160"></canvas>
+  <div style="
+    font-family:'Orbitron',sans-serif;
+    font-size:16px; font-weight:700;
+    letter-spacing:4px; text-transform:uppercase;
+    color:#ef5e20;
+  ">Cargando interfaz</div>
+</div>
+
 <div class="title-bar">
   <div class="title">Sistema de Telemetria de Escudería Fénix UPIITA</div>
 </div>
@@ -921,6 +937,46 @@ function updateDashboard(payload){
   else if(eta!=null){ eta_total=eta; }
   drawPMRPM(rpm, p_mec, eta_total);
 }
+
+// ── Pantalla de carga (750 ms) ──────────────────────────────────────────
+(function() {
+  var cv  = document.getElementById('loading-canvas');
+  var ctx = cv.getContext('2d');
+  var t   = 0;
+  var raf;
+  function drawLoader() {
+    ctx.clearRect(0, 0, 160, 160);
+    var cx = 80, cy = 80;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 56, t, t + Math.PI * 1.5);
+    ctx.strokeStyle = '#ef5e20';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 38, -t * 0.7, -t * 0.7 + Math.PI * 1.1);
+    ctx.strokeStyle = '#ef5e20';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef5e20';
+    ctx.fill();
+    t += 0.04;
+    raf = requestAnimationFrame(drawLoader);
+  }
+  drawLoader();
+  setTimeout(function() {
+    cancelAnimationFrame(raf);
+    var screen = document.getElementById('loading-screen');
+    screen.style.transition = 'opacity 0.4s ease';
+    screen.style.opacity = '0';
+    setTimeout(function() { screen.style.display = 'none'; }, 400);
+  }, 750);
+})();
 
 connect();
 </script>
