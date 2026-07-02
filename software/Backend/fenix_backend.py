@@ -47,7 +47,7 @@ DT              = 0.1
 
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
-LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
+LAP_T_MIN       = 15.0    # s mínimos de duración de una vuelta
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
