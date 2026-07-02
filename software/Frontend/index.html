@@ -42,6 +42,7 @@
     .laps-table td{padding:6px 10px;border-bottom:1px solid var(--sep);color:var(--text);}
     .laps-table tr:nth-child(even){background:#0a0a0a;}
     .laps-empty-row td{text-align:center;color:#666;padding:30px;}
+    .laps-current td{color:var(--orange);font-weight:700;background:#150d05;}
     .ws-ind{display:flex;align-items:center;gap:8px;}
     .ws-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;transition:background 0.3s;}
     .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
@@ -417,9 +418,9 @@
   <div class="laps-wrap">
     <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
     <table class="laps-table">
-      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th></tr></thead>
+      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>Estado</th></tr></thead>
       <tbody id="laps-tbody">
-        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="3">Esperando cruces de meta…</td></tr>
+        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="4">Esperando cruces de meta…</td></tr>
       </tbody>
     </table>
   </div>
@@ -865,14 +866,20 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
-var lastNLap=0;
-function addLapRow(n,t,dist){
-  var empty=document.getElementById('laps-empty-row');
-  if(empty) empty.remove();
+function renderLapsTable(laps, armado, nLap, tActual, dActual){
   var tbody=document.getElementById('laps-tbody');
-  var tr=document.createElement('tr');
-  tr.innerHTML='<td>'+n+'</td><td>'+t.toFixed(1)+'</td><td>'+dist.toFixed(3)+'</td>';
-  tbody.insertBefore(tr,tbody.firstChild); // vuelta más reciente arriba
+  if(!armado && (!laps || laps.length===0)){
+    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="4">Esperando primer cruce de meta…</td></tr>';
+    return;
+  }
+  var rows='';
+  (laps||[]).forEach(function(l){
+    rows += '<tr><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>Completa</td></tr>';
+  });
+  if(armado){
+    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>En curso…</td></tr>';
+  }
+  tbody.innerHTML = rows;
 }
 
 function updateDashboard(payload){
@@ -893,16 +900,7 @@ function updateDashboard(payload){
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
   // ── Conteo de vueltas ──
-  var nLap = Math.round(num(d.n_lap));
-  if(nLap > lastNLap){
-    addLapRow(nLap, num(d.t_vuelta), num(d.d_vuelta));
-    lastNLap = nLap;
-  } else if(nLap < lastNLap){
-    // sesión nueva detectada (conteo reiniciado en backend) — limpiar tabla
-    lastNLap = nLap;
-    var tbody=document.getElementById('laps-tbody');
-    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="3">Esperando cruces de meta…</td></tr>';
-  }
+  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta));
 
   // ── Header ──
   document.getElementById('sub-ts').textContent = ts;

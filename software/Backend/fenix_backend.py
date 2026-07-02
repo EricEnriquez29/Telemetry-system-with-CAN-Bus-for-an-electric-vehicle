@@ -107,6 +107,8 @@ _meta_xy          = None   # (xA, yA, xB, yB, lat_ref, lat_a, lon_a, lat_b, lon_
 _meta_lock        = threading.Lock()
 _sesion_act_prev  = False
 _n_lap            = 0
+_armado           = False   # primer cruce arma el cronómetro, no cuenta como vuelta
+_laps_history     = []      # [{"n_lap":..,"t_vuelta":..,"d_vuelta":..}, ...] sesión actual
 _t_vuelta_inicio  = None
 _d_vuelta         = 0.0
 _ultimo_gps       = None   # (x, y, d_signed, t)
@@ -158,6 +160,8 @@ def send_zero_snapshot():
             "phi": 0.0, "theta": 0.0,
             "Gx":  0.0, "Gy":    0.0, "Gz": 0.0,
             "n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4),
+            "laps": list(_laps_history),
+            "armado": False,
             "sesion_act": False,
             "meta_lat_a": _meta_xy[5] if _meta_xy else None,
             "meta_lon_a": _meta_xy[6] if _meta_xy else None,
@@ -304,7 +308,7 @@ def reset_laps():
     """Reinicia el conteo de vueltas por completo. Se llama al detectar
     transición de sesión inactiva → activa."""
     global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
-    global _d_ref_muestras, _d_ref
+    global _d_ref_muestras, _d_ref, _armado, _laps_history
 
     _n_lap            = 0
     _d_vuelta         = 0.0
@@ -313,23 +317,26 @@ def reset_laps():
     _t_ultimo_cruce   = None
     _d_ref_muestras   = []
     _d_ref            = None
+    _armado           = False
+    _laps_history     = []
     print("[LAP] Conteo de vueltas reiniciado (nueva sesión activa)", flush=True)
 
 
 def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, sesion_act: bool) -> dict:
     """Evalúa cruce de línea de meta y actualiza n_lap/t_vuelta/d_vuelta.
-    Si la sesión está inactiva o no hay línea seteada, congela el estado
-    (no evalúa cruces, no acumula distancia) y solo reporta el último valor."""
+    El primer cruce válido arma el cronómetro (no cuenta como vuelta);
+    los siguientes cierran vueltas. Si la sesión está inactiva o no hay
+    línea seteada, congela el estado."""
     global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
-    global _d_ref_muestras, _d_ref
+    global _d_ref_muestras, _d_ref, _armado, _laps_history
 
     if not sesion_act or _meta_xy is None:
-        return {"n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4)}
+        return {"n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4), "laps": list(_laps_history), "armado": _armado}
 
     # GPS sin fix válido (0,0) — ignorar este snapshot para el conteo
     if gps_lat == 0.0 and gps_lon == 0.0:
         t_vuelta_actual = round(now_t - _t_vuelta_inicio, 1) if _t_vuelta_inicio else 0.0
-        return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4)}
+        return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4), "laps": list(_laps_history), "armado": _armado}
 
     xA, yA, xB, yB, lat_ref = _meta_xy[0], _meta_xy[1], _meta_xy[2], _meta_xy[3], _meta_xy[4]
     x, y = _to_xy(gps_lat, gps_lon, lat_ref)
@@ -356,17 +363,26 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
                 debounce_ok = (_t_ultimo_cruce is None) or ((now_t - _t_ultimo_cruce) > LAP_DEBOUNCE)
 
                 if debounce_ok:
-                    t_vuelta_actual = now_t - _t_vuelta_inicio
+                    # ── Interpolar instante exacto de cruce ──
+                    frac = abs(d0) / (abs(d0) + abs(d_signed)) if (abs(d0) + abs(d_signed)) > 0 else 0.5
+                    t_cruce = t0 + (now_t - t0) * frac
 
+                    # ── Primer cruce: solo arma el cronómetro, no cuenta vuelta ──
+                    if not _armado:
+                        _armado          = True
+                        _t_ultimo_cruce  = t_cruce
+                        _t_vuelta_inicio = t_cruce
+                        _d_vuelta        = 0.0
+                        _ultimo_gps      = (x, y, d_signed, now_t)
+                        print("[LAP] Primer cruce — cronómetro armado, esperando vuelta 1", flush=True)
+                        return {"n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": 0.0, "laps": list(_laps_history), "armado": _armado}
+
+                    t_vuelta_actual = now_t - _t_vuelta_inicio
                     d_valida = True
                     if _d_ref is not None:
                         d_valida = (_d_ref * (1 - LAP_D_TOL)) <= _d_vuelta <= (_d_ref * (1 + LAP_D_TOL))
 
                     if t_vuelta_actual >= LAP_T_MIN and d_valida:
-                        # ── Interpolar instante exacto de cruce ──
-                        frac = abs(d0) / (abs(d0) + abs(d_signed)) if (abs(d0) + abs(d_signed)) > 0 else 0.5
-                        t_cruce = t0 + (now_t - t0) * frac
-
                         _n_lap += 1
 
                         # ── Calibración de distancia de referencia (primeras 5 vueltas) ──
@@ -376,13 +392,15 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
                                 _d_ref = sum(_d_ref_muestras) / len(_d_ref_muestras)
                                 print(f"[LAP] Calibración lista — d_ref={_d_ref:.3f} km", flush=True)
 
-                        print(f"[LAP] Vuelta {_n_lap} — t={t_vuelta_actual:.1f}s d={_d_vuelta:.3f}km", flush=True)
-
-                        result = {
+                        entry = {
                             "n_lap":    _n_lap,
                             "t_vuelta": round(t_vuelta_actual, 1),
                             "d_vuelta": round(_d_vuelta, 4),
                         }
+                        _laps_history.append(entry)
+                        print(f"[LAP] Vuelta {_n_lap} — t={t_vuelta_actual:.1f}s d={_d_vuelta:.3f}km", flush=True)
+
+                        result = {**entry, "laps": list(_laps_history), "armado": _armado}
 
                         _t_ultimo_cruce  = t_cruce
                         _t_vuelta_inicio = t_cruce
@@ -392,7 +410,7 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
 
     _ultimo_gps = (x, y, d_signed, now_t)
     t_vuelta_actual = round(now_t - _t_vuelta_inicio, 1) if _t_vuelta_inicio else 0.0
-    return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4)}
+    return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4), "laps": list(_laps_history), "armado": _armado}
 
 
 # ─── Servidor HTTP interno: POST /set_meta ────────────────────────────────────
@@ -514,6 +532,8 @@ def on_message(client, userdata, msg):
         derived["n_lap"]    = lap_info["n_lap"]
         derived["t_vuelta"] = lap_info["t_vuelta"]
         derived["d_vuelta"] = lap_info["d_vuelta"]
+        derived["laps"]     = lap_info["laps"]
+        derived["armado"]   = lap_info["armado"]
 
         # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -I_MIN and derived["p_hv"] is not None:
@@ -721,6 +741,8 @@ def on_message(client, userdata, msg):
                 "n_lap":      derived["n_lap"],
                 "t_vuelta":   derived["t_vuelta"],
                 "d_vuelta":   derived["d_vuelta"],
+                "laps":       derived["laps"],
+                "armado":     derived["armado"],
                 "sesion_act": sesion_act,
                 "meta_lat_a": _meta_xy[5] if _meta_xy else None,
                 "meta_lon_a": _meta_xy[6] if _meta_xy else None,
