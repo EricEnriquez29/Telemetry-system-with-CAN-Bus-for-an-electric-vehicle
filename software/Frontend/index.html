@@ -876,7 +876,7 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
-function renderLapsTable(laps, armado, nLap, tActual, dActual){
+function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual){
   var tbody=document.getElementById('laps-tbody');
   if(!armado && (!laps || laps.length===0)){
     tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="6">Esperando primer cruce de meta…</td></tr>';
@@ -889,7 +889,9 @@ function renderLapsTable(laps, armado, nLap, tActual, dActual){
     rows += '<tr><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>'+eV+'</td><td>'+eR+'</td><td>Completa</td></tr>';
   });
   if(armado){
-    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>—</td><td>—</td><td>En curso…</td></tr>';
+    var eVA = (eActual!=null) ? eActual.toFixed(2) : '—';
+    var eRA = (eRegenActual!=null) ? eRegenActual.toFixed(2) : '—';
+    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>'+eVA+'</td><td>'+eRA+'</td><td>En curso…</td></tr>';
   }
   tbody.innerHTML = rows;
 }
@@ -912,7 +914,7 @@ function updateDashboard(payload){
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
   // ── Conteo de vueltas ──
-  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta));
+  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual);
 
   // ── Header ──
   document.getElementById('sub-ts').textContent = ts;

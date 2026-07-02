@@ -418,6 +418,15 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
                         _d_vuelta        = 0.0
                         _ultimo_gps      = (x, y, d_signed, now_t)
                         return result
+                    else:
+                        # ── Cruce rechazado: no cuenta como vuelta, pero SÍ se
+                        # actualiza el debounce para no dejarlo "abierto" y que
+                        # cruces espurios cercanos se sigan sin filtrar. El
+                        # tiempo/distancia de la vuelta en curso NO se reinician,
+                        # así el siguiente cruce válido mide correctamente. ──
+                        motivo = "t_vuelta<{:.0f}s".format(LAP_T_MIN) if t_vuelta_actual < LAP_T_MIN else "distancia fuera de ±15% d_ref"
+                        print(f"[LAP] Cruce RECHAZADO ({motivo}) — t={t_vuelta_actual:.1f}s d={_d_vuelta:.3f}km d_ref={_d_ref}", flush=True)
+                        _t_ultimo_cruce = t_cruce
 
     _ultimo_gps = (x, y, d_signed, now_t)
     t_vuelta_actual = round(now_t - _t_vuelta_inicio, 1) if _t_vuelta_inicio else 0.0
@@ -610,6 +619,14 @@ def on_snapshot_message(client, userdata, msg):
             derived["laps"] = list(_laps_history)
             _E_HV_lap_inicio    = _E_HV
             _E_regen_lap_inicio = _E_regen
+
+        # ── Energía de la vuelta en curso (se actualiza cada snapshot, no solo al cerrar) ──
+        if lap_info["armado"]:
+            derived["E_vuelta_actual"]       = round(_E_HV - _E_HV_lap_inicio, 3)
+            derived["E_regen_vuelta_actual"] = round(_E_regen - _E_regen_lap_inicio, 3)
+        else:
+            derived["E_vuelta_actual"]       = None
+            derived["E_regen_vuelta_actual"] = None
 
         # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -I_MIN and derived["p_hv"] is not None:
@@ -819,6 +836,8 @@ def on_snapshot_message(client, userdata, msg):
                 "d_vuelta":   derived["d_vuelta"],
                 "laps":       derived["laps"],
                 "armado":     derived["armado"],
+                "E_vuelta_actual":       derived["E_vuelta_actual"],
+                "E_regen_vuelta_actual": derived["E_regen_vuelta_actual"],
                 "sesion_act": sesion_act,
                 "mgt_conectado": _mgt_conectado,
                 "meta_lat_a": _meta_xy[5] if _meta_xy else None,
