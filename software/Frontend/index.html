@@ -196,6 +196,7 @@
   <div class="ws-ind"><div class="ws-dot" id="ws-dot"></div><span id="ws-label">Conectando…</span></div>
   <div>Vehículo <span id="sub-veh">—</span> · Sesión <span id="sub-sess">—</span> · Último dato: <span id="sub-ts">—</span></div>
   <div id="sub-clock">--:--:--</div>
+  <div class="ws-ind"><div class="ws-dot" id="mgt-dot"></div><span id="mgt-label">MGT desconocido</span></div>
 </div>
 
 <button class="menu-btn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
@@ -418,9 +419,9 @@
   <div class="laps-wrap">
     <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
     <table class="laps-table">
-      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>E consumida (Wh)</th><th>E regenerada (Wh)</th><th>Estado</th></tr></thead>
       <tbody id="laps-tbody">
-        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="4">Esperando cruces de meta…</td></tr>
+        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="6">Esperando cruces de meta…</td></tr>
       </tbody>
     </table>
   </div>
@@ -853,7 +854,16 @@ function setConn(connected){
   var dot=document.getElementById('ws-dot');
   var lbl=document.getElementById('ws-label');
   if(dot){ if(connected) dot.classList.add('connected'); else dot.classList.remove('connected'); }
-  if(lbl){ lbl.textContent = connected ? 'Conectado' : 'Reconectando…'; }
+  if(lbl){ lbl.textContent = connected ? 'Servidor conectado' : 'Servidor reconectando…'; }
+}
+
+function setMgtConn(connected){
+  var dot=document.getElementById('mgt-dot');
+  var lbl=document.getElementById('mgt-label');
+  if(!dot||!lbl) return;
+  if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); return; }
+  if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
+  else{ dot.classList.remove('connected'); lbl.textContent='MGT desconectado'; }
 }
 
 function connect(){
@@ -869,15 +879,17 @@ function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v);
 function renderLapsTable(laps, armado, nLap, tActual, dActual){
   var tbody=document.getElementById('laps-tbody');
   if(!armado && (!laps || laps.length===0)){
-    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="4">Esperando primer cruce de meta…</td></tr>';
+    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="6">Esperando primer cruce de meta…</td></tr>';
     return;
   }
   var rows='';
   (laps||[]).forEach(function(l){
-    rows += '<tr><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>Completa</td></tr>';
+    var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
+    var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
+    rows += '<tr><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>'+eV+'</td><td>'+eR+'</td><td>Completa</td></tr>';
   });
   if(armado){
-    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>En curso…</td></tr>';
+    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>—</td><td>—</td><td>En curso…</td></tr>';
   }
   tbody.innerHTML = rows;
 }
@@ -906,6 +918,7 @@ function updateDashboard(payload){
   document.getElementById('sub-ts').textContent = ts;
   document.getElementById('sub-veh').textContent = payload.vehicle_id != null ? payload.vehicle_id : '—';
   document.getElementById('sub-sess').textContent = payload.session_id != null ? payload.session_id : '—';
+  setMgtConn(d.mgt_conectado);
 
   // ── Rev lights + gauges ──
   updateRev(rpm/5000);

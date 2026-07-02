@@ -81,6 +81,7 @@ static bool mqtt_conectar() {
                            MQTT_LWT_TOPIC, 0, true, MQTT_LWT_MSG)) {
         mqtt_conectado = true;
         mqtt_tx_on     = true;
+        mqttClient.publish(MQTT_LWT_TOPIC, "online", true);  // retenido — LWT lo sobreescribe con "offline" si se cae
         Serial.println("[T4] MQTT conectado");
         esp_task_wdt_reset();
         return true;

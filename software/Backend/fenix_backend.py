@@ -24,6 +24,7 @@ MQTT_PORT  = 1883
 MQTT_USER  = "fenix25"
 MQTT_PASS  = "pswTeleFenix"
 MQTT_TOPIC = "fenix/mgt/snapshot"
+MQTT_STATUS_TOPIC = "fenix/mgt/status"
 
 # ─── Configuración InfluxDB ───────────────────────────────────────────────────
 INFLUX_URL    = "http://localhost:8086"
@@ -46,7 +47,7 @@ DT              = 0.1
 
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
-LAP_T_MIN       = 15.0    # s mínimos de duración de una vuelta
+LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
@@ -115,6 +116,12 @@ _ultimo_gps       = None   # (x, y, d_signed, t)
 _t_ultimo_cruce   = None
 _d_ref_muestras   = []
 _d_ref            = None
+_E_HV_lap_inicio     = 0.0
+_E_regen_lap_inicio  = 0.0
+
+# ─── Estado de conexión del MGT (via LWT) ────────────────────────────────────
+_mgt_conectado = False
+_last_snapshot = None   # dict completo {timestamp, vehicle_id, session_id, data} — último enviado
 
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
@@ -162,6 +169,7 @@ def send_zero_snapshot():
             "n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4),
             "laps": list(_laps_history),
             "armado": False,
+            "mgt_conectado": _mgt_conectado,
             "sesion_act": False,
             "meta_lat_a": _meta_xy[5] if _meta_xy else None,
             "meta_lon_a": _meta_xy[6] if _meta_xy else None,
@@ -309,6 +317,7 @@ def reset_laps():
     transición de sesión inactiva → activa."""
     global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
     global _d_ref_muestras, _d_ref, _armado, _laps_history
+    global _E_HV_lap_inicio, _E_regen_lap_inicio
 
     _n_lap            = 0
     _d_vuelta         = 0.0
@@ -319,6 +328,8 @@ def reset_laps():
     _d_ref            = None
     _armado           = False
     _laps_history     = []
+    _E_HV_lap_inicio     = 0.0
+    _E_regen_lap_inicio  = 0.0
     print("[LAP] Conteo de vueltas reiniciado (nueva sesión activa)", flush=True)
 
 
@@ -468,23 +479,71 @@ def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("Conectado al broker MQTT")
         client.subscribe(MQTT_TOPIC)
-        print(f"Suscrito a {MQTT_TOPIC}")
+        client.subscribe(MQTT_STATUS_TOPIC)
+        print(f"Suscrito a {MQTT_TOPIC} y {MQTT_STATUS_TOPIC}")
     else:
         print(f"Error de conexion MQTT: rc={rc}")
 
+
+def push_snapshot_now():
+    """Reenvía el último snapshot conocido con el estado de conexión del MGT
+    actualizado. Se usa cuando cambia sesion_act/LWT sin esperar el próximo dato."""
+    global _last_snapshot
+    if _last_snapshot is None:
+        return
+    snap = dict(_last_snapshot)
+    snap["data"] = dict(snap["data"])
+    snap["data"]["mgt_conectado"] = _mgt_conectado
+    snap["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    try:
+        requests.post(API_INTERNAL_URL, json=snap, timeout=0.5)
+    except Exception as e:
+        print(f"[MGT] Error POST estado: {e}", flush=True)
+
+
+def on_status_message(msg):
+    """Callback para el tópico fenix/mgt/status (LWT: 'online' / 'offline')."""
+    global _mgt_conectado
+    try:
+        payload = msg.payload.decode().strip().lower()
+    except Exception:
+        payload = ""
+    nuevo_estado = (payload == "online")
+    if nuevo_estado != _mgt_conectado:
+        _mgt_conectado = nuevo_estado
+        print(f"[MGT] Estado → {'conectado' if _mgt_conectado else 'DESCONECTADO'}", flush=True)
+        push_snapshot_now()
+
+
 def on_message(client, userdata, msg):
+    if msg.topic == MQTT_STATUS_TOPIC:
+        on_status_message(msg)
+        return
+    on_snapshot_message(client, userdata, msg)
+
+
+def on_snapshot_message(client, userdata, msg):
     global _session_id_prev, _E_HV, _Q_HV, _E_regen, _E_aux, _Q_aux
     global _soc0_aux, _aux_muestras, _aux_ultimo_t
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
     global _phi_rad, _theta_rad
     global _sesion_act_prev
+    global _E_HV_lap_inicio, _E_regen_lap_inicio
+    global _last_snapshot
 
     # ── Watchdog: llegó un mensaje, reiniciar timer ───────────────────────────
     reset_watchdog()
 
     try:
         data = json.loads(msg.payload.decode())
+
+        # ── 0. Validar formato y campos obligatorios ──────────────────────────
+        campos_obligatorios = ("veh_id", "sess_id", "times")
+        faltantes = [c for c in campos_obligatorios if c not in data]
+        if faltantes:
+            print(f"[ERROR] Mensaje MQTT sin campos obligatorios: {faltantes}", flush=True)
+            return
 
         curr_p     = float(data.get("curr_p",  0))
         soc        = float(data.get("soc",     0))
@@ -528,12 +587,29 @@ def on_message(client, userdata, msg):
         gps_lat  = float(data.get("gps_lat", 0))
         gps_lon  = float(data.get("gps_lon", 0))
         speed_v  = float(data.get("speed_v", 0))
+        n_lap_antes    = _n_lap
+        armado_antes   = _armado
         lap_info = process_lap(gps_lat, gps_lon, speed_v, now, sesion_act)
         derived["n_lap"]    = lap_info["n_lap"]
         derived["t_vuelta"] = lap_info["t_vuelta"]
         derived["d_vuelta"] = lap_info["d_vuelta"]
         derived["laps"]     = lap_info["laps"]
         derived["armado"]   = lap_info["armado"]
+
+        # ── Primer cruce (recién armado): marca el inicio de la vuelta 1 ───────
+        if lap_info["armado"] and not armado_antes:
+            _E_HV_lap_inicio    = _E_HV
+            _E_regen_lap_inicio = _E_regen
+
+        # ── Vuelta recién completada: energía consumida/regenerada en esa vuelta ──
+        if lap_info["n_lap"] > n_lap_antes and _laps_history:
+            e_vuelta       = round(_E_HV - _E_HV_lap_inicio, 3)
+            e_regen_vuelta = round(_E_regen - _E_regen_lap_inicio, 3)
+            _laps_history[-1]["E_vuelta"]       = e_vuelta
+            _laps_history[-1]["E_regen_vuelta"] = e_regen_vuelta
+            derived["laps"] = list(_laps_history)
+            _E_HV_lap_inicio    = _E_HV
+            _E_regen_lap_inicio = _E_regen
 
         # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -I_MIN and derived["p_hv"] is not None:
@@ -744,6 +820,7 @@ def on_message(client, userdata, msg):
                 "laps":       derived["laps"],
                 "armado":     derived["armado"],
                 "sesion_act": sesion_act,
+                "mgt_conectado": _mgt_conectado,
                 "meta_lat_a": _meta_xy[5] if _meta_xy else None,
                 "meta_lon_a": _meta_xy[6] if _meta_xy else None,
                 "meta_lat_b": _meta_xy[7] if _meta_xy else None,
@@ -751,6 +828,7 @@ def on_message(client, userdata, msg):
             }
         }
 
+        _last_snapshot = snapshot
         try:
             requests.post(API_INTERNAL_URL, json=snapshot, timeout=0.5)
         except Exception as api_err:
