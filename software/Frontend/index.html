@@ -34,6 +34,14 @@
     .menu-item:hover{background:#161616;color:#ccc;}
     .menu-item.active{color:var(--orange);border-left:3px solid var(--orange);background:#120c08;}
     .empty-tab{color:#888;font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
+    .laps-wrap{padding:20px;font-family:'Share Tech Mono',monospace;}
+    .laps-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .laps-title{font-size:12px;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
+    .laps-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .laps-table th{text-align:left;padding:6px 10px;color:var(--muted);font-size:9px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--sep);}
+    .laps-table td{padding:6px 10px;border-bottom:1px solid var(--sep);color:var(--text);}
+    .laps-table tr:nth-child(even){background:#0a0a0a;}
+    .laps-empty-row td{text-align:center;color:#666;padding:30px;}
     .ws-ind{display:flex;align-items:center;gap:8px;}
     .ws-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;transition:background 0.3s;}
     .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
@@ -122,6 +130,15 @@
     /* Mapa */
     .map-box{padding:6px;}
     .map-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+    .meta-details{margin-top:6px;font-family:'Share Tech Mono',monospace;border:1px solid var(--sep);border-radius:2px;}
+    .meta-details summary{padding:5px 8px;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;cursor:pointer;background:#0a0a0a;}
+    .meta-body{padding:8px;display:flex;flex-direction:column;gap:6px;}
+    .meta-row{display:flex;gap:6px;align-items:center;}
+    .meta-row label{font-size:9px;color:#999;width:34px;flex-shrink:0;}
+    .meta-row input{flex:1;background:#050505;border:1px solid var(--sep);color:var(--text);font-family:inherit;font-size:10px;padding:3px 5px;border-radius:2px;}
+    .meta-btn{font-family:inherit;font-size:9px;padding:4px 8px;background:transparent;color:var(--orange);border:1px solid var(--orange);cursor:pointer;border-radius:2px;}
+    .meta-msg{font-size:9px;min-height:12px;}
+    .meta-msg.ok{color:var(--green);} .meta-msg.err{color:var(--red);}
     .map-title-t{font-size:9px;color:var(--green);letter-spacing:2px;text-transform:uppercase;}
     .map-btn{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 8px;background:transparent;color:var(--green);border:1px solid var(--green);cursor:pointer;border-radius:2px;}
     #map{height:170px;border-radius:3px;}
@@ -346,6 +363,19 @@
       <div id="map"></div>
     </div>
 
+    <details class="meta-details">
+      <summary>⚑ Línea de meta</summary>
+      <div class="meta-body">
+        <div class="meta-row"><label>PA lat</label><input type="text" id="meta-lat-a" placeholder="19.xxxxx"></div>
+        <div class="meta-row"><label>PA lon</label><input type="text" id="meta-lon-a" placeholder="-99.xxxxx"></div>
+        <div class="meta-row"><label>PB lat</label><input type="text" id="meta-lat-b" placeholder="19.xxxxx"></div>
+        <div class="meta-row"><label>PB lon</label><input type="text" id="meta-lon-b" placeholder="-99.xxxxx"></div>
+        <div class="meta-row"><label>Pass</label><input type="password" id="meta-pass" placeholder="••••••"></div>
+        <div class="meta-row"><button class="meta-btn" onclick="setMetaLine()">Setear línea de meta</button></div>
+        <div class="meta-msg" id="meta-msg"></div>
+      </div>
+    </details>
+
     <!-- Celdas -->
     <div class="sec src">Baterías HV</div>
     <div class="cell-summary">
@@ -384,7 +414,15 @@
 
 <!-- ══ Pestaña 1: Tabla de Vueltas ══ -->
 <div id="tab-1" style="display:none;">
-  <div class="empty-tab">— Tabla de Vueltas — en construcción —</div>
+  <div class="laps-wrap">
+    <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
+    <table class="laps-table">
+      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th></tr></thead>
+      <tbody id="laps-tbody">
+        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="3">Esperando cruces de meta…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ══ Pestaña 2: Ploteo ══ -->
@@ -450,6 +488,44 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.
 var marker=L.circleMarker(GPS_CENTER,{radius:6,color:'#fff',fillColor:'#d9621a',fillOpacity:1,weight:2}).addTo(map);
 function centerMap(){map.setView(marker.getLatLng(),map.getZoom(),{animate:true,duration:0.5});}
 function updateMap(lat,lon){if(lat===0&&lon===0)return;marker.setLatLng([lat,lon]);}
+
+// ── Línea de meta ──
+var metaLine=null;
+var metaLineDrawn=null; // "latA,lonA,latB,lonB" ya dibujado, para no redibujar cada frame
+function drawMetaLine(latA,lonA,latB,lonB){
+  if(latA==null||lonA==null||latB==null||lonB==null) return;
+  var key=latA+','+lonA+','+latB+','+lonB;
+  if(key===metaLineDrawn) return;
+  metaLineDrawn=key;
+  if(metaLine) map.removeLayer(metaLine);
+  metaLine=L.polyline([[latA,lonA],[latB,lonB]],{color:'#000',weight:3,opacity:0.9}).addTo(map);
+}
+
+const META_HTTP_URL="http://23.94.237.163:8060/set_meta";
+const META_PASS="fenix25";
+function setMetaLine(){
+  var msg=document.getElementById('meta-msg');
+  var pass=document.getElementById('meta-pass').value;
+  if(pass!==META_PASS){ msg.textContent='Contraseña incorrecta'; msg.className='meta-msg err'; return; }
+  var lat_a=parseFloat(document.getElementById('meta-lat-a').value);
+  var lon_a=parseFloat(document.getElementById('meta-lon-a').value);
+  var lat_b=parseFloat(document.getElementById('meta-lat-b').value);
+  var lon_b=parseFloat(document.getElementById('meta-lon-b').value);
+  if([lat_a,lon_a,lat_b,lon_b].some(isNaN)){ msg.textContent='Completa las 4 coordenadas'; msg.className='meta-msg err'; return; }
+  msg.textContent='Enviando…'; msg.className='meta-msg';
+  fetch(META_HTTP_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat_a:lat_a,lon_a:lon_a,lat_b:lat_b,lon_b:lon_b})})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+    .then(function(res){
+      if(res.ok){
+        msg.textContent='Línea de meta seteada ✓'; msg.className='meta-msg ok';
+        document.getElementById('meta-pass').value='';
+        drawMetaLine(lat_a,lon_a,lat_b,lon_b);
+      } else {
+        msg.textContent='Error: '+(res.body.error||'desconocido'); msg.className='meta-msg err';
+      }
+    })
+    .catch(function(){ msg.textContent='No se pudo conectar al backend'; msg.className='meta-msg err'; });
+}
 
 // ── Termómetro helper ──
 function setThermo(prefix,val,max){
@@ -770,7 +846,6 @@ window.addEventListener('resize',pmResize);
 
 // ── WebSocket — datos reales del servidor ──
 const WS_URL = "ws://23.94.237.163:8050/ws";
-const KT = 0.143;  // constante de torque (Nm/A) — igual que el backend
 let ws = null;
 
 function setConn(connected){
@@ -790,6 +865,16 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
+var lastNLap=0;
+function addLapRow(n,t,dist){
+  var empty=document.getElementById('laps-empty-row');
+  if(empty) empty.remove();
+  var tbody=document.getElementById('laps-tbody');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td>'+n+'</td><td>'+t.toFixed(1)+'</td><td>'+dist.toFixed(3)+'</td>';
+  tbody.insertBefore(tr,tbody.firstChild); // vuelta más reciente arriba
+}
+
 function updateDashboard(payload){
   const d = payload.data || {};
   const ts = payload.timestamp || new Date().toISOString();
@@ -802,7 +887,22 @@ function updateDashboard(payload){
   var tmot=num(d.tmp_mot), tcont=num(d.tmp_cont), tcap=num(d.tmp_cap), tmax=num(d.tmp_max);
   var vaux=num(d.volt_a), iaux=num(d.curr_a);
   var odo=num(d.odo_veh), cont=Math.round(num(d.cont_st));
-  var torq = KT * curr_rms;  // torque calculado con la constante y corriente RMS
+  var torq = num(d.tau_est);  // ya calculado en el backend
+
+  // ── Línea de meta (redibuja solo si cambian coordenadas) ──
+  drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
+
+  // ── Conteo de vueltas ──
+  var nLap = Math.round(num(d.n_lap));
+  if(nLap > lastNLap){
+    addLapRow(nLap, num(d.t_vuelta), num(d.d_vuelta));
+    lastNLap = nLap;
+  } else if(nLap < lastNLap){
+    // sesión nueva detectada (conteo reiniciado en backend) — limpiar tabla
+    lastNLap = nLap;
+    var tbody=document.getElementById('laps-tbody');
+    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="3">Esperando cruces de meta…</td></tr>';
+  }
 
   // ── Header ──
   document.getElementById('sub-ts').textContent = ts;
@@ -831,15 +931,11 @@ function updateDashboard(payload){
   document.getElementById('tbn-thr').textContent=thr.toFixed(0)+'%';
   document.getElementById('tbn-brk').textContent=brk.toFixed(0)+'%';
 
-  // ── Derivadas necesarias del snapshot ──
+  // ── Derivadas necesarias del snapshot (ya calculadas en el backend) ──
   var p_mec=num(d.p_mec), p_hv=d.p_hv;          // p_hv puede ser null
   var v_rest=d.v_rest_pack;                       // null si no hay reposo medido
-  // Eficiencia de motor (eta = p_mec/p_hv), solo válida en tracción
-  var eta=null;
-  if(p_hv!=null && p_hv>50){ eta=Math.min(100,(p_mec/p_hv)*100); }
-  // Eficiencia de batería HV (volt_p / v_rest_pack)
-  var etabat=null;
-  if(v_rest!=null && v_rest>1){ etabat=Math.min(100,(volt_p/v_rest)*100); }
+  var eta    = d.eta;       // eficiencia motor/controlador, viene del backend
+  var etabat = d.eta_bat;   // eficiencia batería, viene del backend
 
   // ── Sidebar izquierda: Controlador/Motor ──
   document.getElementById('d-eta').innerHTML=(eta!=null?eta.toFixed(1):'—')+'<span class="rl-unit">%</span>';
@@ -929,9 +1025,7 @@ function updateDashboard(payload){
   cA.update('none'); cTM.update('none'); cPWR.update('none');
 
   // ── G-meter Potencia Mecánica vs RPM (color = eficiencia total TME) ──
-  var eta_total=null;
-  if(eta!=null && etabat!=null){ eta_total=(eta/100)*(etabat/100)*100; }
-  else if(eta!=null){ eta_total=eta; }
+  var eta_total = (d.eta_total != null) ? d.eta_total : eta; // fallback si aún no hay v_rest
   drawPMRPM(rpm, p_mec, eta_total);
 }
 

@@ -13,6 +13,7 @@ import time
 import threading
 import requests
 from datetime import datetime, timezone, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -42,6 +43,14 @@ T_REPOSO        = 60.0
 T_GAP_MAX       = 600.0
 SOC_MIN_DELTA   = 30.0
 DT              = 0.1
+
+# ─── Constantes conteo de vueltas ────────────────────────────────────────────
+LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
+LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
+LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
+LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
+EARTH_R_KM      = 6371.0
+META_HTTP_PORT  = 8060    # puerto del servidor HTTP interno para /set_meta
 
 # ─── Watchdog ─────────────────────────────────────────────────────────────────
 WATCHDOG_TIMEOUT = 5.0   # segundos sin datos MQTT → enviar ceros
@@ -93,6 +102,18 @@ _soh_activo       = False
 _phi_rad   = 0.0
 _theta_rad = 0.0
 
+# ─── Línea de meta / conteo de vueltas (RAM) ─────────────────────────────────
+_meta_xy          = None   # (xA, yA, xB, yB, lat_ref, lat_a, lon_a, lat_b, lon_b) o None
+_meta_lock        = threading.Lock()
+_sesion_act_prev  = False
+_n_lap            = 0
+_t_vuelta_inicio  = None
+_d_vuelta         = 0.0
+_ultimo_gps       = None   # (x, y, d_signed, t)
+_t_ultimo_cruce   = None
+_d_ref_muestras   = []
+_d_ref            = None
+
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
@@ -120,7 +141,7 @@ def send_zero_snapshot():
             "volt_a":   0.0, "curr_a":   0.0,
             "cells": {f"cell_{i+1}": 0.0 for i in range(16)},
             "tau_est": 0.0, "p_mec": 0.0, "p_hv": None,
-            "p_regen": None, "eta": None,
+            "p_regen": None, "eta": None, "eta_bat": None, "eta_total": None,
             "E_HV":    round(_E_HV,    3),
             "Q_HV":    round(_Q_HV,    4),
             "E_regen": round(_E_regen, 3),
@@ -136,6 +157,12 @@ def send_zero_snapshot():
             "v_rest_pack": _v_rest_pack, "t_reposo_s": 0,
             "phi": 0.0, "theta": 0.0,
             "Gx":  0.0, "Gy":    0.0, "Gz": 0.0,
+            "n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4),
+            "sesion_act": False,
+            "meta_lat_a": _meta_xy[5] if _meta_xy else None,
+            "meta_lon_a": _meta_xy[6] if _meta_xy else None,
+            "meta_lat_b": _meta_xy[7] if _meta_xy else None,
+            "meta_lon_b": _meta_xy[8] if _meta_xy else None,
         }
     }
     try:
@@ -180,6 +207,16 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
     if _v_rest_pack is not None and abs(curr_p) > I_MIN:
         r_pack = (_v_rest_pack - volt_p) / abs(curr_p)
 
+    # eta_bat: eficiencia batería (sag de voltaje vs. reposo)
+    eta_bat = None
+    if _v_rest_pack is not None and _v_rest_pack > 1:
+        eta_bat = min((volt_p / _v_rest_pack) * 100, 100.0)
+
+    # eta_total: eficiencia total del tren motriz (bat * motor)
+    eta_total = None
+    if eta is not None and eta_bat is not None:
+        eta_total = (eta_bat * eta) / 100.0
+
     r_cells = {}
     for i, v_load in enumerate(cell_volts):
         v_rest = _v_rest_cells[i] if i < len(_v_rest_cells) else None
@@ -220,6 +257,8 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "p_hv":       round(p_hv,    2) if p_hv    is not None else None,
         "p_regen":    round(p_regen, 2) if p_regen is not None else None,
         "eta":        round(eta,     2) if eta      is not None else None,
+        "eta_bat":    round(eta_bat, 2) if eta_bat  is not None else None,
+        "eta_total":  round(eta_total, 2) if eta_total is not None else None,
         "Q_HV_rest":  round(Q_HV_rest, 3),
         "E_HV_rest":  round(E_HV_rest, 2),
         "r_pack":     round(r_pack,  6) if r_pack  is not None else None,
@@ -232,6 +271,178 @@ def compute_derived(data: dict, soc: float, curr_p: float) -> dict:
         "E_HV": None, "Q_HV": None, "E_regen": None, "soh_c": None,
         "p_aux": None, "E_aux": None, "Q_aux": None, "soc_aux": None,
     }
+
+
+# ─── Conteo de vueltas ────────────────────────────────────────────────────────
+def _to_xy(lat, lon, lat_ref_rad):
+    """Proyección equirectangular simple lat/lon → km cartesianos locales."""
+    x = EARTH_R_KM * math.radians(lon) * math.cos(lat_ref_rad)
+    y = EARTH_R_KM * math.radians(lat)
+    return x, y
+
+
+def set_meta(lat_a, lon_a, lat_b, lon_b):
+    """Setea/actualiza la línea de meta. No resetea n_lap — solo descarta
+    la vuelta en curso y reinicia la espera de cruce contra la línea nueva."""
+    global _meta_xy, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
+
+    lat_ref = math.radians((lat_a + lat_b) / 2.0)
+    xA, yA  = _to_xy(lat_a, lon_a, lat_ref)
+    xB, yB  = _to_xy(lat_b, lon_b, lat_ref)
+
+    with _meta_lock:
+        _meta_xy         = (xA, yA, xB, yB, lat_ref, lat_a, lon_a, lat_b, lon_b)
+        _d_vuelta         = 0.0
+        _t_vuelta_inicio  = None
+        _ultimo_gps       = None
+        _t_ultimo_cruce   = None
+
+    print(f"[META] Línea de meta seteada — A=({lat_a},{lon_a}) B=({lat_b},{lon_b})", flush=True)
+
+
+def reset_laps():
+    """Reinicia el conteo de vueltas por completo. Se llama al detectar
+    transición de sesión inactiva → activa."""
+    global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
+    global _d_ref_muestras, _d_ref
+
+    _n_lap            = 0
+    _d_vuelta         = 0.0
+    _t_vuelta_inicio  = None
+    _ultimo_gps       = None
+    _t_ultimo_cruce   = None
+    _d_ref_muestras   = []
+    _d_ref            = None
+    print("[LAP] Conteo de vueltas reiniciado (nueva sesión activa)", flush=True)
+
+
+def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, sesion_act: bool) -> dict:
+    """Evalúa cruce de línea de meta y actualiza n_lap/t_vuelta/d_vuelta.
+    Si la sesión está inactiva o no hay línea seteada, congela el estado
+    (no evalúa cruces, no acumula distancia) y solo reporta el último valor."""
+    global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
+    global _d_ref_muestras, _d_ref
+
+    if not sesion_act or _meta_xy is None:
+        return {"n_lap": _n_lap, "t_vuelta": 0.0, "d_vuelta": round(_d_vuelta, 4)}
+
+    # GPS sin fix válido (0,0) — ignorar este snapshot para el conteo
+    if gps_lat == 0.0 and gps_lon == 0.0:
+        t_vuelta_actual = round(now_t - _t_vuelta_inicio, 1) if _t_vuelta_inicio else 0.0
+        return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4)}
+
+    xA, yA, xB, yB, lat_ref = _meta_xy[0], _meta_xy[1], _meta_xy[2], _meta_xy[3], _meta_xy[4]
+    x, y = _to_xy(gps_lat, gps_lon, lat_ref)
+
+    dx, dy   = xB - xA, yB - yA
+    seg_len2 = dx * dx + dy * dy
+    denom    = math.sqrt(seg_len2) if seg_len2 > 0 else 0.0
+    d_signed = ((dx * (y - yA)) - (dy * (x - xA))) / denom if denom > 0 else 0.0
+
+    if _t_vuelta_inicio is None:
+        _t_vuelta_inicio = now_t
+
+    _d_vuelta += abs(speed_v) * DT / 3600.0
+
+    if _ultimo_gps is not None:
+        x0, y0, d0, t0 = _ultimo_gps
+
+        # ── Cambio de signo → candidato a cruce ──
+        if d0 * d_signed < 0 and seg_len2 > 0:
+            t_proj = ((x - xA) * dx + (y - yA) * dy) / seg_len2
+
+            # ── Cruce dentro del segmento (no su extensión infinita) ──
+            if 0.0 <= t_proj <= 1.0:
+                debounce_ok = (_t_ultimo_cruce is None) or ((now_t - _t_ultimo_cruce) > LAP_DEBOUNCE)
+
+                if debounce_ok:
+                    t_vuelta_actual = now_t - _t_vuelta_inicio
+
+                    d_valida = True
+                    if _d_ref is not None:
+                        d_valida = (_d_ref * (1 - LAP_D_TOL)) <= _d_vuelta <= (_d_ref * (1 + LAP_D_TOL))
+
+                    if t_vuelta_actual >= LAP_T_MIN and d_valida:
+                        # ── Interpolar instante exacto de cruce ──
+                        frac = abs(d0) / (abs(d0) + abs(d_signed)) if (abs(d0) + abs(d_signed)) > 0 else 0.5
+                        t_cruce = t0 + (now_t - t0) * frac
+
+                        _n_lap += 1
+
+                        # ── Calibración de distancia de referencia (primeras 5 vueltas) ──
+                        if _d_ref is None:
+                            _d_ref_muestras.append(_d_vuelta)
+                            if len(_d_ref_muestras) >= LAP_N_CAL:
+                                _d_ref = sum(_d_ref_muestras) / len(_d_ref_muestras)
+                                print(f"[LAP] Calibración lista — d_ref={_d_ref:.3f} km", flush=True)
+
+                        print(f"[LAP] Vuelta {_n_lap} — t={t_vuelta_actual:.1f}s d={_d_vuelta:.3f}km", flush=True)
+
+                        result = {
+                            "n_lap":    _n_lap,
+                            "t_vuelta": round(t_vuelta_actual, 1),
+                            "d_vuelta": round(_d_vuelta, 4),
+                        }
+
+                        _t_ultimo_cruce  = t_cruce
+                        _t_vuelta_inicio = t_cruce
+                        _d_vuelta        = 0.0
+                        _ultimo_gps      = (x, y, d_signed, now_t)
+                        return result
+
+    _ultimo_gps = (x, y, d_signed, now_t)
+    t_vuelta_actual = round(now_t - _t_vuelta_inicio, 1) if _t_vuelta_inicio else 0.0
+    return {"n_lap": _n_lap, "t_vuelta": t_vuelta_actual, "d_vuelta": round(_d_vuelta, 4)}
+
+
+# ─── Servidor HTTP interno: POST /set_meta ────────────────────────────────────
+class _MetaHandler(BaseHTTPRequestHandler):
+    def _send(self, code, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self._send(204, {})
+
+    def do_POST(self):
+        if self.path != "/set_meta":
+            self._send(404, {"error": "not_found"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length))
+            lat_a  = float(body["lat_a"]); lon_a = float(body["lon_a"])
+            lat_b  = float(body["lat_b"]); lon_b = float(body["lon_b"])
+        except Exception:
+            self._send(400, {"error": "json_invalido"})
+            return
+
+        if not (-90 <= lat_a <= 90 and -90 <= lat_b <= 90):
+            self._send(400, {"error": "latitud_fuera_de_rango"}); return
+        if not (-180 <= lon_a <= 180 and -180 <= lon_b <= 180):
+            self._send(400, {"error": "longitud_fuera_de_rango"}); return
+        if lat_a == lat_b and lon_a == lon_b:
+            self._send(400, {"error": "PA_igual_a_PB"}); return
+
+        set_meta(lat_a, lon_a, lat_b, lon_b)
+        self._send(200, {"status": "ok", "lat_a": lat_a, "lon_a": lon_a, "lat_b": lat_b, "lon_b": lon_b})
+
+    def log_message(self, fmt, *args):
+        pass  # silenciar el log por request de http.server
+
+
+def start_meta_server():
+    server = ThreadingHTTPServer(("0.0.0.0", META_HTTP_PORT), _MetaHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    print(f"[META] Servidor HTTP /set_meta escuchando en puerto {META_HTTP_PORT}", flush=True)
 
 
 # ─── Callbacks MQTT ───────────────────────────────────────────────────────────
@@ -249,6 +460,7 @@ def on_message(client, userdata, msg):
     global _v_rest_pack, _v_rest_cells, _t_reposo_inicio, _en_reposo
     global _soh_c, _soh_Q_SOH, _soh_soc_inicio, _soh_t_ultimo, _soh_activo
     global _phi_rad, _theta_rad
+    global _sesion_act_prev
 
     # ── Watchdog: llegó un mensaje, reiniciar timer ───────────────────────────
     reset_watchdog()
@@ -261,8 +473,9 @@ def on_message(client, userdata, msg):
         volt_p     = float(data.get("volt_p",  0))
         cell_volts = data.get("cell_volts", [])
 
-        # ── 1. Detectar cambio de sesión ──────────────────────────────────────
-        new_session_id = str(data.get("sess_id", 0))
+        # ── 1. Detectar cambio de sesión (fecha + sess_id, evita choques entre días) ──
+        fecha_hoy       = str(data.get("times", ""))[:10]
+        new_session_id  = f"{fecha_hoy}_{data.get('sess_id', 0)}"
         if new_session_id != _session_id_prev:
             print(f"[Sesión] {_session_id_prev} → {new_session_id} — reiniciando acumuladores")
             _session_id_prev = new_session_id
@@ -271,6 +484,12 @@ def on_message(client, userdata, msg):
             _soh_Q_SOH = 0.0; _soh_soc_inicio = None
             _soh_t_ultimo = None; _soh_activo = False
             _phi_rad = 0.0; _theta_rad = 0.0
+
+        # ── 1b. Estado de sesión activa (lo calcula el MGT, no se infiere aquí) ──
+        sesion_act = bool(data.get("sesion_act", False))
+        if sesion_act and not _sesion_act_prev:
+            reset_laps()
+        _sesion_act_prev = sesion_act
 
         # ── 2. Lógica de reposo para V_rest ──────────────────────────────────
         now = time.time()
@@ -286,6 +505,15 @@ def on_message(client, userdata, msg):
 
         # ── 3. Calcular variables derivadas ───────────────────────────────────
         derived = compute_derived(data, soc, curr_p)
+
+        # ── 3b. Conteo de vueltas ──────────────────────────────────────────────
+        gps_lat  = float(data.get("gps_lat", 0))
+        gps_lon  = float(data.get("gps_lon", 0))
+        speed_v  = float(data.get("speed_v", 0))
+        lap_info = process_lap(gps_lat, gps_lon, speed_v, now, sesion_act)
+        derived["n_lap"]    = lap_info["n_lap"]
+        derived["t_vuelta"] = lap_info["t_vuelta"]
+        derived["d_vuelta"] = lap_info["d_vuelta"]
 
         # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -I_MIN and derived["p_hv"] is not None:
@@ -359,6 +587,7 @@ def on_message(client, userdata, msg):
             Point("vehicle_telemetry")
             .tag("vehicle_id", str(data.get("veh_id", 25)))
             .tag("session_id",  str(data.get("sess_id", 0)))
+            .tag("lap_number",  str(derived["n_lap"]))
             .time(ts, WritePrecision.MS)
             .field("curr_rms",  float(data.get("curr_rms",  0)))
             .field("speed_v",   float(data.get("speed_v",   0)))
@@ -403,12 +632,16 @@ def on_message(client, userdata, msg):
             .field("Gx",        derived["Gx"])
             .field("Gy",        derived["Gy"])
             .field("Gz",        derived["Gz"])
+            .field("t_vuelta",  derived["t_vuelta"])
+            .field("d_vuelta",  derived["d_vuelta"])
         )
 
         if derived["soc_aux"] is not None: point = point.field("soc_aux", derived["soc_aux"])
         if derived["p_hv"]    is not None: point = point.field("p_hv",    derived["p_hv"])
         if derived["p_regen"] is not None: point = point.field("p_regen", derived["p_regen"])
         if derived["eta"]     is not None: point = point.field("eta",     derived["eta"])
+        if derived["eta_bat"]   is not None: point = point.field("eta_bat",   derived["eta_bat"])
+        if derived["eta_total"] is not None: point = point.field("eta_total", derived["eta_total"])
         if derived["r_pack"]  is not None: point = point.field("r_pack",  derived["r_pack"])
         if derived["soh_c"]   is not None: point = point.field("soh_c",   derived["soh_c"])
 
@@ -461,6 +694,8 @@ def on_message(client, userdata, msg):
                 "p_hv":       derived["p_hv"],
                 "p_regen":    derived["p_regen"],
                 "eta":        derived["eta"],
+                "eta_bat":    derived["eta_bat"],
+                "eta_total":  derived["eta_total"],
                 "E_HV":       derived["E_HV"],
                 "Q_HV":       derived["Q_HV"],
                 "E_regen":    derived["E_regen"],
@@ -483,6 +718,14 @@ def on_message(client, userdata, msg):
                 "Gx":         derived["Gx"],
                 "Gy":         derived["Gy"],
                 "Gz":         derived["Gz"],
+                "n_lap":      derived["n_lap"],
+                "t_vuelta":   derived["t_vuelta"],
+                "d_vuelta":   derived["d_vuelta"],
+                "sesion_act": sesion_act,
+                "meta_lat_a": _meta_xy[5] if _meta_xy else None,
+                "meta_lon_a": _meta_xy[6] if _meta_xy else None,
+                "meta_lat_b": _meta_xy[7] if _meta_xy else None,
+                "meta_lon_b": _meta_xy[8] if _meta_xy else None,
             }
         }
 
@@ -501,6 +744,8 @@ def main():
     client.username_pw_set(MQTT_USER, MQTT_PASS)
     client.on_connect = on_connect
     client.on_message = on_message
+
+    start_meta_server()
 
     print("Conectando al broker MQTT...")
     client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)

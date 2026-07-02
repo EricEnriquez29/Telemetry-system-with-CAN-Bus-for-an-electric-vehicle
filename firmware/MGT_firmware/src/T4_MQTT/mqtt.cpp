@@ -66,6 +66,7 @@ static bool serializar_snapshot(Snapshot& s, char* buf, size_t buf_size) {
     doc["gyro_z"]  = s.gyro_z;
     doc["volt_a"]  = s.voltage_aux;
     doc["curr_a"]  = s.current_aux;
+    doc["sesion_act"] = sesion_activa;
 
     return serializeJson(doc, buf, buf_size) > 0;
 }
