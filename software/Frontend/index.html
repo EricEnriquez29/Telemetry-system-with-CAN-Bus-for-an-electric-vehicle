@@ -43,6 +43,10 @@
     .laps-table tr:nth-child(even){background:#0a0a0a;}
     .laps-empty-row td{text-align:center;color:#666;padding:30px;}
     .laps-current td{color:var(--orange);font-weight:700;background:#150d05;}
+    .laps-optimal td{color:var(--green);}
+    .laps-optimal td:first-child::after{content:' ★';}
+    .laps-estimates{display:flex;gap:30px;margin:14px 0 4px;font-size:11px;color:var(--muted);}
+    .laps-estimates b{color:var(--text);}
     .ws-ind{display:flex;align-items:center;gap:8px;}
     .ws-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;transition:background 0.3s;}
     .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
@@ -418,10 +422,15 @@
 <div id="tab-1" style="display:none;">
   <div class="laps-wrap">
     <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
+    <div class="laps-estimates" id="laps-estimates">
+      <span>Distancia restante: <b id="est-drest">—</b> km</span>
+      <span>Vueltas restantes: <b id="est-nrest">—</b></span>
+      <span>Tiempo restante: <b id="est-trest">—</b> s</span>
+    </div>
     <table class="laps-table">
-      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>E consumida (Wh)</th><th>E regenerada (Wh)</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>E consumida (Wh)</th><th>E regenerada (Wh)</th><th>Eficiencia (Wh/km)</th><th>Estado</th></tr></thead>
       <tbody id="laps-tbody">
-        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="6">Esperando cruces de meta…</td></tr>
+        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="7">Esperando cruces de meta…</td></tr>
       </tbody>
     </table>
   </div>
@@ -876,24 +885,32 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
-function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual){
+function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual, nOpt){
   var tbody=document.getElementById('laps-tbody');
   if(!armado && (!laps || laps.length===0)){
-    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="6">Esperando primer cruce de meta…</td></tr>';
+    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="7">Esperando primer cruce de meta…</td></tr>';
     return;
   }
   var rows='';
   (laps||[]).forEach(function(l){
     var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
     var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
-    rows += '<tr><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>'+eV+'</td><td>'+eR+'</td><td>Completa</td></tr>';
+    var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
+    var cls = (nOpt!=null && l.n_lap===nOpt) ? ' class="laps-optimal"' : '';
+    rows += '<tr'+cls+'><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>'+eV+'</td><td>'+eR+'</td><td>'+etaV+'</td><td>Completa</td></tr>';
   });
   if(armado){
     var eVA = (eActual!=null) ? eActual.toFixed(2) : '—';
     var eRA = (eRegenActual!=null) ? eRegenActual.toFixed(2) : '—';
-    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>'+eVA+'</td><td>'+eRA+'</td><td>En curso…</td></tr>';
+    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>'+eVA+'</td><td>'+eRA+'</td><td>—</td><td>En curso…</td></tr>';
   }
   tbody.innerHTML = rows;
+}
+
+function renderEstimates(dRest, nRest, tRest){
+  document.getElementById('est-drest').textContent = (dRest!=null) ? dRest.toFixed(2) : '—';
+  document.getElementById('est-nrest').textContent = (nRest!=null) ? nRest.toFixed(1) : '—';
+  document.getElementById('est-trest').textContent = (tRest!=null) ? tRest.toFixed(0) : '—';
 }
 
 function updateDashboard(payload){
@@ -914,7 +931,8 @@ function updateDashboard(payload){
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
   // ── Conteo de vueltas ──
-  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual);
+  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt);
+  renderEstimates(d.d_rest, d.n_rest, d.t_rest);
 
   // ── Header ──
   document.getElementById('sub-ts').textContent = ts;

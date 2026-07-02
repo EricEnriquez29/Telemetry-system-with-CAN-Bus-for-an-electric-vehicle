@@ -47,7 +47,7 @@ DT              = 0.1
 
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
-LAP_T_MIN       = 15.0    # s mínimos de duración de una vuelta
+LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
@@ -170,6 +170,8 @@ def send_zero_snapshot():
             "laps": list(_laps_history),
             "armado": False,
             "mgt_conectado": _mgt_conectado,
+            "d_rest": None, "n_rest": None, "t_rest": None, "n_opt": None,
+            "E_vuelta_actual": None, "E_regen_vuelta_actual": None,
             "sesion_act": False,
             "meta_lat_a": _meta_xy[5] if _meta_xy else None,
             "meta_lon_a": _meta_xy[6] if _meta_xy else None,
@@ -331,6 +333,42 @@ def reset_laps():
     _E_HV_lap_inicio     = 0.0
     _E_regen_lap_inicio  = 0.0
     print("[LAP] Conteo de vueltas reiniciado (nueva sesión activa)", flush=True)
+
+
+# ─── Estimaciones de sesión: autonomía y vuelta óptima ───────────────────────
+def compute_lap_estimates(laps_history: list, E_HV_rest) -> dict:
+    """Calcula d_rest/n_rest/t_rest (autonomía estimada) y n_opt/score
+    (vuelta óptima) a partir de las vueltas completadas de la sesión.
+    Requiere al menos 1 vuelta con E_vuelta calculada; si no hay datos
+    suficientes, devuelve None en los campos correspondientes."""
+    completas = [l for l in laps_history if l.get("E_vuelta") is not None and l.get("d_vuelta", 0) > 0]
+
+    d_rest = n_rest = t_rest = None
+    if completas and E_HV_rest is not None:
+        etas = [l["E_vuelta"] / l["d_vuelta"] for l in completas]
+        eta_sesion_prom = sum(etas) / len(etas)
+        d_sesion_prom   = sum(l["d_vuelta"] for l in completas) / len(completas)
+        t_sesion_prom   = sum(l["t_vuelta"] for l in completas) / len(completas)
+
+        if eta_sesion_prom > 0:
+            d_rest = round(E_HV_rest / eta_sesion_prom, 2)
+            if d_sesion_prom > 0:
+                n_rest = round(d_rest / d_sesion_prom, 1)
+                t_rest = round(n_rest * t_sesion_prom, 1)
+
+    n_opt = None
+    if len(completas) >= 2:
+        t_mejor  = min(l["t_vuelta"] for l in completas)
+        e_min    = min(l["E_vuelta"] for l in completas)
+        if t_mejor > 0 and e_min > 0:
+            mejor_score = None
+            for l in completas:
+                score = 0.5 * (l["t_vuelta"] / t_mejor) + 0.5 * (l["E_vuelta"] / e_min)
+                if mejor_score is None or score < mejor_score:
+                    mejor_score = score
+                    n_opt = l["n_lap"]
+
+    return {"d_rest": d_rest, "n_rest": n_rest, "t_rest": t_rest, "n_opt": n_opt}
 
 
 def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, sesion_act: bool) -> dict:
@@ -616,9 +654,17 @@ def on_snapshot_message(client, userdata, msg):
             e_regen_vuelta = round(_E_regen - _E_regen_lap_inicio, 3)
             _laps_history[-1]["E_vuelta"]       = e_vuelta
             _laps_history[-1]["E_regen_vuelta"] = e_regen_vuelta
+            _laps_history[-1]["eta_vuelta"] = (
+                round(e_vuelta / _laps_history[-1]["d_vuelta"], 2)
+                if _laps_history[-1]["d_vuelta"] > 0 else None
+            )
             derived["laps"] = list(_laps_history)
             _E_HV_lap_inicio    = _E_HV
             _E_regen_lap_inicio = _E_regen
+
+        # ── Estimaciones de sesión: autonomía y vuelta óptima ──────────────────
+        estim = compute_lap_estimates(_laps_history, derived.get("E_HV_rest"))
+        derived.update(estim)
 
         # ── Energía de la vuelta en curso (se actualiza cada snapshot, no solo al cerrar) ──
         if lap_info["armado"]:
@@ -838,6 +884,10 @@ def on_snapshot_message(client, userdata, msg):
                 "armado":     derived["armado"],
                 "E_vuelta_actual":       derived["E_vuelta_actual"],
                 "E_regen_vuelta_actual": derived["E_regen_vuelta_actual"],
+                "d_rest":     derived["d_rest"],
+                "n_rest":     derived["n_rest"],
+                "t_rest":     derived["t_rest"],
+                "n_opt":      derived["n_opt"],
                 "sesion_act": sesion_act,
                 "mgt_conectado": _mgt_conectado,
                 "meta_lat_a": _meta_xy[5] if _meta_xy else None,
