@@ -500,6 +500,11 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
 
 # ─── Servidor HTTP interno: POST /set_meta ────────────────────────────────────
 # ─── Resumen y tabla de vueltas de sesiones históricas (consulta a InfluxDB) ──
+def _r(v, dec=None):
+    """round() seguro — devuelve None si v es None, evita 'NoneType doesn't define __round__'."""
+    return None if v is None else round(v, dec if dec is not None else 0)
+
+
 def build_session_summary(date_str: str, session_id: str) -> dict:
     start = f"{date_str}T00:00:00Z"
     stop_dt = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
@@ -641,7 +646,7 @@ from(bucket: "{INFLUX_BUCKET}")
 
     def maxprom(lst, dec=0):
         if not lst: return (None, None)
-        return (round(max(lst), dec), round(sum(lst)/len(lst), dec))
+        return (_r(max(lst), dec), _r(sum(lst)/len(lst), dec))
 
     laps = []
     for lap_n in sorted(lap_groups.keys()):
@@ -650,18 +655,18 @@ from(bucket: "{INFLUX_BUCKET}")
         t_v = max(grp["t"]); d_v = max(grp["d"])
         e_v = (max(grp["ehv"]) - min(grp["ehv"])) if grp["ehv"] else None
         er_v = (max(grp["ereg"]) - min(grp["ereg"])) if grp["ereg"] else None
-        eta_v = round(e_v / d_v, 2) if (e_v is not None and d_v > 0) else None
+        eta_v = _r(e_v / d_v, 2) if (e_v is not None and d_v > 0) else None
         vel_max, vel_prom = maxprom(grp["spd"], 1)
         phv_max, phv_prom = maxprom(grp["phv"])
         pregen_max, pregen_prom = maxprom(grp["pregen"])
         pmec_max, pmec_prom = maxprom(grp["pmec"])
-        gx_max = round(max(grp["gx"]), 2) if grp["gx"] else None
-        gy_max = round(max(grp["gy"]), 2) if grp["gy"] else None
+        gx_max = _r(max(grp["gx"]), 2) if grp["gx"] else None
+        gy_max = _r(max(grp["gy"]), 2) if grp["gy"] else None
         rpm_max, rpm_prom = maxprom(grp["rpm"])
         laps.append({
-            "n_lap": lap_n, "t_vuelta": round(t_v, 1), "d_vuelta": round(d_v, 4),
-            "E_vuelta": round(e_v, 3) if e_v is not None else None,
-            "E_regen_vuelta": round(er_v, 3) if er_v is not None else None,
+            "n_lap": lap_n, "t_vuelta": _r(t_v, 1), "d_vuelta": _r(d_v, 4),
+            "E_vuelta": _r(e_v, 3) if e_v is not None else None,
+            "E_regen_vuelta": _r(er_v, 3) if er_v is not None else None,
             "eta_vuelta": eta_v,
             "vel_max": vel_max, "vel_prom": vel_prom,
             "p_hv_max": phv_max, "p_hv_prom": phv_prom,
@@ -674,7 +679,7 @@ from(bucket: "{INFLUX_BUCKET}")
     if laps:
         t_mejor_global = min(l["t_vuelta"] for l in laps)
         for l in laps:
-            l["delta_mejor"] = round(l["t_vuelta"] - t_mejor_global, 1)
+            l["delta_mejor"] = _r(l["t_vuelta"] - t_mejor_global, 1)
 
     top_tiempo = sorted(laps, key=lambda l: l["t_vuelta"])[:3]
     con_e = [l for l in laps if l["E_vuelta"] is not None]
@@ -686,38 +691,61 @@ from(bucket: "{INFLUX_BUCKET}")
         if t_mejor > 0 and e_min > 0:
             scored = [(0.5*(l["t_vuelta"]/t_mejor) + 0.5*(l["E_vuelta"]/e_min), l) for l in con_e]
             scored.sort(key=lambda x: x[0])
-            top_optimas = [{"n_lap": l["n_lap"], "score": round(s,3)} for s,l in scored[:3]]
+            top_optimas = [{"n_lap": l["n_lap"], "score": _r(s,3)} for s,l in scored[:3]]
 
     e_vuelta_vals = [l["E_vuelta"] for l in laps if l["E_vuelta"] is not None]
     ereg_vuelta_vals = [l["E_regen_vuelta"] for l in laps if l["E_regen_vuelta"] is not None]
 
     return {
         "date": date_str, "session_id": session_id,
-        "n_vueltas": len(laps), "duracion_s": round(dur_s, 0),
+        "n_vueltas": len(laps), "duracion_s": _r(dur_s, 0),
         "soc_ini": soc_ini, "soc_fin": soc_fin,
         "E_HV_ini": ehv_ini, "E_HV_fin": ehv_fin,
         "Q_HV_ini": qhv_ini, "Q_HV_fin": qhv_fin,
         "soc_aux_ini": socaux_ini, "soc_aux_fin": socaux_fin,
         "E_aux_ini": eaux_ini, "E_aux_fin": eaux_fin,
         "Q_aux_ini": qaux_ini, "Q_aux_fin": qaux_fin,
-        "spd_prom": round(spd_sum/n, 1) if n else None, "spd_max": round(spd_max, 1),
-        "rpm_prom": round(rpm_sum/n, 0) if n else None, "rpm_max": round(rpm_max, 0),
-        "Gx_max": round(gx_max, 2), "Gy_max": round(gy_max, 2), "Gz_max": round(gz_max, 2),
-        "p_hv_prom": round(phv_sum/phv_n, 1) if phv_n else None, "p_hv_max": round(phv_max, 1),
-        "p_regen_prom": round(pregen_sum/pregen_n, 1) if pregen_n else None, "p_regen_max": round(pregen_max, 1),
-        "p_mec_prom": round(pmec_sum/n, 1) if n else None, "p_mec_max": round(pmec_max, 1),
-        "tmp_mot_max": round(tmot_max,1), "tmp_cont_max": round(tcont_max,1),
-        "tmp_cap_max": round(tcap_max,1), "tmp_batt_max": round(tbatt_max,1),
-        "curr_batt_prom": round(currb_sum/currb_n, 1) if currb_n else None, "curr_batt_max": round(currb_max, 1),
-        "curr_regen_prom": round(currr_sum/currr_n, 1) if currr_n else None, "curr_regen_max": round(currr_max, 1),
-        "E_vuelta_prom": round(sum(e_vuelta_vals)/len(e_vuelta_vals), 2) if e_vuelta_vals else None,
-        "E_regen_vuelta_prom": round(sum(ereg_vuelta_vals)/len(ereg_vuelta_vals), 2) if ereg_vuelta_vals else None,
+        "spd_prom": _r(spd_sum/n, 1) if n else None, "spd_max": _r(spd_max, 1),
+        "rpm_prom": _r(rpm_sum/n, 0) if n else None, "rpm_max": _r(rpm_max, 0),
+        "Gx_max": _r(gx_max, 2), "Gy_max": _r(gy_max, 2), "Gz_max": _r(gz_max, 2),
+        "p_hv_prom": _r(phv_sum/phv_n, 1) if phv_n else None, "p_hv_max": _r(phv_max, 1),
+        "p_regen_prom": _r(pregen_sum/pregen_n, 1) if pregen_n else None, "p_regen_max": _r(pregen_max, 1),
+        "p_mec_prom": _r(pmec_sum/n, 1) if n else None, "p_mec_max": _r(pmec_max, 1),
+        "tmp_mot_max": _r(tmot_max,1), "tmp_cont_max": _r(tcont_max,1),
+        "tmp_cap_max": _r(tcap_max,1), "tmp_batt_max": _r(tbatt_max,1),
+        "curr_batt_prom": _r(currb_sum/currb_n, 1) if currb_n else None, "curr_batt_max": _r(currb_max, 1),
+        "curr_regen_prom": _r(currr_sum/currr_n, 1) if currr_n else None, "curr_regen_max": _r(currr_max, 1),
+        "E_vuelta_prom": _r(sum(e_vuelta_vals)/len(e_vuelta_vals), 2) if e_vuelta_vals else None,
+        "E_regen_vuelta_prom": _r(sum(ereg_vuelta_vals)/len(ereg_vuelta_vals), 2) if ereg_vuelta_vals else None,
         "top_tiempo": top_tiempo, "top_consumo": top_consumo, "top_optimas": top_optimas,
         "laps": laps,
     }
 
 
+def get_sessions_for_date(date_str: str) -> list:
+    """Devuelve la lista de session_id distintos con datos en ese día."""
+    start = f"{date_str}T00:00:00Z"
+    stop_dt = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
+    stop = stop_dt.strftime("%Y-%m-%dT00:00:00Z")
+    flux = f'''
+from(bucket: "{INFLUX_BUCKET}")
+  |> range(start: {start}, stop: {stop})
+  |> filter(fn: (r) => r._measurement == "vehicle_telemetry")
+  |> keep(columns: ["session_id"])
+  |> distinct(column: "session_id")
+'''
+    tables = query_api.query(flux, org=INFLUX_ORG)
+    sesiones = set()
+    for table in tables:
+        for rec in table.records:
+            v = rec.get_value()
+            if v is not None:
+                sesiones.add(str(v))
+    return sorted(sesiones, key=lambda s: int(s) if s.isdigit() else s)
+
+
 class _MetaHandler(BaseHTTPRequestHandler):
+
     def _send(self, code, payload):
         body = json.dumps(payload).encode()
         self.send_response(code)
@@ -758,10 +786,24 @@ class _MetaHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+
+        if parsed.path == "/sessions_for_date":
+            date_str = qs.get("date", [None])[0]
+            if not date_str:
+                self._send(400, {"error": "falta_date"})
+                return
+            try:
+                sesiones = get_sessions_for_date(date_str)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+                return
+            self._send(200, {"date": date_str, "sessions": sesiones})
+            return
+
         if parsed.path != "/session_summary":
             self._send(404, {"error": "not_found"})
             return
-        qs = parse_qs(parsed.query)
         date_str   = qs.get("date", [None])[0]
         session_id = qs.get("session_id", [None])[0]
         if not date_str or not session_id:

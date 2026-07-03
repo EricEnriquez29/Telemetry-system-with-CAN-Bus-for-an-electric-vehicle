@@ -477,9 +477,10 @@
 
         <div id="hist-picker-view">
           <div class="hist-picker">
-            <input type="date" id="hist-date">
-            <input type="number" id="hist-session" placeholder="N° de sesión" min="1" step="1">
+            <input type="date" id="hist-date" onchange="fetchSessionsForDate()">
+            <select id="hist-session"><option value="">— elige fecha primero —</option></select>
           </div>
+          <div id="hist-picker-msg" style="font-size:9px;color:var(--muted);min-height:12px;margin-bottom:8px;"></div>
           <button class="hist-load" onclick="loadHistSession()">Cargar sesión</button>
         </div>
 
@@ -580,6 +581,7 @@ function openHistModal(){
   var dInput = document.getElementById('hist-date');
   if(!dInput.value){ dInput.value = new Date().toISOString().slice(0,10); }
   document.getElementById('hist-overlay').classList.add('open');
+  fetchSessionsForDate();
 }
 function closeHistModal(){
   document.getElementById('hist-overlay').classList.remove('open');
@@ -590,6 +592,28 @@ function closeHistModal(){
 function backToHistPicker(){
   document.getElementById('hist-picker-view').style.display='block';
   document.getElementById('hist-result-view').style.display='none';
+}
+
+function fetchSessionsForDate(){
+  var date = document.getElementById('hist-date').value;
+  var sel = document.getElementById('hist-session');
+  var msg = document.getElementById('hist-picker-msg');
+  if(!date){ return; }
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  msg.textContent = '';
+  fetch(HIST_URL_BASE.replace('/session_summary','/sessions_for_date')+'?date='+encodeURIComponent(date))
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+    .then(function(res){
+      if(res.ok && res.body.sessions && res.body.sessions.length>0){
+        sel.innerHTML = res.body.sessions.map(function(s){ return '<option value="'+s+'">Sesión '+s+'</option>'; }).join('');
+      } else {
+        sel.innerHTML = '<option value="">— sin sesiones ese día —</option>';
+      }
+    })
+    .catch(function(){
+      sel.innerHTML = '<option value="">— error al consultar —</option>';
+      msg.textContent = 'No se pudo conectar al backend';
+    });
 }
 
 function fmtDur(s){
