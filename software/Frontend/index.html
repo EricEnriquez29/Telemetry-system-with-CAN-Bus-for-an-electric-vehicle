@@ -1318,9 +1318,11 @@ function updateDashboard(payload){
 
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
-  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt, d);
-  renderEstimates(d.d_rest, d.n_rest, d.t_rest);
-  updateLapSummary(!!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), d.laps, d.n_rest, d.t_rest, d.n_opt);
+  try{
+    renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt, d);
+    renderEstimates(d.d_rest, d.n_rest, d.t_rest);
+    updateLapSummary(!!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), d.laps, d.n_rest, d.t_rest, d.n_opt);
+  }catch(e){ console.error('Error en tabla de vueltas:', e); }
 
   document.getElementById('sub-ts').textContent = ts;
   document.getElementById('sub-veh').textContent = payload.vehicle_id != null ? payload.vehicle_id : '—';
