@@ -47,7 +47,7 @@ DT              = 0.1
 
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
-LAP_T_MIN       = 15.0    # s mínimos de duración de una vuelta
+LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
@@ -126,6 +126,7 @@ _last_snapshot = None   # dict completo {timestamp, vehicle_id, session_id, data
 # ─── Cliente InfluxDB ─────────────────────────────────────────────────────────
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api     = influx_client.write_api(write_options=SYNCHRONOUS)
+query_api     = influx_client.query_api()
 
 
 # ─── Watchdog ─────────────────────────────────────────────────────────────────
@@ -472,6 +473,193 @@ def process_lap(gps_lat: float, gps_lon: float, speed_v: float, now_t: float, se
 
 
 # ─── Servidor HTTP interno: POST /set_meta ────────────────────────────────────
+# ─── Resumen y tabla de vueltas de sesiones históricas (consulta a InfluxDB) ──
+def build_session_summary(date_str: str, session_id: str) -> dict:
+    start = f"{date_str}T00:00:00Z"
+    stop_dt = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
+    stop = stop_dt.strftime("%Y-%m-%dT00:00:00Z")
+
+    campos_base = ["soc", "E_HV", "Q_HV", "soc_aux", "E_aux", "Q_aux",
+                   "speed_v", "rpm", "Gx", "Gy", "Gz", "p_hv", "p_regen",
+                   "p_mec", "tmp_mot", "tmp_cont", "tmp_cap", "tmp_max", "curr_p"]
+    filtro_campos = " or ".join([f'r._field == "{c}"' for c in campos_base])
+
+    flux_base = f'''
+from(bucket: "{INFLUX_BUCKET}")
+  |> range(start: {start}, stop: {stop})
+  |> filter(fn: (r) => r._measurement == "vehicle_telemetry" and r.session_id == "{session_id}")
+  |> filter(fn: (r) => {filtro_campos})
+  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])
+'''
+
+    tables = query_api.query(flux_base, org=INFLUX_ORG)
+
+    n = 0
+    soc_ini = soc_fin = None
+    ehv_ini = ehv_fin = qhv_ini = qhv_fin = None
+    socaux_ini = socaux_fin = eaux_ini = eaux_fin = qaux_ini = qaux_fin = None
+    spd_sum = spd_max = 0.0
+    rpm_sum = rpm_max = 0.0
+    gx_max = gy_max = gz_max = 0.0
+    phv_sum = phv_max = phv_n = 0.0
+    pregen_sum = pregen_max = pregen_n = 0.0
+    pmec_sum = pmec_max = 0.0
+    tmot_max = tcont_max = tcap_max = tbatt_max = 0.0
+    currb_sum = currb_max = currb_n = 0.0
+    currr_sum = currr_max = currr_n = 0.0
+    t_ini = t_fin = None
+
+    for table in tables:
+        for rec in table.records:
+            n += 1
+            t = rec.get_time()
+            if t_ini is None: t_ini = t
+            t_fin = t
+
+            def g(field):
+                return rec.values.get(field)
+
+            soc = g("soc")
+            if soc is not None:
+                if soc_ini is None: soc_ini = soc
+                soc_fin = soc
+            ehv = g("E_HV")
+            if ehv is not None:
+                if ehv_ini is None: ehv_ini = ehv
+                ehv_fin = ehv
+            qhv = g("Q_HV")
+            if qhv is not None:
+                if qhv_ini is None: qhv_ini = qhv
+                qhv_fin = qhv
+            socaux = g("soc_aux")
+            if socaux is not None:
+                if socaux_ini is None: socaux_ini = socaux
+                socaux_fin = socaux
+            eaux = g("E_aux")
+            if eaux is not None:
+                if eaux_ini is None: eaux_ini = eaux
+                eaux_fin = eaux
+            qaux = g("Q_aux")
+            if qaux is not None:
+                if qaux_ini is None: qaux_ini = qaux
+                qaux_fin = qaux
+
+            spd = g("speed_v")
+            if spd is not None:
+                spd_sum += spd; spd_max = max(spd_max, spd)
+            rpm_v = g("rpm")
+            if rpm_v is not None:
+                rpm_v = abs(rpm_v)
+                rpm_sum += rpm_v; rpm_max = max(rpm_max, rpm_v)
+            gx=g("Gx"); gy=g("Gy"); gz=g("Gz")
+            if gx is not None: gx_max = max(gx_max, abs(gx))
+            if gy is not None: gy_max = max(gy_max, abs(gy))
+            if gz is not None: gz_max = max(gz_max, abs(gz))
+            phv = g("p_hv")
+            if phv is not None:
+                phv_sum += phv; phv_max = max(phv_max, phv); phv_n += 1
+            pregen = g("p_regen")
+            if pregen is not None:
+                pregen_sum += pregen; pregen_max = max(pregen_max, pregen); pregen_n += 1
+            pmec = g("p_mec")
+            if pmec is not None:
+                pmec_sum += pmec; pmec_max = max(pmec_max, pmec)
+            for fld, acc in (("tmp_mot","tmot"),("tmp_cont","tcont"),("tmp_cap","tcap"),("tmp_max","tbatt")):
+                v = g(fld)
+                if v is not None:
+                    if acc=="tmot": tmot_max = max(tmot_max, v)
+                    elif acc=="tcont": tcont_max = max(tcont_max, v)
+                    elif acc=="tcap": tcap_max = max(tcap_max, v)
+                    else: tbatt_max = max(tbatt_max, v)
+            curr_p = g("curr_p")
+            if curr_p is not None:
+                if curr_p < 0:
+                    v = abs(curr_p); currb_sum += v; currb_max = max(currb_max, v); currb_n += 1
+                elif curr_p > 0:
+                    currr_sum += curr_p; currr_max = max(currr_max, curr_p); currr_n += 1
+
+    dur_s = (t_fin - t_ini).total_seconds() if (t_ini and t_fin) else 0
+
+    # ── Tabla de vueltas: agrupar por tag lap_number ──
+    flux_laps = f'''
+from(bucket: "{INFLUX_BUCKET}")
+  |> range(start: {start}, stop: {stop})
+  |> filter(fn: (r) => r._measurement == "vehicle_telemetry" and r.session_id == "{session_id}")
+  |> filter(fn: (r) => r._field == "t_vuelta" or r._field == "d_vuelta" or r._field == "E_HV" or r._field == "E_regen")
+  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])
+'''
+    lap_tables = query_api.query(flux_laps, org=INFLUX_ORG)
+    lap_groups = {}
+    for table in lap_tables:
+        for rec in table.records:
+            lap_n = rec.values.get("lap_number")
+            if lap_n is None: continue
+            lap_n = int(lap_n)
+            if lap_n == 0: continue
+            grp = lap_groups.setdefault(lap_n, {"t":[], "d":[], "ehv":[], "ereg":[]})
+            if rec.values.get("t_vuelta") is not None: grp["t"].append(rec.values["t_vuelta"])
+            if rec.values.get("d_vuelta") is not None: grp["d"].append(rec.values["d_vuelta"])
+            if rec.values.get("E_HV") is not None: grp["ehv"].append(rec.values["E_HV"])
+            if rec.values.get("E_regen") is not None: grp["ereg"].append(rec.values["E_regen"])
+
+    laps = []
+    for lap_n in sorted(lap_groups.keys()):
+        grp = lap_groups[lap_n]
+        if not grp["t"] or not grp["d"]: continue
+        t_v = max(grp["t"]); d_v = max(grp["d"])
+        e_v = (max(grp["ehv"]) - min(grp["ehv"])) if grp["ehv"] else None
+        er_v = (max(grp["ereg"]) - min(grp["ereg"])) if grp["ereg"] else None
+        eta_v = round(e_v / d_v, 2) if (e_v is not None and d_v > 0) else None
+        laps.append({
+            "n_lap": lap_n, "t_vuelta": round(t_v, 1), "d_vuelta": round(d_v, 4),
+            "E_vuelta": round(e_v, 3) if e_v is not None else None,
+            "E_regen_vuelta": round(er_v, 3) if er_v is not None else None,
+            "eta_vuelta": eta_v,
+        })
+
+    top_tiempo = sorted(laps, key=lambda l: l["t_vuelta"])[:3]
+    con_e = [l for l in laps if l["E_vuelta"] is not None]
+    top_consumo = sorted(con_e, key=lambda l: l["E_vuelta"])[:3]
+    top_optimas = []
+    if len(con_e) >= 2:
+        t_mejor = min(l["t_vuelta"] for l in laps)
+        e_min = min(l["E_vuelta"] for l in con_e)
+        if t_mejor > 0 and e_min > 0:
+            scored = [(0.5*(l["t_vuelta"]/t_mejor) + 0.5*(l["E_vuelta"]/e_min), l) for l in con_e]
+            scored.sort(key=lambda x: x[0])
+            top_optimas = [{"n_lap": l["n_lap"], "score": round(s,3)} for s,l in scored[:3]]
+
+    e_vuelta_vals = [l["E_vuelta"] for l in laps if l["E_vuelta"] is not None]
+    ereg_vuelta_vals = [l["E_regen_vuelta"] for l in laps if l["E_regen_vuelta"] is not None]
+
+    return {
+        "date": date_str, "session_id": session_id,
+        "n_vueltas": len(laps), "duracion_s": round(dur_s, 0),
+        "soc_ini": soc_ini, "soc_fin": soc_fin,
+        "E_HV_ini": ehv_ini, "E_HV_fin": ehv_fin,
+        "Q_HV_ini": qhv_ini, "Q_HV_fin": qhv_fin,
+        "soc_aux_ini": socaux_ini, "soc_aux_fin": socaux_fin,
+        "E_aux_ini": eaux_ini, "E_aux_fin": eaux_fin,
+        "Q_aux_ini": qaux_ini, "Q_aux_fin": qaux_fin,
+        "spd_prom": round(spd_sum/n, 1) if n else None, "spd_max": round(spd_max, 1),
+        "rpm_prom": round(rpm_sum/n, 0) if n else None, "rpm_max": round(rpm_max, 0),
+        "Gx_max": round(gx_max, 2), "Gy_max": round(gy_max, 2), "Gz_max": round(gz_max, 2),
+        "p_hv_prom": round(phv_sum/phv_n, 1) if phv_n else None, "p_hv_max": round(phv_max, 1),
+        "p_regen_prom": round(pregen_sum/pregen_n, 1) if pregen_n else None, "p_regen_max": round(pregen_max, 1),
+        "p_mec_prom": round(pmec_sum/n, 1) if n else None, "p_mec_max": round(pmec_max, 1),
+        "tmp_mot_max": round(tmot_max,1), "tmp_cont_max": round(tcont_max,1),
+        "tmp_cap_max": round(tcap_max,1), "tmp_batt_max": round(tbatt_max,1),
+        "curr_batt_prom": round(currb_sum/currb_n, 1) if currb_n else None, "curr_batt_max": round(currb_max, 1),
+        "curr_regen_prom": round(currr_sum/currr_n, 1) if currr_n else None, "curr_regen_max": round(currr_max, 1),
+        "E_vuelta_prom": round(sum(e_vuelta_vals)/len(e_vuelta_vals), 2) if e_vuelta_vals else None,
+        "E_regen_vuelta_prom": round(sum(ereg_vuelta_vals)/len(ereg_vuelta_vals), 2) if ereg_vuelta_vals else None,
+        "top_tiempo": top_tiempo, "top_consumo": top_consumo, "top_optimas": top_optimas,
+        "laps": laps,
+    }
+
+
 class _MetaHandler(BaseHTTPRequestHandler):
     def _send(self, code, payload):
         body = json.dumps(payload).encode()
@@ -509,6 +697,25 @@ class _MetaHandler(BaseHTTPRequestHandler):
 
         set_meta(lat_a, lon_a, lat_b, lon_b)
         self._send(200, {"status": "ok", "lat_a": lat_a, "lon_a": lon_a, "lat_b": lat_b, "lon_b": lon_b})
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        if parsed.path != "/session_summary":
+            self._send(404, {"error": "not_found"})
+            return
+        qs = parse_qs(parsed.query)
+        date_str   = qs.get("date", [None])[0]
+        session_id = qs.get("session_id", [None])[0]
+        if not date_str or not session_id:
+            self._send(400, {"error": "faltan_parametros_date_session_id"})
+            return
+        try:
+            summary = build_session_summary(date_str, session_id)
+        except Exception as e:
+            self._send(500, {"error": str(e)})
+            return
+        self._send(200, summary)
 
     def log_message(self, fmt, *args):
         pass  # silenciar el log por request de http.server

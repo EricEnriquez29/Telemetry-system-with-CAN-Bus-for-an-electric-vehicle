@@ -170,7 +170,27 @@
     .horizon-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;}
     .horizon-lbl span{color:var(--cyan);font-weight:600;}
 
-    .laps-title-bar{text-align:center;border-bottom:2px solid var(--orange);padding-bottom:12px;margin-bottom:18px;}
+    .laps-title-bar{text-align:center;border-bottom:2px solid var(--orange);padding-bottom:12px;margin-bottom:18px;position:relative;}
+    .hist-btn{position:absolute;right:0;top:0;font-family:inherit;font-size:10px;padding:7px 14px;background:transparent;color:var(--cyan);border:1px solid var(--cyan);cursor:pointer;border-radius:2px;}
+    .hist-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+    .hist-overlay.open{display:flex;}
+    .hist-modal{background:#0d0d0d;border:1px solid var(--orange);border-radius:8px;padding:18px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;font-family:'Share Tech Mono',monospace;}
+    .hist-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+    .hist-head-title{font-family:'Orbitron',sans-serif;font-size:12px;color:var(--orange);letter-spacing:1px;}
+    .hist-close{background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;}
+    .hist-picker{display:flex;gap:8px;margin-bottom:14px;}
+    .hist-picker input,.hist-picker select{flex:1;background:#050505;border:1px solid var(--sep);color:var(--text);font-family:inherit;font-size:11px;padding:7px 8px;border-radius:2px;}
+    .hist-load{width:100%;font-family:inherit;font-size:11px;padding:9px;background:transparent;color:var(--orange);border:1px solid var(--orange);cursor:pointer;border-radius:2px;}
+    .hist-back{margin-top:12px;font-family:inherit;font-size:10px;padding:6px 12px;background:transparent;color:var(--muted);border:1px solid #333;cursor:pointer;border-radius:2px;}
+    .hist-sec-title{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;}
+    .hist-grid{display:grid;gap:1px;background:var(--sep);margin-bottom:8px;}
+    .hist-grid > div{background:#0a0a0a;padding:7px;text-align:center;}
+    .hist-grid .hg-lbl{font-size:7px;color:var(--muted);text-transform:uppercase;display:block;}
+    .hist-grid .hg-val{font-size:12px;color:var(--text);}
+    .hist-top3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+    .hist-top3 div{background:#0d0d0d;border:1px solid var(--sep);padding:6px;text-align:center;font-size:11px;}
+    .hist-err{color:var(--red);font-size:11px;text-align:center;padding:20px;}
+    .hist-loading{color:var(--muted);font-size:11px;text-align:center;padding:20px;}
     .laps-title-big{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
     .laps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:20px;}
     .laps-stat-cell{background:#0a0a0a;padding:10px;text-align:center;}
@@ -443,7 +463,29 @@
 
 <div id="tab-1" style="display:none;">
   <div class="laps-wrap">
-    <div class="laps-title-bar"><span class="laps-title-big">Tabla de Vueltas — Sesión Actual</span></div>
+    <div class="laps-title-bar">
+      <span class="laps-title-big">Tabla de Vueltas — Sesión Actual</span>
+      <button class="hist-btn" onclick="openHistModal()">Tabla de vueltas / resumen</button>
+    </div>
+
+    <div class="hist-overlay" id="hist-overlay">
+      <div class="hist-modal">
+        <div class="hist-head">
+          <span class="hist-head-title">CONSULTAR SESIÓN HISTÓRICA</span>
+          <button class="hist-close" onclick="closeHistModal()">✕</button>
+        </div>
+
+        <div id="hist-picker-view">
+          <div class="hist-picker">
+            <input type="date" id="hist-date">
+            <input type="number" id="hist-session" placeholder="N° de sesión" min="1" step="1">
+          </div>
+          <button class="hist-load" onclick="loadHistSession()">Cargar sesión</button>
+        </div>
+
+        <div id="hist-result-view" style="display:none;"></div>
+      </div>
+    </div>
 
     <div class="laps-stats">
       <div class="laps-stat-cell"><span class="lsc-label">Distancia restante</span><span class="lsc-val" id="est-drest">—</span></div>
@@ -530,7 +572,123 @@ function drawMetaLine(latA,lonA,latB,lonB){
   metaLine=L.polyline([[latA,lonA],[latB,lonB]],{color:'#000',weight:3,opacity:0.9}).addTo(map);
 }
 
+const HIST_URL_BASE = "http://23.94.237.163:8060/session_summary";
 const META_HTTP_URL="http://23.94.237.163:8060/set_meta";
+
+function openHistModal(){
+  var dInput = document.getElementById('hist-date');
+  if(!dInput.value){ dInput.value = new Date().toISOString().slice(0,10); }
+  document.getElementById('hist-overlay').classList.add('open');
+}
+function closeHistModal(){
+  document.getElementById('hist-overlay').classList.remove('open');
+  document.getElementById('hist-picker-view').style.display='block';
+  document.getElementById('hist-result-view').style.display='none';
+  document.getElementById('hist-result-view').innerHTML='';
+}
+function backToHistPicker(){
+  document.getElementById('hist-picker-view').style.display='block';
+  document.getElementById('hist-result-view').style.display='none';
+}
+
+function fmtDur(s){
+  s = Math.round(s||0);
+  var m = Math.floor(s/60), r = s%60;
+  return m+':'+String(r).padStart(2,'0');
+}
+function nn(v, dec){ return (v==null) ? '—' : v.toFixed(dec!=null?dec:1); }
+
+function renderHistSummary(sum){
+  var laps = sum.laps || [];
+  var lapsRows = laps.map(function(l){
+    var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
+    var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
+    var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
+    return '<div class="lap-row"><div class="lap-cell">'+l.n_lap+'</div><div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div><div class="lap-cell">'+l.d_vuelta.toFixed(3)+'<span class="lc-unit"> km</span></div><div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div><div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div><div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div><div class="lap-cell">Completa</div></div>';
+  }).join('');
+
+  var topRow = function(list, unit, key){
+    return list.map(function(l){
+      var v = key==='score' ? l.score : l[key];
+      return '<div>#'+l.n_lap+' — '+v+' '+unit+'</div>';
+    }).join('') || '<div style="grid-column:span 3">—</div>';
+  };
+
+  var html = ''
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+    +   '<span style="font-size:11px;color:var(--green)">Sesión '+sum.session_id+' — '+sum.date+' · '+sum.n_vueltas+' vueltas</span>'
+    +   '<span style="font-size:10px;color:var(--muted)">Duración: <b style="color:var(--text)">'+fmtDur(sum.duracion_s)+'</b></span>'
+    + '</div>'
+
+    + '<div class="hist-sec-title">Batería HV / Aux</div>'
+    + '<div class="hist-grid" style="grid-template-columns:repeat(3,1fr)">'
+    +   '<div><span class="hg-lbl">SOC inicial→final</span><span class="hg-val">'+nn(sum.soc_ini,0)+'%→'+nn(sum.soc_fin,0)+'%</span></div>'
+    +   '<div><span class="hg-lbl">E.HV/Q.HV inicial→final</span><span class="hg-val">'+nn(sum.E_HV_ini,0)+'→'+nn(sum.E_HV_fin,0)+'Wh · '+nn(sum.Q_HV_ini,1)+'→'+nn(sum.Q_HV_fin,1)+'Ah</span></div>'
+    +   '<div><span class="hg-lbl">SOC aux inicial→final</span><span class="hg-val">'+nn(sum.soc_aux_ini,0)+'%→'+nn(sum.soc_aux_fin,0)+'%</span></div>'
+    +   '<div style="grid-column:span 3"><span class="hg-lbl">E.Aux/Q.Aux inicial→final</span><span class="hg-val">'+nn(sum.E_aux_ini,1)+'→'+nn(sum.E_aux_fin,1)+'Wh · '+nn(sum.Q_aux_ini,2)+'→'+nn(sum.Q_aux_fin,2)+'Ah</span></div>'
+    + '</div>'
+
+    + '<div class="hist-sec-title">Velocidad / RPM / Fuerzas G</div>'
+    + '<div class="hist-grid" style="grid-template-columns:repeat(3,1fr)">'
+    +   '<div><span class="hg-lbl">Vel prom/máx</span><span class="hg-val">'+nn(sum.spd_prom)+'/'+nn(sum.spd_max)+' km/h</span></div>'
+    +   '<div><span class="hg-lbl">RPM prom/máx</span><span class="hg-val">'+nn(sum.rpm_prom,0)+'/'+nn(sum.rpm_max,0)+'</span></div>'
+    +   '<div><span class="hg-lbl">G máx X/Y/Z</span><span class="hg-val">'+nn(sum.Gx_max,2)+'/'+nn(sum.Gy_max,2)+'/'+nn(sum.Gz_max,2)+'</span></div>'
+    + '</div>'
+
+    + '<div class="hist-sec-title">Potencia / Corriente / Energía</div>'
+    + '<div class="hist-grid" style="grid-template-columns:repeat(3,1fr)">'
+    +   '<div><span class="hg-lbl">P.HV prom/máx</span><span class="hg-val">'+nn(sum.p_hv_prom,0)+'/'+nn(sum.p_hv_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">P.Regen prom/máx</span><span class="hg-val">'+nn(sum.p_regen_prom,0)+'/'+nn(sum.p_regen_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">P.Mec prom/máx</span><span class="hg-val">'+nn(sum.p_mec_prom,0)+'/'+nn(sum.p_mec_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">Corr.batt prom/máx</span><span class="hg-val">'+nn(sum.curr_batt_prom)+'/'+nn(sum.curr_batt_max)+' A</span></div>'
+    +   '<div><span class="hg-lbl">Corr.regen prom/máx</span><span class="hg-val">'+nn(sum.curr_regen_prom)+'/'+nn(sum.curr_regen_max)+' A</span></div>'
+    +   '<div><span class="hg-lbl">E cons/regen prom</span><span class="hg-val">'+nn(sum.E_vuelta_prom,1)+'/'+nn(sum.E_regen_vuelta_prom,1)+' Wh</span></div>'
+    + '</div>'
+
+    + '<div class="hist-sec-title">Temperaturas máximas</div>'
+    + '<div class="hist-grid" style="grid-template-columns:repeat(4,1fr)">'
+    +   '<div><span class="hg-lbl">Motor</span><span class="hg-val">'+nn(sum.tmp_mot_max,0)+'°</span></div>'
+    +   '<div><span class="hg-lbl">Controlador</span><span class="hg-val">'+nn(sum.tmp_cont_max,0)+'°</span></div>'
+    +   '<div><span class="hg-lbl">Capacitores</span><span class="hg-val">'+nn(sum.tmp_cap_max,0)+'°</span></div>'
+    +   '<div><span class="hg-lbl">Batería HV</span><span class="hg-val">'+nn(sum.tmp_batt_max,0)+'°</span></div>'
+    + '</div>'
+
+    + '<div class="hist-sec-title">Top 3 — tiempo</div>'
+    + '<div class="hist-top3">'+topRow(sum.top_tiempo,'s','t_vuelta')+'</div>'
+    + '<div class="hist-sec-title">Top 3 — menor consumo</div>'
+    + '<div class="hist-top3">'+topRow(sum.top_consumo,'Wh','E_vuelta')+'</div>'
+    + '<div class="hist-sec-title">Top 3 — vueltas más óptimas</div>'
+    + '<div class="hist-top3">'+topRow(sum.top_optimas,'','score')+'</div>'
+
+    + '<div class="hist-sec-title" style="color:var(--orange)">Tabla de vueltas (idéntica a la vista en vivo)</div>'
+    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Estado</span></div>'
+    + '<div>'+ (lapsRows || '<div class="laps-empty-msg">Sin vueltas registradas en esta sesión</div>') +'</div>'
+
+    + '<button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>';
+
+  document.getElementById('hist-result-view').innerHTML = html;
+}
+
+function loadHistSession(){
+  var date = document.getElementById('hist-date').value;
+  var sess = document.getElementById('hist-session').value;
+  if(!date || !sess){ alert('Completa fecha y número de sesión'); return; }
+
+  var resultView = document.getElementById('hist-result-view');
+  document.getElementById('hist-picker-view').style.display='none';
+  resultView.style.display='block';
+  resultView.innerHTML = '<div class="hist-loading">Consultando InfluxDB…</div>';
+
+  fetch(HIST_URL_BASE+'?date='+encodeURIComponent(date)+'&session_id='+encodeURIComponent(sess))
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+    .then(function(res){
+      if(res.ok){ renderHistSummary(res.body); }
+      else { resultView.innerHTML = '<div class="hist-err">Error: '+(res.body.error||'desconocido')+'</div><button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>'; }
+    })
+    .catch(function(){ resultView.innerHTML = '<div class="hist-err">No se pudo conectar al backend</div><button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>'; });
+}
+
+
 const META_PASS="fenix25";
 function setMetaLine(){
   var msg=document.getElementById('meta-msg');
