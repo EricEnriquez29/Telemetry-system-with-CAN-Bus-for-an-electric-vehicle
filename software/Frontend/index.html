@@ -120,6 +120,8 @@
     .sec-best{color:var(--green);}.sec-slow{color:var(--red);}
 
     .charts{flex:1;display:flex;flex-direction:column;min-height:200px;}
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sep);border-top:1px solid var(--sep);}
+    .chart-cell{background:#060606;padding:4px 8px;min-height:160px;display:flex;flex-direction:column;}
     .chart-block{flex:1;display:flex;flex-direction:column;border-top:1px solid var(--sep);padding:4px 8px;min-height:120px;}
     .cb-title{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;display:flex;justify-content:space-between;}
     .cb-tag{color:var(--orange);}
@@ -351,17 +353,23 @@
     </div>
 
     <div class="charts">
-      <div class="chart-block">
-        <div class="cb-title"><span>Velocidad / RPM / Throttle</span><span class="cb-tag"></span></div>
-        <div class="chart-wrap"><canvas id="chart-a"></canvas></div>
-      </div>
-      <div class="chart-block">
-        <div class="cb-title"><span>Torque / P. Mecánica / P. Eléctrica</span><span class="cb-tag"></span></div>
-        <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
-      </div>
-      <div class="chart-block">
-        <div class="cb-title"><span>P. HV / Corriente / Throttle</span><span class="cb-tag"></span></div>
-        <div class="chart-wrap"><canvas id="chart-pwr"></canvas></div>
+      <div class="charts-grid">
+        <div class="chart-cell">
+          <div class="cb-title"><span>Velocidad / RPM / Throttle</span><span class="cb-tag"></span></div>
+          <div class="chart-wrap"><canvas id="chart-a"></canvas></div>
+        </div>
+        <div class="chart-cell">
+          <div class="cb-title"><span>Torque / P. Mecánica / P. HV</span><span class="cb-tag"></span></div>
+          <div class="chart-wrap"><canvas id="chart-tm"></canvas></div>
+        </div>
+        <div class="chart-cell">
+          <div class="cb-title"><span>P. HV / Corriente / Throttle</span><span class="cb-tag"></span></div>
+          <div class="chart-wrap"><canvas id="chart-pwr"></canvas></div>
+        </div>
+        <div class="chart-cell">
+          <div class="cb-title"><span>P. Regen / Freno / Corriente Regen</span><span class="cb-tag"></span></div>
+          <div class="chart-wrap"><canvas id="chart-regen"></canvas></div>
+        </div>
       </div>
       <div class="chart-block">
         <div class="cb-title"><span>Potencia Mecánica vs RPM // Color = Eficiencia TME</span><span class="cb-tag"></span></div>
@@ -562,23 +570,28 @@ var rcg=document.getElementById('rcells');
 for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="rc'+i+'">—</div>';rcg.appendChild(d);}
 
 var WMS=15000;
-function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}}},scales}});}
+function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}},tooltip:{backgroundColor:'#0d0d0d',borderColor:'#333',borderWidth:1,titleColor:'#ccc',bodyColor:'#f0f0f0',titleFont:{family:'Share Tech Mono',size:10},bodyFont:{family:'Share Tech Mono',size:10},padding:8}},scales}});}
 var sx={type:'time',time:{unit:'second',displayFormats:{second:'HH:mm:ss'}},ticks:{color:'#888',maxTicksLimit:6,font:{size:8}},grid:{color:'#0d0d0d'}};
 var cA=mkChart('chart-a',[
   {label:'Vel km/h',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yL'},
-  {label:'RPM/50',data:[],borderColor:'#cc4055',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yL'},
+  {label:'RPM',data:[],borderColor:'#cc4055',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yRPM'},
   {label:'Throttle%',data:[],borderColor:'#d9621a',backgroundColor:'rgba(217,98,26,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yR'},
-],{x:sx,yL:{position:'left',min:0,max:130,ticks:{color:'#3aa8bd',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yR:{position:'right',min:0,max:100,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
+],{x:sx,yL:{position:'left',min:0,max:130,ticks:{color:'#3aa8bd',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yRPM:{position:'left',min:0,max:7000,ticks:{color:'#cc4055',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}},yR:{position:'right',min:0,max:100,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
 var cTM=mkChart('chart-tm',[
   {label:'Torque Nm',data:[],borderColor:'#d9621a',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yNm'},
   {label:'P.Mec W',data:[],borderColor:'#3ba776',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yW'},
-  {label:'P.Eléc W',data:[],borderColor:'#cc4055',backgroundColor:'rgba(204,64,85,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yW'},
-],{x:sx,yNm:{position:'left',min:0,max:35,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yW:{position:'right',min:0,suggestedMax:6000,ticks:{color:'#3ba776',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
+  {label:'P.HV W',data:[],borderColor:'#a85cc0',backgroundColor:'rgba(168,92,192,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yPHV',spanGaps:false},
+],{x:sx,yNm:{position:'right',min:0,max:35,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}},yW:{position:'left',min:0,suggestedMax:6000,ticks:{color:'#3ba776',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yPHV:{position:'left',min:0,suggestedMax:10000,ticks:{color:'#a85cc0',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
 var cPWR=mkChart('chart-pwr',[
-  {label:'P.HV W',data:[],borderColor:'#a85cc0',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yW2'},
-  {label:'Corriente A',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yA2'},
+  {label:'P.HV W',data:[],borderColor:'#a85cc0',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yW2',spanGaps:false},
+  {label:'Corriente descarga A',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yA2',spanGaps:false},
   {label:'Throttle%',data:[],borderColor:'#d9621a',backgroundColor:'rgba(217,98,26,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yT2'},
-],{x:sx,yW2:{position:'left',min:0,suggestedMax:10000,ticks:{color:'#a85cc0',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yA2:{position:'left',min:0,max:200,display:false},yT2:{position:'right',min:0,max:100,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
+],{x:sx,yW2:{position:'left',min:0,suggestedMax:10000,ticks:{color:'#a85cc0',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yA2:{position:'left',min:0,max:250,ticks:{color:'#3aa8bd',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}},yT2:{position:'right',min:0,max:100,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
+var cRegen=mkChart('chart-regen',[
+  {label:'P.Regen W',data:[],borderColor:'#3ba776',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yWR',spanGaps:false},
+  {label:'Freno%',data:[],borderColor:'#cc4055',backgroundColor:'rgba(204,64,85,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yBR'},
+  {label:'Corriente regen A',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yAR',spanGaps:false},
+],{x:sx,yWR:{position:'left',min:0,suggestedMax:3000,ticks:{color:'#3ba776',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yBR:{position:'right',min:0,max:100,ticks:{color:'#cc4055',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}},yAR:{position:'left',min:0,max:250,ticks:{color:'#3aa8bd',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
 function push(ch,di,ts,v){var now=new Date(ts).getTime()||Date.now();ch.data.datasets[di].data.push({x:now,y:v});while(ch.data.datasets[di].data.length>0&&ch.data.datasets[di].data[0].x<now-WMS)ch.data.datasets[di].data.shift();}
 
 var battCv=document.getElementById('batt-canvas'),battCtx=battCv.getContext('2d');
@@ -1154,10 +1167,16 @@ function updateDashboard(payload){
     document.getElementById('cs-delta').textContent=(vmax-vmin).toFixed(3);
   }
 
-  push(cA,0,tms,spd); push(cA,1,tms,rpm/50); push(cA,2,tms,thr);
-  push(cTM,0,tms,torq); push(cTM,1,tms,p_mec); push(cTM,2,tms,(p_hv!=null?p_hv:0));
-  push(cPWR,0,tms,(p_hv!=null?p_hv:0)); push(cPWR,1,tms,Math.abs(curr_p)); push(cPWR,2,tms,thr);
-  cA.update('none'); cTM.update('none'); cPWR.update('none');
+  var currDescarga = curr_p<0 ? Math.abs(curr_p) : null;
+  var currRegen    = curr_p>0 ? curr_p : null;
+  var pHVval       = (p_hv!=null) ? p_hv : null;
+  var pRegenVal    = (d.p_regen!=null) ? d.p_regen : null;
+
+  push(cA,0,tms,spd); push(cA,1,tms,rpm); push(cA,2,tms,thr);
+  push(cTM,0,tms,torq); push(cTM,1,tms,p_mec); push(cTM,2,tms,pHVval);
+  push(cPWR,0,tms,pHVval); push(cPWR,1,tms,currDescarga); push(cPWR,2,tms,thr);
+  push(cRegen,0,tms,pRegenVal); push(cRegen,1,tms,brk); push(cRegen,2,tms,currRegen);
+  cA.update('none'); cTM.update('none'); cPWR.update('none'); cRegen.update('none');
 
   var eta_total = (d.eta_total != null) ? d.eta_total : eta;
   drawPMRPM(rpm, p_mec, eta_total);
