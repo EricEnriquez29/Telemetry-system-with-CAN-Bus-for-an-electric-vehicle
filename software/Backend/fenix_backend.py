@@ -865,10 +865,10 @@ def on_status_message(msg):
     if nuevo_estado != _mgt_conectado:
         _mgt_conectado = nuevo_estado
         print(f"[MGT] Estado → {'conectado' if _mgt_conectado else 'DESCONECTADO'}", flush=True)
-        if _mgt_conectado:
-            push_snapshot_now()
-        else:
+        if not _mgt_conectado:
             send_zero_snapshot()
+        # al reconectar NO reenviamos el último snapshot cacheado (son datos
+        # congelados de antes de la caída) — esperamos el primer dato real nuevo
 
 
 def on_message(client, userdata, msg):

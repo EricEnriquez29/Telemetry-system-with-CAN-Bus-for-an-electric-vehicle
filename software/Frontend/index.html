@@ -1174,18 +1174,21 @@ function setMgtConn(connected){
 }
 
 function connect(){
+  try{ if(ws){ ws.onclose=null; ws.onerror=null; ws.close(); } }catch(e){}
   ws = new WebSocket(WS_URL);
   ws.onopen = ()=>{ setConn(true); lastMsgTime = Date.now(); };
   ws.onmessage = (event)=>{ lastMsgTime = Date.now(); try{ updateDashboard(JSON.parse(event.data)); }catch(e){ console.error(e); } };
   ws.onclose = ()=>{ setConn(false); setTimeout(connect,2000); };
-  ws.onerror = ()=>ws.close();
+  ws.onerror = ()=>{ try{ ws.close(); }catch(e){} };
 }
 
-// ── Watchdog: si el socket se queda "colgado" sin cerrar, forzar reconexión ──
+// ── Watchdog: si no llegan datos en 8s (socket colgado, onclose que no dispara,
+// pérdida de red sin aviso), forzar reconexión sin importar readyState ──
 setInterval(function(){
-  if(ws && ws.readyState===WebSocket.OPEN && (Date.now()-lastMsgTime)>8000){
+  if((Date.now()-lastMsgTime)>8000){
     console.warn('WS sin datos por 8s, forzando reconexión');
-    ws.close();
+    lastMsgTime = Date.now(); // evita disparos repetidos mientras reconecta
+    connect();
   }
 }, 3000);
 
