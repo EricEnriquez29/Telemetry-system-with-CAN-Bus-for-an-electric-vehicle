@@ -865,7 +865,10 @@ def on_status_message(msg):
     if nuevo_estado != _mgt_conectado:
         _mgt_conectado = nuevo_estado
         print(f"[MGT] Estado → {'conectado' if _mgt_conectado else 'DESCONECTADO'}", flush=True)
-        push_snapshot_now()
+        if _mgt_conectado:
+            push_snapshot_now()
+        else:
+            send_zero_snapshot()
 
 
 def on_message(client, userdata, msg):

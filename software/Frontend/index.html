@@ -57,9 +57,7 @@
     .revbar{background:#050505;border-bottom:1px solid #111;height:14px;display:flex;align-items:center;justify-content:center;gap:3px;flex-shrink:0;}
     .rl{width:20px;height:8px;border-radius:1px;background:#111;transition:all 0.05s;}
 
-    .body{flex:1;display:grid;grid-template-columns:230px 1fr 260px;min-height:0;position:relative;}
-    .body.mgt-offline::before{content:'⚠ MGT DESCONECTADO — datos congelados, no en vivo';position:absolute;top:0;left:0;right:0;z-index:500;background:var(--red);color:#fff;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;padding:5px;}
-    .body.mgt-offline{filter:grayscale(0.6) brightness(0.6);}
+    .body{flex:1;display:grid;grid-template-columns:230px 1fr 260px;min-height:0;}
 
     .sidebar{background:var(--col1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
     .sidebar-right{border-right:none;border-left:1px solid var(--border);}
@@ -1168,15 +1166,10 @@ function setConn(connected){
 function setMgtConn(connected){
   var dot=document.getElementById('mgt-dot');
   var lbl=document.getElementById('mgt-label');
-  var body=document.querySelector('#tab-0 .body');
   if(!dot||!lbl) return;
   if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); }
   else if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
   else{ dot.classList.remove('connected'); lbl.textContent='MGT desconectado'; }
-  if(body){
-    if(connected===true){ body.classList.remove('mgt-offline'); }
-    else{ body.classList.add('mgt-offline'); }
-  }
 }
 
 function connect(){
