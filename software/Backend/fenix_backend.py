@@ -47,7 +47,7 @@ DT              = 0.1
 
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
-LAP_T_MIN       = 30.0    # s mínimos de duración de una vuelta
+LAP_T_MIN       = 15.0   # s mínimos de duración de una vuelta — FIJO, no cambiar sin que Payo lo pida
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
@@ -119,6 +119,14 @@ _d_ref            = None
 _E_HV_lap_inicio     = 0.0
 _E_regen_lap_inicio  = 0.0
 
+# ─── Acumuladores por vuelta (máx/prom dentro de la vuelta en curso) ─────────
+_lap_spd_max=0.0; _lap_spd_sum=0.0; _lap_spd_n=0
+_lap_phv_max=0.0; _lap_phv_sum=0.0; _lap_phv_n=0
+_lap_pregen_max=0.0; _lap_pregen_sum=0.0; _lap_pregen_n=0
+_lap_pmec_max=0.0; _lap_pmec_sum=0.0; _lap_pmec_n=0
+_lap_gx_max=0.0; _lap_gy_max=0.0
+_lap_rpm_max=0.0; _lap_rpm_sum=0.0; _lap_rpm_n=0
+
 # ─── Estado de conexión del MGT (via LWT) ────────────────────────────────────
 _mgt_conectado = False
 _last_snapshot = None   # dict completo {timestamp, vehicle_id, session_id, data} — último enviado
@@ -173,6 +181,12 @@ def send_zero_snapshot():
             "mgt_conectado": _mgt_conectado,
             "d_rest": None, "n_rest": None, "t_rest": None, "n_opt": None,
             "E_vuelta_actual": None, "E_regen_vuelta_actual": None,
+            "vel_max_actual": None, "vel_prom_actual": None,
+            "p_hv_max_actual": None, "p_hv_prom_actual": None,
+            "p_regen_max_actual": None, "p_regen_prom_actual": None,
+            "p_mec_max_actual": None, "p_mec_prom_actual": None,
+            "Gx_max_actual": None, "Gy_max_actual": None,
+            "rpm_max_actual": None, "rpm_prom_actual": None,
             "sesion_act": False,
             "meta_lat_a": _meta_xy[5] if _meta_xy else None,
             "meta_lon_a": _meta_xy[6] if _meta_xy else None,
@@ -321,6 +335,12 @@ def reset_laps():
     global _n_lap, _d_vuelta, _t_vuelta_inicio, _ultimo_gps, _t_ultimo_cruce
     global _d_ref_muestras, _d_ref, _armado, _laps_history
     global _E_HV_lap_inicio, _E_regen_lap_inicio
+    global _lap_spd_max, _lap_spd_sum, _lap_spd_n
+    global _lap_phv_max, _lap_phv_sum, _lap_phv_n
+    global _lap_pregen_max, _lap_pregen_sum, _lap_pregen_n
+    global _lap_pmec_max, _lap_pmec_sum, _lap_pmec_n
+    global _lap_gx_max, _lap_gy_max
+    global _lap_rpm_max, _lap_rpm_sum, _lap_rpm_n
 
     _n_lap            = 0
     _d_vuelta         = 0.0
@@ -333,6 +353,12 @@ def reset_laps():
     _laps_history     = []
     _E_HV_lap_inicio     = 0.0
     _E_regen_lap_inicio  = 0.0
+    _lap_spd_max=_lap_spd_sum=0.0; _lap_spd_n=0
+    _lap_phv_max=_lap_phv_sum=0.0; _lap_phv_n=0
+    _lap_pregen_max=_lap_pregen_sum=0.0; _lap_pregen_n=0
+    _lap_pmec_max=_lap_pmec_sum=0.0; _lap_pmec_n=0
+    _lap_gx_max=_lap_gy_max=0.0
+    _lap_rpm_max=_lap_rpm_sum=0.0; _lap_rpm_n=0
     print("[LAP] Conteo de vueltas reiniciado (nueva sesión activa)", flush=True)
 
 
@@ -586,7 +612,7 @@ from(bucket: "{INFLUX_BUCKET}")
 from(bucket: "{INFLUX_BUCKET}")
   |> range(start: {start}, stop: {stop})
   |> filter(fn: (r) => r._measurement == "vehicle_telemetry" and r.session_id == "{session_id}")
-  |> filter(fn: (r) => r._field == "t_vuelta" or r._field == "d_vuelta" or r._field == "E_HV" or r._field == "E_regen")
+  |> filter(fn: (r) => r._field == "t_vuelta" or r._field == "d_vuelta" or r._field == "E_HV" or r._field == "E_regen" or r._field == "speed_v" or r._field == "p_hv" or r._field == "p_regen" or r._field == "p_mec" or r._field == "Gx" or r._field == "Gy" or r._field == "rpm")
   |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
   |> sort(columns: ["_time"])
 '''
@@ -598,11 +624,24 @@ from(bucket: "{INFLUX_BUCKET}")
             if lap_n is None: continue
             lap_n = int(lap_n)
             if lap_n == 0: continue
-            grp = lap_groups.setdefault(lap_n, {"t":[], "d":[], "ehv":[], "ereg":[]})
-            if rec.values.get("t_vuelta") is not None: grp["t"].append(rec.values["t_vuelta"])
-            if rec.values.get("d_vuelta") is not None: grp["d"].append(rec.values["d_vuelta"])
-            if rec.values.get("E_HV") is not None: grp["ehv"].append(rec.values["E_HV"])
-            if rec.values.get("E_regen") is not None: grp["ereg"].append(rec.values["E_regen"])
+            grp = lap_groups.setdefault(lap_n, {"t":[], "d":[], "ehv":[], "ereg":[],
+                "spd":[], "phv":[], "pregen":[], "pmec":[], "gx":[], "gy":[], "rpm":[]})
+            v = rec.values
+            if v.get("t_vuelta") is not None: grp["t"].append(v["t_vuelta"])
+            if v.get("d_vuelta") is not None: grp["d"].append(v["d_vuelta"])
+            if v.get("E_HV") is not None: grp["ehv"].append(v["E_HV"])
+            if v.get("E_regen") is not None: grp["ereg"].append(v["E_regen"])
+            if v.get("speed_v") is not None: grp["spd"].append(abs(v["speed_v"]))
+            if v.get("p_hv") is not None: grp["phv"].append(v["p_hv"])
+            if v.get("p_regen") is not None: grp["pregen"].append(v["p_regen"])
+            if v.get("p_mec") is not None: grp["pmec"].append(v["p_mec"])
+            if v.get("Gx") is not None: grp["gx"].append(abs(v["Gx"]))
+            if v.get("Gy") is not None: grp["gy"].append(abs(v["Gy"]))
+            if v.get("rpm") is not None: grp["rpm"].append(abs(v["rpm"]))
+
+    def maxprom(lst, dec=0):
+        if not lst: return (None, None)
+        return (round(max(lst), dec), round(sum(lst)/len(lst), dec))
 
     laps = []
     for lap_n in sorted(lap_groups.keys()):
@@ -612,12 +651,30 @@ from(bucket: "{INFLUX_BUCKET}")
         e_v = (max(grp["ehv"]) - min(grp["ehv"])) if grp["ehv"] else None
         er_v = (max(grp["ereg"]) - min(grp["ereg"])) if grp["ereg"] else None
         eta_v = round(e_v / d_v, 2) if (e_v is not None and d_v > 0) else None
+        vel_max, vel_prom = maxprom(grp["spd"], 1)
+        phv_max, phv_prom = maxprom(grp["phv"])
+        pregen_max, pregen_prom = maxprom(grp["pregen"])
+        pmec_max, pmec_prom = maxprom(grp["pmec"])
+        gx_max = round(max(grp["gx"]), 2) if grp["gx"] else None
+        gy_max = round(max(grp["gy"]), 2) if grp["gy"] else None
+        rpm_max, rpm_prom = maxprom(grp["rpm"])
         laps.append({
             "n_lap": lap_n, "t_vuelta": round(t_v, 1), "d_vuelta": round(d_v, 4),
             "E_vuelta": round(e_v, 3) if e_v is not None else None,
             "E_regen_vuelta": round(er_v, 3) if er_v is not None else None,
             "eta_vuelta": eta_v,
+            "vel_max": vel_max, "vel_prom": vel_prom,
+            "p_hv_max": phv_max, "p_hv_prom": phv_prom,
+            "p_regen_max": pregen_max, "p_regen_prom": pregen_prom,
+            "p_mec_max": pmec_max, "p_mec_prom": pmec_prom,
+            "Gx_max": gx_max, "Gy_max": gy_max,
+            "rpm_max": rpm_max, "rpm_prom": rpm_prom,
         })
+
+    if laps:
+        t_mejor_global = min(l["t_vuelta"] for l in laps)
+        for l in laps:
+            l["delta_mejor"] = round(l["t_vuelta"] - t_mejor_global, 1)
 
     top_tiempo = sorted(laps, key=lambda l: l["t_vuelta"])[:3]
     con_e = [l for l in laps if l["E_vuelta"] is not None]
@@ -784,6 +841,12 @@ def on_snapshot_message(client, userdata, msg):
     global _phi_rad, _theta_rad
     global _sesion_act_prev
     global _E_HV_lap_inicio, _E_regen_lap_inicio
+    global _lap_spd_max, _lap_spd_sum, _lap_spd_n
+    global _lap_phv_max, _lap_phv_sum, _lap_phv_n
+    global _lap_pregen_max, _lap_pregen_sum, _lap_pregen_n
+    global _lap_pmec_max, _lap_pmec_sum, _lap_pmec_n
+    global _lap_gx_max, _lap_gy_max
+    global _lap_rpm_max, _lap_rpm_sum, _lap_rpm_n
     global _last_snapshot
 
     # ── Watchdog: llegó un mensaje, reiniciar timer ───────────────────────────
@@ -855,19 +918,72 @@ def on_snapshot_message(client, userdata, msg):
             _E_HV_lap_inicio    = _E_HV
             _E_regen_lap_inicio = _E_regen
 
+        # ── Acumular estadísticas de la vuelta en curso (máx/prom dentro de la vuelta) ──
+        if lap_info["armado"]:
+            spd_v = abs(speed_v)
+            _lap_spd_max = max(_lap_spd_max, spd_v); _lap_spd_sum += spd_v; _lap_spd_n += 1
+            if derived.get("p_hv") is not None:
+                _lap_phv_max = max(_lap_phv_max, derived["p_hv"]); _lap_phv_sum += derived["p_hv"]; _lap_phv_n += 1
+            if derived.get("p_regen") is not None:
+                _lap_pregen_max = max(_lap_pregen_max, derived["p_regen"]); _lap_pregen_sum += derived["p_regen"]; _lap_pregen_n += 1
+            _lap_pmec_max = max(_lap_pmec_max, derived["p_mec"]); _lap_pmec_sum += derived["p_mec"]; _lap_pmec_n += 1
+            _lap_gx_max = max(_lap_gx_max, abs(derived["Gx"]))
+            _lap_gy_max = max(_lap_gy_max, abs(derived["Gy"]))
+            rpm_v = abs(float(data.get("rpm", 0)))
+            _lap_rpm_max = max(_lap_rpm_max, rpm_v); _lap_rpm_sum += rpm_v; _lap_rpm_n += 1
+
         # ── Vuelta recién completada: energía consumida/regenerada en esa vuelta ──
         if lap_info["n_lap"] > n_lap_antes and _laps_history:
             e_vuelta       = round(_E_HV - _E_HV_lap_inicio, 3)
             e_regen_vuelta = round(_E_regen - _E_regen_lap_inicio, 3)
-            _laps_history[-1]["E_vuelta"]       = e_vuelta
-            _laps_history[-1]["E_regen_vuelta"] = e_regen_vuelta
-            _laps_history[-1]["eta_vuelta"] = (
-                round(e_vuelta / _laps_history[-1]["d_vuelta"], 2)
-                if _laps_history[-1]["d_vuelta"] > 0 else None
+            entry = _laps_history[-1]
+            entry["E_vuelta"]       = e_vuelta
+            entry["E_regen_vuelta"] = e_regen_vuelta
+            entry["eta_vuelta"] = (
+                round(e_vuelta / entry["d_vuelta"], 2)
+                if entry["d_vuelta"] > 0 else None
             )
+            entry["vel_max"]    = round(_lap_spd_max, 1)
+            entry["vel_prom"]   = round(_lap_spd_sum / _lap_spd_n, 1) if _lap_spd_n else None
+            entry["p_hv_max"]   = round(_lap_phv_max, 0) if _lap_phv_n else None
+            entry["p_hv_prom"]  = round(_lap_phv_sum / _lap_phv_n, 0) if _lap_phv_n else None
+            entry["p_regen_max"]  = round(_lap_pregen_max, 0) if _lap_pregen_n else None
+            entry["p_regen_prom"] = round(_lap_pregen_sum / _lap_pregen_n, 0) if _lap_pregen_n else None
+            entry["p_mec_max"]  = round(_lap_pmec_max, 0)
+            entry["p_mec_prom"] = round(_lap_pmec_sum / _lap_pmec_n, 0) if _lap_pmec_n else None
+            entry["Gx_max"]     = round(_lap_gx_max, 2)
+            entry["Gy_max"]     = round(_lap_gy_max, 2)
+            entry["rpm_max"]    = round(_lap_rpm_max, 0)
+            entry["rpm_prom"]   = round(_lap_rpm_sum / _lap_rpm_n, 0) if _lap_rpm_n else None
+
+            # ── Δ vs mejor tiempo — recalcular para todas las vueltas ──────────
+            t_mejor = min(l["t_vuelta"] for l in _laps_history)
+            for l in _laps_history:
+                l["delta_mejor"] = round(l["t_vuelta"] - t_mejor, 1)
+
             derived["laps"] = list(_laps_history)
             _E_HV_lap_inicio    = _E_HV
             _E_regen_lap_inicio = _E_regen
+            _lap_spd_max=_lap_spd_sum=0.0; _lap_spd_n=0
+            _lap_phv_max=_lap_phv_sum=0.0; _lap_phv_n=0
+            _lap_pregen_max=_lap_pregen_sum=0.0; _lap_pregen_n=0
+            _lap_pmec_max=_lap_pmec_sum=0.0; _lap_pmec_n=0
+            _lap_gx_max=_lap_gy_max=0.0
+            _lap_rpm_max=_lap_rpm_sum=0.0; _lap_rpm_n=0
+
+        # ── Estadísticas en vivo de la vuelta en curso (aún sin cerrar) ────────
+        derived["vel_max_actual"]  = round(_lap_spd_max, 1)
+        derived["vel_prom_actual"] = round(_lap_spd_sum/_lap_spd_n, 1) if _lap_spd_n else None
+        derived["p_hv_max_actual"]  = round(_lap_phv_max, 0) if _lap_phv_n else None
+        derived["p_hv_prom_actual"] = round(_lap_phv_sum/_lap_phv_n, 0) if _lap_phv_n else None
+        derived["p_regen_max_actual"]  = round(_lap_pregen_max, 0) if _lap_pregen_n else None
+        derived["p_regen_prom_actual"] = round(_lap_pregen_sum/_lap_pregen_n, 0) if _lap_pregen_n else None
+        derived["p_mec_max_actual"]  = round(_lap_pmec_max, 0)
+        derived["p_mec_prom_actual"] = round(_lap_pmec_sum/_lap_pmec_n, 0) if _lap_pmec_n else None
+        derived["Gx_max_actual"]   = round(_lap_gx_max, 2)
+        derived["Gy_max_actual"]   = round(_lap_gy_max, 2)
+        derived["rpm_max_actual"]  = round(_lap_rpm_max, 0)
+        derived["rpm_prom_actual"] = round(_lap_rpm_sum/_lap_rpm_n, 0) if _lap_rpm_n else None
 
         # ── Estimaciones de sesión: autonomía y vuelta óptima ──────────────────
         estim = compute_lap_estimates(_laps_history, derived.get("E_HV_rest"))
@@ -1091,6 +1207,18 @@ def on_snapshot_message(client, userdata, msg):
                 "armado":     derived["armado"],
                 "E_vuelta_actual":       derived["E_vuelta_actual"],
                 "E_regen_vuelta_actual": derived["E_regen_vuelta_actual"],
+                "vel_max_actual":     derived["vel_max_actual"],
+                "vel_prom_actual":    derived["vel_prom_actual"],
+                "p_hv_max_actual":    derived["p_hv_max_actual"],
+                "p_hv_prom_actual":   derived["p_hv_prom_actual"],
+                "p_regen_max_actual": derived["p_regen_max_actual"],
+                "p_regen_prom_actual":derived["p_regen_prom_actual"],
+                "p_mec_max_actual":   derived["p_mec_max_actual"],
+                "p_mec_prom_actual":  derived["p_mec_prom_actual"],
+                "Gx_max_actual":      derived["Gx_max_actual"],
+                "Gy_max_actual":      derived["Gy_max_actual"],
+                "rpm_max_actual":     derived["rpm_max_actual"],
+                "rpm_prom_actual":    derived["rpm_prom_actual"],
                 "d_rest":     derived["d_rest"],
                 "n_rest":     derived["n_rest"],
                 "t_rest":     derived["t_rest"],

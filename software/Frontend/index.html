@@ -31,7 +31,7 @@
     .menu-item:hover{background:#161616;color:#ccc;}
     .menu-item.active{color:var(--orange);border-left:3px solid var(--orange);background:#120c08;}
     .empty-tab{color:#888;font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
-    .laps-wrap{padding:20px;font-family:'Share Tech Mono',monospace;}
+    .laps-wrap{padding:20px;font-family:'Share Tech Mono',monospace;overflow-x:auto;}
     .laps-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
     .laps-title{font-size:12px;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
     .laps-table{width:100%;border-collapse:collapse;font-size:12px;}
@@ -192,14 +192,14 @@
     .hist-err{color:var(--red);font-size:11px;text-align:center;padding:20px;}
     .hist-loading{color:var(--muted);font-size:11px;text-align:center;padding:20px;}
     .laps-title-big{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
-    .laps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:20px;}
+    .laps-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:20px;}
     .laps-stat-cell{background:#0a0a0a;padding:10px;text-align:center;}
     .laps-stat-cell .lsc-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
     .laps-stat-cell .lsc-val{font-size:20px;color:var(--text);}
-    .lap-row{display:grid;grid-template-columns:50px 1fr 1fr 1fr 1fr 1fr 100px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
-    .lap-row-head{display:grid;grid-template-columns:50px 1fr 1fr 1fr 1fr 1fr 100px;gap:1px;margin-bottom:6px;}
-    .lap-row-head span{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;text-align:center;padding:0 6px;}
-    .lap-cell{background:#0d0d0d;padding:10px 8px;text-align:center;color:var(--text);}
+    .lap-row{display:grid;grid-template-columns:40px 55px 60px 65px 90px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+    .lap-cell{background:#0d0d0d;padding:6px 4px;text-align:center;color:var(--text);font-size:9px;}
+    .lap-row-head{display:grid;grid-template-columns:40px 55px 60px 65px 90px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;margin-bottom:6px;}
+    .lap-row-head span{font-size:7px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;text-align:center;padding:0 3px;}
     .lap-cell .lc-unit{font-size:9px;color:var(--muted);}
     .lap-row.optimal .lap-cell{color:var(--green);}
     .lap-row.optimal .lap-cell:first-child::after{content:' ★';}
@@ -491,10 +491,11 @@
       <div class="laps-stat-cell"><span class="lsc-label">Distancia restante</span><span class="lsc-val" id="est-drest">—</span></div>
       <div class="laps-stat-cell"><span class="lsc-label">Vueltas restantes</span><span class="lsc-val" id="est-nrest">—</span></div>
       <div class="laps-stat-cell"><span class="lsc-label">Tiempo restante</span><span class="lsc-val" id="est-trest">—</span></div>
+      <div class="laps-stat-cell"><span class="lsc-label">Duración de sesión</span><span class="lsc-val" id="est-duracion" style="color:var(--orange)">00:00</span></div>
     </div>
 
     <div class="lap-row-head">
-      <span>Vuelta</span><span>Tiempo</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Estado</span>
+      <span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E cons/regen</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span>
     </div>
     <div id="laps-cells">
       <div class="laps-empty-msg" id="laps-empty-msg">Esperando cruces de meta…</div>
@@ -604,7 +605,23 @@ function renderHistSummary(sum){
     var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
     var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
     var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
-    return '<div class="lap-row"><div class="lap-cell">'+l.n_lap+'</div><div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div><div class="lap-cell">'+l.d_vuelta.toFixed(3)+'<span class="lc-unit"> km</span></div><div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div><div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div><div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div><div class="lap-cell">Completa</div></div>';
+    var deltaStr = (l.delta_mejor==null) ? '—' : (l.delta_mejor===0 ? '—' : '+'+l.delta_mejor.toFixed(1)+'s');
+    return '<div class="lap-row">'
+      +'<div class="lap-cell">'+l.n_lap+'</div>'
+      +'<div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div>'
+      +'<div class="lap-cell">'+deltaStr+'</div>'
+      +'<div class="lap-cell">'+l.d_vuelta.toFixed(3)+'<span class="lc-unit"> km</span></div>'
+      +'<div class="lap-cell">'+eV+'/'+eR+'<span class="lc-unit"> Wh</span></div>'
+      +'<div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div>'
+      +'<div class="lap-cell">'+fmtMP(l.vel_max,l.vel_prom,1)+'<span class="lc-unit"> km/h</span></div>'
+      +'<div class="lap-cell">'+fmtMP(l.p_hv_max,l.p_hv_prom)+'<span class="lc-unit"> W</span></div>'
+      +'<div class="lap-cell">'+fmtMP(l.p_regen_max,l.p_regen_prom)+'<span class="lc-unit"> W</span></div>'
+      +'<div class="lap-cell">'+fmtMP(l.p_mec_max,l.p_mec_prom)+'<span class="lc-unit"> W</span></div>'
+      +'<div class="lap-cell">'+((l.Gx_max!=null)?l.Gx_max.toFixed(2):'—')+'</div>'
+      +'<div class="lap-cell">'+((l.Gy_max!=null)?l.Gy_max.toFixed(2):'—')+'</div>'
+      +'<div class="lap-cell">'+fmtMP(l.rpm_max,l.rpm_prom)+'</div>'
+      +'<div class="lap-cell">Completa</div>'
+      +'</div>';
   }).join('');
 
   var topRow = function(list, unit, key){
@@ -628,21 +645,21 @@ function renderHistSummary(sum){
     +   '<div style="grid-column:span 3"><span class="hg-lbl">E.Aux/Q.Aux inicial→final</span><span class="hg-val">'+nn(sum.E_aux_ini,1)+'→'+nn(sum.E_aux_fin,1)+'Wh · '+nn(sum.Q_aux_ini,2)+'→'+nn(sum.Q_aux_fin,2)+'Ah</span></div>'
     + '</div>'
 
-    + '<div class="hist-sec-title">Velocidad / RPM / Fuerzas G</div>'
+    + '<div class="hist-sec-title">Velocidad / RPM / Fuerzas G — promedio</div>'
     + '<div class="hist-grid" style="grid-template-columns:repeat(3,1fr)">'
-    +   '<div><span class="hg-lbl">Vel prom/máx</span><span class="hg-val">'+nn(sum.spd_prom)+'/'+nn(sum.spd_max)+' km/h</span></div>'
-    +   '<div><span class="hg-lbl">RPM prom/máx</span><span class="hg-val">'+nn(sum.rpm_prom,0)+'/'+nn(sum.rpm_max,0)+'</span></div>'
+    +   '<div><span class="hg-lbl">Vel promedio/máx</span><span class="hg-val">'+nn(sum.spd_prom)+'/'+nn(sum.spd_max)+' km/h</span></div>'
+    +   '<div><span class="hg-lbl">RPM promedio/máx</span><span class="hg-val">'+nn(sum.rpm_prom,0)+'/'+nn(sum.rpm_max,0)+'</span></div>'
     +   '<div><span class="hg-lbl">G máx X/Y/Z</span><span class="hg-val">'+nn(sum.Gx_max,2)+'/'+nn(sum.Gy_max,2)+'/'+nn(sum.Gz_max,2)+'</span></div>'
     + '</div>'
 
-    + '<div class="hist-sec-title">Potencia / Corriente / Energía</div>'
+    + '<div class="hist-sec-title">Potencia / Corriente / Energía — promedio</div>'
     + '<div class="hist-grid" style="grid-template-columns:repeat(3,1fr)">'
-    +   '<div><span class="hg-lbl">P.HV prom/máx</span><span class="hg-val">'+nn(sum.p_hv_prom,0)+'/'+nn(sum.p_hv_max,0)+' W</span></div>'
-    +   '<div><span class="hg-lbl">P.Regen prom/máx</span><span class="hg-val">'+nn(sum.p_regen_prom,0)+'/'+nn(sum.p_regen_max,0)+' W</span></div>'
-    +   '<div><span class="hg-lbl">P.Mec prom/máx</span><span class="hg-val">'+nn(sum.p_mec_prom,0)+'/'+nn(sum.p_mec_max,0)+' W</span></div>'
-    +   '<div><span class="hg-lbl">Corr.batt prom/máx</span><span class="hg-val">'+nn(sum.curr_batt_prom)+'/'+nn(sum.curr_batt_max)+' A</span></div>'
-    +   '<div><span class="hg-lbl">Corr.regen prom/máx</span><span class="hg-val">'+nn(sum.curr_regen_prom)+'/'+nn(sum.curr_regen_max)+' A</span></div>'
-    +   '<div><span class="hg-lbl">E cons/regen prom</span><span class="hg-val">'+nn(sum.E_vuelta_prom,1)+'/'+nn(sum.E_regen_vuelta_prom,1)+' Wh</span></div>'
+    +   '<div><span class="hg-lbl">P.HV promedio/máx</span><span class="hg-val">'+nn(sum.p_hv_prom,0)+'/'+nn(sum.p_hv_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">P.Regen promedio/máx</span><span class="hg-val">'+nn(sum.p_regen_prom,0)+'/'+nn(sum.p_regen_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">P.Mec promedio/máx</span><span class="hg-val">'+nn(sum.p_mec_prom,0)+'/'+nn(sum.p_mec_max,0)+' W</span></div>'
+    +   '<div><span class="hg-lbl">Corr.batt promedio/máx</span><span class="hg-val">'+nn(sum.curr_batt_prom)+'/'+nn(sum.curr_batt_max)+' A</span></div>'
+    +   '<div><span class="hg-lbl">Corr.regen promedio/máx</span><span class="hg-val">'+nn(sum.curr_regen_prom)+'/'+nn(sum.curr_regen_max)+' A</span></div>'
+    +   '<div><span class="hg-lbl">E cons/regen promedio por vuelta</span><span class="hg-val">'+nn(sum.E_vuelta_prom,1)+'/'+nn(sum.E_regen_vuelta_prom,1)+' Wh</span></div>'
     + '</div>'
 
     + '<div class="hist-sec-title">Temperaturas máximas</div>'
@@ -661,7 +678,7 @@ function renderHistSummary(sum){
     + '<div class="hist-top3">'+topRow(sum.top_optimas,'','score')+'</div>'
 
     + '<div class="hist-sec-title" style="color:var(--orange)">Tabla de vueltas (idéntica a la vista en vivo)</div>'
-    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Estado</span></div>'
+    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E cons/regen</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span></div>'
     + '<div>'+ (lapsRows || '<div class="laps-empty-msg">Sin vueltas registradas en esta sesión</div>') +'</div>'
 
     + '<button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>';
@@ -1139,23 +1156,37 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
-function lapCellRow(nLap, tVuelta, dVuelta, eV, eR, etaV, estado, extraClass){
+function fmtMP(mx, pr, dec){
+  dec = dec!=null?dec:0;
+  var m = (mx!=null) ? mx.toFixed(dec) : '—';
+  var p = (pr!=null) ? pr.toFixed(dec) : '—';
+  return m+'/'+p;
+}
+
+function lapCellRow(nLap, tVuelta, deltaMejor, dVuelta, eV, eR, etaV, velMax, velProm, phvMax, phvProm, pregenMax, pregenProm, pmecMax, pmecProm, gxMax, gyMax, rpmMax, rpmProm, estado, extraClass){
   var row = document.createElement('div');
   row.className = 'lap-row'+(extraClass?' '+extraClass:'');
+  var deltaStr = (deltaMejor==null) ? '—' : (deltaMejor===0 ? '—' : '+'+deltaMejor.toFixed(1)+'s');
   row.innerHTML =
     '<div class="lap-cell">'+nLap+'</div>' +
     '<div class="lap-cell">'+tVuelta+'<span class="lc-unit"> s</span></div>' +
+    '<div class="lap-cell">'+deltaStr+'</div>' +
     '<div class="lap-cell">'+dVuelta+'<span class="lc-unit"> km</span></div>' +
-    '<div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div>' +
-    '<div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div>' +
+    '<div class="lap-cell">'+eV+'/'+eR+'<span class="lc-unit"> Wh</span></div>' +
     '<div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div>' +
+    '<div class="lap-cell">'+fmtMP(velMax,velProm,1)+'<span class="lc-unit"> km/h</span></div>' +
+    '<div class="lap-cell">'+fmtMP(phvMax,phvProm)+'<span class="lc-unit"> W</span></div>' +
+    '<div class="lap-cell">'+fmtMP(pregenMax,pregenProm)+'<span class="lc-unit"> W</span></div>' +
+    '<div class="lap-cell">'+fmtMP(pmecMax,pmecProm)+'<span class="lc-unit"> W</span></div>' +
+    '<div class="lap-cell">'+((gxMax!=null)?gxMax.toFixed(2):'—')+'</div>' +
+    '<div class="lap-cell">'+((gyMax!=null)?gyMax.toFixed(2):'—')+'</div>' +
+    '<div class="lap-cell">'+fmtMP(rpmMax,rpmProm)+'</div>' +
     '<div class="lap-cell">'+estado+'</div>';
   return row;
 }
 
-function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual, nOpt){
+function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual, nOpt, d){
   var wrap=document.getElementById('laps-cells');
-  var empty=document.getElementById('laps-empty-msg');
   if(!armado && (!laps || laps.length===0)){
     wrap.innerHTML='<div class="laps-empty-msg" id="laps-empty-msg">Esperando primer cruce de meta…</div>';
     return;
@@ -1166,14 +1197,36 @@ function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenAc
     var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
     var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
     var cls = (nOpt!=null && l.n_lap===nOpt) ? 'optimal' : '';
-    wrap.appendChild(lapCellRow(l.n_lap, l.t_vuelta.toFixed(1), l.d_vuelta.toFixed(3), eV, eR, etaV, 'Completa', cls));
+    wrap.appendChild(lapCellRow(
+      l.n_lap, l.t_vuelta.toFixed(1), l.delta_mejor, l.d_vuelta.toFixed(3), eV, eR, etaV,
+      l.vel_max, l.vel_prom, l.p_hv_max, l.p_hv_prom, l.p_regen_max, l.p_regen_prom,
+      l.p_mec_max, l.p_mec_prom, l.Gx_max, l.Gy_max, l.rpm_max, l.rpm_prom,
+      'Completa', cls
+    ));
   });
   if(armado){
     var eVA = (eActual!=null) ? eActual.toFixed(2) : '—';
     var eRA = (eRegenActual!=null) ? eRegenActual.toFixed(2) : '—';
-    wrap.appendChild(lapCellRow(nLap+1, tActual.toFixed(1), dActual.toFixed(3), eVA, eRA, '—', 'En curso…', 'current'));
+    wrap.appendChild(lapCellRow(
+      nLap+1, tActual.toFixed(1), null, dActual.toFixed(3), eVA, eRA, '—',
+      d.vel_max_actual, d.vel_prom_actual, d.p_hv_max_actual, d.p_hv_prom_actual,
+      d.p_regen_max_actual, d.p_regen_prom_actual, d.p_mec_max_actual, d.p_mec_prom_actual,
+      d.Gx_max_actual, d.Gy_max_actual, d.rpm_max_actual, d.rpm_prom_actual,
+      'En curso…', 'current'
+    ));
   }
 }
+
+var lastSessionId = null;
+var sessionStartTime = null;
+function updateSessionClock(){
+  var el = document.getElementById('est-duracion');
+  if(!el || sessionStartTime==null){ if(el) el.textContent='00:00'; return; }
+  var s = Math.floor((Date.now()-sessionStartTime)/1000);
+  var m = Math.floor(s/60), r = s%60;
+  el.textContent = String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');
+}
+setInterval(updateSessionClock, 1000);
 
 function renderEstimates(dRest, nRest, tRest){
   document.getElementById('est-drest').innerHTML = (dRest!=null ? dRest.toFixed(2) : '—') + '<span style="font-size:11px;color:var(--muted)"> km</span>';
@@ -1226,13 +1279,17 @@ function updateDashboard(payload){
 
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
-  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt);
+  renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt, d);
   renderEstimates(d.d_rest, d.n_rest, d.t_rest);
   updateLapSummary(!!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), d.laps, d.n_rest, d.t_rest, d.n_opt);
 
   document.getElementById('sub-ts').textContent = ts;
   document.getElementById('sub-veh').textContent = payload.vehicle_id != null ? payload.vehicle_id : '—';
   document.getElementById('sub-sess').textContent = payload.session_id != null ? payload.session_id : '—';
+  if(payload.session_id != null && payload.session_id !== lastSessionId){
+    lastSessionId = payload.session_id;
+    sessionStartTime = Date.now();
+  }
   setMgtConn(d.mgt_conectado);
 
   updateRev(rpm/5000);
