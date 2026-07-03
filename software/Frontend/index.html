@@ -6,7 +6,6 @@
   <title>Fénix — Página Principal (Demo 44 var)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.27.0/plotly.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -771,8 +770,9 @@ var rcg=document.getElementById('rcells');
 for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="rc'+i+'">—</div>';rcg.appendChild(d);}
 
 var WMS=15000;
-function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}},tooltip:{backgroundColor:'#0d0d0d',borderColor:'#333',borderWidth:1,titleColor:'#ccc',bodyColor:'#f0f0f0',titleFont:{family:'Share Tech Mono',size:10},bodyFont:{family:'Share Tech Mono',size:10},padding:8}},scales}});}
-var sx={type:'time',time:{unit:'second',displayFormats:{second:'HH:mm:ss'}},ticks:{color:'#888',maxTicksLimit:6,font:{size:8}},grid:{color:'#0d0d0d'}};
+function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}},tooltip:{backgroundColor:'#0d0d0d',borderColor:'#333',borderWidth:1,titleColor:'#ccc',bodyColor:'#f0f0f0',titleFont:{family:'Share Tech Mono',size:10},bodyFont:{family:'Share Tech Mono',size:10},padding:8,callbacks:{title:function(items){return items.length?fmtHMS(items[0].parsed.x):'';}}}},scales}});}
+function fmtHMS(ms){var d=new Date(ms);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');}
+var sx={type:'linear',ticks:{color:'#888',maxTicksLimit:6,font:{size:8},callback:function(v){return fmtHMS(v);}},grid:{color:'#0d0d0d'}};
 var cA=mkChart('chart-a',[
   {label:'Vel km/h',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yL'},
   {label:'RPM',data:[],borderColor:'#cc4055',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yRPM'},
