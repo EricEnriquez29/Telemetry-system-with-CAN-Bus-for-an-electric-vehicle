@@ -1167,10 +1167,10 @@ function updateDashboard(payload){
     document.getElementById('cs-delta').textContent=(vmax-vmin).toFixed(3);
   }
 
-  var currDescarga = curr_p<0 ? Math.abs(curr_p) : null;
-  var currRegen    = curr_p>0 ? curr_p : null;
-  var pHVval       = (p_hv!=null) ? p_hv : null;
-  var pRegenVal    = (d.p_regen!=null) ? d.p_regen : null;
+  var currDescarga = curr_p<0 ? Math.abs(curr_p) : 0;
+  var currRegen    = curr_p>0 ? curr_p : 0;
+  var pHVval       = (p_hv!=null) ? p_hv : 0;
+  var pRegenVal    = (d.p_regen!=null) ? d.p_regen : 0;
 
   push(cA,0,tms,spd); push(cA,1,tms,rpm); push(cA,2,tms,thr);
   push(cTM,0,tms,torq); push(cTM,1,tms,p_mec); push(cTM,2,tms,pHVval);
