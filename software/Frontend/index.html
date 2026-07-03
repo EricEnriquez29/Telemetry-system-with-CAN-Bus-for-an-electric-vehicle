@@ -168,6 +168,23 @@
     .horizon-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;}
     .horizon-lbl span{color:var(--cyan);font-weight:600;}
 
+    .laps-title-bar{text-align:center;border-bottom:2px solid var(--orange);padding-bottom:12px;margin-bottom:18px;}
+    .laps-title-big{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
+    .laps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:20px;}
+    .laps-stat-cell{background:#0a0a0a;padding:10px;text-align:center;}
+    .laps-stat-cell .lsc-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
+    .laps-stat-cell .lsc-val{font-size:20px;color:var(--text);}
+    .lap-row{display:grid;grid-template-columns:50px 1fr 1fr 1fr 1fr 1fr 100px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+    .lap-row-head{display:grid;grid-template-columns:50px 1fr 1fr 1fr 1fr 1fr 100px;gap:1px;margin-bottom:6px;}
+    .lap-row-head span{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;text-align:center;padding:0 6px;}
+    .lap-cell{background:#0d0d0d;padding:10px 8px;text-align:center;color:var(--text);}
+    .lap-cell .lc-unit{font-size:9px;color:var(--muted);}
+    .lap-row.optimal .lap-cell{color:var(--green);}
+    .lap-row.optimal .lap-cell:first-child::after{content:' ★';}
+    .lap-row.current{border-color:var(--orange);}
+    .lap-row.current .lap-cell{background:#150d05;color:var(--orange);font-weight:700;}
+    .laps-empty-msg{text-align:center;color:#666;padding:40px;font-size:13px;letter-spacing:1px;}
+
     ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:#050505;}::-webkit-scrollbar-thumb{background:#1e1e1e;}
   </style>
 </head>
@@ -247,7 +264,6 @@
         <div class="gm-gz">Gz: <span id="gm-gz-val">0.00</span> G</div>
       </div>
     </div>
-    
     <div class="subsec">Objeto 3D</div>
     <div class="horizon-wrap">
       <div id="horizon-3d" style="width:150px;height:120px;"></div>
@@ -419,18 +435,20 @@
 
 <div id="tab-1" style="display:none;">
   <div class="laps-wrap">
-    <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
-    <div class="laps-estimates" id="laps-estimates">
-      <span>Distancia restante: <b id="est-drest">—</b> km</span>
-      <span>Vueltas restantes: <b id="est-nrest">—</b></span>
-      <span>Tiempo restante: <b id="est-trest">—</b> s</span>
+    <div class="laps-title-bar"><span class="laps-title-big">Tabla de Vueltas — Sesión Actual</span></div>
+
+    <div class="laps-stats">
+      <div class="laps-stat-cell"><span class="lsc-label">Distancia restante</span><span class="lsc-val" id="est-drest">—</span></div>
+      <div class="laps-stat-cell"><span class="lsc-label">Vueltas restantes</span><span class="lsc-val" id="est-nrest">—</span></div>
+      <div class="laps-stat-cell"><span class="lsc-label">Tiempo restante</span><span class="lsc-val" id="est-trest">—</span></div>
     </div>
-    <table class="laps-table">
-      <thead><tr><th>Vuelta</th><th>Tiempo (s)</th><th>Distancia (km)</th><th>E consumida (Wh)</th><th>E regenerada (Wh)</th><th>Eficiencia (Wh/km)</th><th>Estado</th></tr></thead>
-      <tbody id="laps-tbody">
-        <tr class="laps-empty-row" id="laps-empty-row"><td colspan="7">Esperando cruces de meta…</td></tr>
-      </tbody>
-    </table>
+
+    <div class="lap-row-head">
+      <span>Vuelta</span><span>Tiempo</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Estado</span>
+    </div>
+    <div id="laps-cells">
+      <div class="laps-empty-msg" id="laps-empty-msg">Esperando cruces de meta…</div>
+    </div>
   </div>
 </div>
 
@@ -950,32 +968,46 @@ function connect(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
+function lapCellRow(nLap, tVuelta, dVuelta, eV, eR, etaV, estado, extraClass){
+  var row = document.createElement('div');
+  row.className = 'lap-row'+(extraClass?' '+extraClass:'');
+  row.innerHTML =
+    '<div class="lap-cell">'+nLap+'</div>' +
+    '<div class="lap-cell">'+tVuelta+'<span class="lc-unit"> s</span></div>' +
+    '<div class="lap-cell">'+dVuelta+'<span class="lc-unit"> km</span></div>' +
+    '<div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div>' +
+    '<div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div>' +
+    '<div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div>' +
+    '<div class="lap-cell">'+estado+'</div>';
+  return row;
+}
+
 function renderLapsTable(laps, armado, nLap, tActual, dActual, eActual, eRegenActual, nOpt){
-  var tbody=document.getElementById('laps-tbody');
+  var wrap=document.getElementById('laps-cells');
+  var empty=document.getElementById('laps-empty-msg');
   if(!armado && (!laps || laps.length===0)){
-    tbody.innerHTML='<tr class="laps-empty-row" id="laps-empty-row"><td colspan="7">Esperando primer cruce de meta…</td></tr>';
+    wrap.innerHTML='<div class="laps-empty-msg" id="laps-empty-msg">Esperando primer cruce de meta…</div>';
     return;
   }
-  var rows='';
+  wrap.innerHTML='';
   (laps||[]).forEach(function(l){
     var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
     var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
     var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
-    var cls = (nOpt!=null && l.n_lap===nOpt) ? ' class="laps-optimal"' : '';
-    rows += '<tr'+cls+'><td>'+l.n_lap+'</td><td>'+l.t_vuelta.toFixed(1)+'</td><td>'+l.d_vuelta.toFixed(3)+'</td><td>'+eV+'</td><td>'+eR+'</td><td>'+etaV+'</td><td>Completa</td></tr>';
+    var cls = (nOpt!=null && l.n_lap===nOpt) ? 'optimal' : '';
+    wrap.appendChild(lapCellRow(l.n_lap, l.t_vuelta.toFixed(1), l.d_vuelta.toFixed(3), eV, eR, etaV, 'Completa', cls));
   });
   if(armado){
     var eVA = (eActual!=null) ? eActual.toFixed(2) : '—';
     var eRA = (eRegenActual!=null) ? eRegenActual.toFixed(2) : '—';
-    rows += '<tr class="laps-current"><td>'+(nLap+1)+'</td><td>'+tActual.toFixed(1)+'</td><td>'+dActual.toFixed(3)+'</td><td>'+eVA+'</td><td>'+eRA+'</td><td>—</td><td>En curso…</td></tr>';
+    wrap.appendChild(lapCellRow(nLap+1, tActual.toFixed(1), dActual.toFixed(3), eVA, eRA, '—', 'En curso…', 'current'));
   }
-  tbody.innerHTML = rows;
 }
 
 function renderEstimates(dRest, nRest, tRest){
-  document.getElementById('est-drest').textContent = (dRest!=null) ? dRest.toFixed(2) : '—';
+  document.getElementById('est-drest').innerHTML = (dRest!=null ? dRest.toFixed(2) : '—') + '<span style="font-size:11px;color:var(--muted)"> km</span>';
   document.getElementById('est-nrest').textContent = (nRest!=null) ? nRest.toFixed(1) : '—';
-  document.getElementById('est-trest').textContent = (tRest!=null) ? tRest.toFixed(0) : '—';
+  document.getElementById('est-trest').innerHTML = (tRest!=null ? tRest.toFixed(0) : '—') + '<span style="font-size:11px;color:var(--muted)"> s</span>';
 }
 
 function updateLapSummary(armado, nLap, tActual, laps, nRest, tRest, nOpt){
