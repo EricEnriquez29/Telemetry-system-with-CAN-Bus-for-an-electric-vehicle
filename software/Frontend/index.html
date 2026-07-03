@@ -1177,6 +1177,7 @@ function setConn(connected){
   if(lbl){ lbl.textContent = connected ? 'Servidor conectado' : 'Servidor reconectando…'; }
 }
 
+var lastMgtConnected = null;
 function setMgtConn(connected){
   var dot=document.getElementById('mgt-dot');
   var lbl=document.getElementById('mgt-label');
@@ -1184,10 +1185,20 @@ function setMgtConn(connected){
   if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); }
   else if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
   else{ dot.classList.remove('connected'); lbl.textContent='MGT desconectado'; }
+
+  if(connected===true && lastMgtConnected===false){
+    console.warn('MGT reconectado — limpiando estado del frontend');
+    pendingPayload = null;
+    gmTrail = []; sagTrail = []; pmTrail = [];
+    lastMsgTime = Date.now();
+  }
+  lastMgtConnected = connected;
 }
 
 function connect(){
-  try{ if(ws){ ws.onclose=null; ws.onerror=null; ws.close(); } }catch(e){}
+  try{
+    if(ws){ ws.onopen=null; ws.onclose=null; ws.onerror=null; ws.onmessage=null; ws.close(); }
+  }catch(e){}
   ws = new WebSocket(WS_URL);
   ws.onopen = ()=>{ setConn(true); lastMsgTime = Date.now(); };
   ws.onmessage = (event)=>{
