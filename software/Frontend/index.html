@@ -239,8 +239,6 @@
     <div class="row"><span class="rl-key">Corriente Aux</span><span class="rl-val" id="d-iaux" style="color:var(--text)">0<span class="rl-unit">A</span></span></div>
     <div class="row"><span class="rl-key">SOC Aux</span><span class="rl-val" id="d-socaux" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
     <div class="row"><span class="rl-key">P. Aux</span><span class="rl-val" id="d-paux" style="color:var(--yellow)">0<span class="rl-unit">W</span></span></div>
-    <div class="row"><span class="rl-key">E. Aux</span><span class="rl-val" id="d-eaux" style="color:var(--yellow)">0<span class="rl-unit">Wh</span></span></div>
-    <div class="row"><span class="rl-key">Q. Aux</span><span class="rl-val" id="d-qaux" style="color:var(--yellow)">0<span class="rl-unit">Ah</span></span></div>
 
     <div class="sec src">Modulo de dinamica vehicular</div>
     <div id="gmeter-slot">
@@ -249,12 +247,8 @@
         <div class="gm-gz">Gz: <span id="gm-gz-val">0.00</span> G</div>
       </div>
     </div>
-    <div class="subsec">Giroscopio </div>
-    <div class="row"><span class="rl-key">Gyro X</span><span class="rl-val" id="d-gx" style="color:var(--red)">0<span class="rl-unit">°/s</span></span></div>
-    <div class="row"><span class="rl-key">Gyro Y</span><span class="rl-val" id="d-gy" style="color:var(--blue)">0<span class="rl-unit">°/s</span></span></div>
-    <div class="row"><span class="rl-key">Gyro Z</span><span class="rl-val" id="d-gz" style="color:var(--green)">0<span class="rl-unit">°/s</span></span></div>
-
-    <div class="subsec">Horizonte artificial</div>
+    
+    <div class="subsec">Objeto 3D</div>
     <div class="horizon-wrap">
       <div id="horizon-3d" style="width:150px;height:120px;"></div>
       <div class="horizon-lbl">Roll: <span id="hz-roll">0.0°</span> · Pitch: <span id="hz-pitch">0.0°</span></div>
@@ -811,7 +805,7 @@ function drawPMRPM(rpm,pmec,eta){
 setTimeout(pmResize,100);
 window.addEventListener('resize',pmResize);
 
-// ── Horizonte artificial 3D (Three.js) — pitch/roll del vehículo ──
+// ── Objeto 3D (Three.js) — pitch/roll del vehículo ──
 var hzScene = new THREE.Scene();
 var hzCamera = new THREE.PerspectiveCamera(40, 150/120, 0.1, 100);
 hzCamera.position.set(3.2, 2.3, 3.8);
@@ -1075,12 +1069,7 @@ function updateDashboard(payload){
   document.getElementById('d-iaux').innerHTML=iaux.toFixed(1)+'<span class="rl-unit">A</span>';
   document.getElementById('d-socaux').innerHTML=(d.soc_aux!=null?num(d.soc_aux).toFixed(1):'—')+'<span class="rl-unit">%</span>';
   document.getElementById('d-paux').innerHTML=num(d.p_aux).toFixed(1)+'<span class="rl-unit">W</span>';
-  document.getElementById('d-eaux').innerHTML=num(d.E_aux).toFixed(1)+'<span class="rl-unit">Wh</span>';
-  document.getElementById('d-qaux').innerHTML=num(d.Q_aux).toFixed(2)+'<span class="rl-unit">Ah</span>';
 
-  document.getElementById('d-gx').innerHTML=num(d.gyro_x).toFixed(2)+'<span class="rl-unit">°/s</span>';
-  document.getElementById('d-gy').innerHTML=num(d.gyro_y).toFixed(2)+'<span class="rl-unit">°/s</span>';
-  document.getElementById('d-gz').innerHTML=num(d.gyro_z).toFixed(2)+'<span class="rl-unit">°/s</span>';
 
   var Gx=num(d.Gx), Gy=num(d.Gy), Gz=num(d.Gz);
   drawGMeter(Gx,Gy);
