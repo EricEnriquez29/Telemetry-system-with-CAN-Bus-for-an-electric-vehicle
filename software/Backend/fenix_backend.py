@@ -199,6 +199,12 @@ def send_zero_snapshot():
     except Exception as e:
         print(f"[WD] Error POST: {e}", flush=True)
 
+    # ── Reprogramar: threading.Timer es de un solo disparo. Si seguimos sin
+    # datos MQTT, esto vuelve a llamar send_zero_snapshot() en WATCHDOG_TIMEOUT
+    # segundos, repitiendo hasta que llegue un mensaje real (que reprograma
+    # el watchdog normalmente vía reset_watchdog() en on_snapshot_message). ──
+    reset_watchdog()
+
 
 def reset_watchdog():
     """Reinicia el timer del watchdog. Llamar en cada on_message."""
