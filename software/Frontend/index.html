@@ -57,7 +57,9 @@
     .revbar{background:#050505;border-bottom:1px solid #111;height:14px;display:flex;align-items:center;justify-content:center;gap:3px;flex-shrink:0;}
     .rl{width:20px;height:8px;border-radius:1px;background:#111;transition:all 0.05s;}
 
-    .body{flex:1;display:grid;grid-template-columns:230px 1fr 260px;min-height:0;}
+    .body{flex:1;display:grid;grid-template-columns:230px 1fr 260px;min-height:0;position:relative;}
+    .body.mgt-offline::before{content:'⚠ MGT DESCONECTADO — datos congelados, no en vivo';position:absolute;top:0;left:0;right:0;z-index:500;background:var(--red);color:#fff;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;padding:5px;}
+    .body.mgt-offline{filter:grayscale(0.6) brightness(0.6);}
 
     .sidebar{background:var(--col1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
     .sidebar-right{border-right:none;border-left:1px solid var(--border);}
@@ -625,12 +627,14 @@ function nn(v, dec){ return (v==null) ? '—' : v.toFixed(dec!=null?dec:1); }
 
 function renderHistSummary(sum){
   var laps = sum.laps || [];
+  var nOptHist = (sum.top_optimas && sum.top_optimas.length>0) ? sum.top_optimas[0].n_lap : null;
   var lapsRows = laps.map(function(l){
     var eV = (l.E_vuelta!=null) ? l.E_vuelta.toFixed(2) : '—';
     var eR = (l.E_regen_vuelta!=null) ? l.E_regen_vuelta.toFixed(2) : '—';
     var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
     var deltaStr = (l.delta_mejor==null) ? '—' : (l.delta_mejor===0 ? '—' : '+'+l.delta_mejor.toFixed(1)+'s');
-    return '<div class="lap-row">'
+    var cls = (nOptHist!=null && l.n_lap===nOptHist) ? ' optimal' : '';
+    return '<div class="lap-row'+cls+'">'
       +'<div class="lap-cell">'+l.n_lap+'</div>'
       +'<div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div>'
       +'<div class="lap-cell">'+deltaStr+'</div>'
@@ -1164,10 +1168,15 @@ function setConn(connected){
 function setMgtConn(connected){
   var dot=document.getElementById('mgt-dot');
   var lbl=document.getElementById('mgt-label');
+  var body=document.querySelector('#tab-0 .body');
   if(!dot||!lbl) return;
-  if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); return; }
-  if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
+  if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); }
+  else if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
   else{ dot.classList.remove('connected'); lbl.textContent='MGT desconectado'; }
+  if(body){
+    if(connected===true){ body.classList.remove('mgt-offline'); }
+    else{ body.classList.add('mgt-offline'); }
+  }
 }
 
 function connect(){
