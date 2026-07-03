@@ -1156,6 +1156,19 @@ updateHorizon(0,0);
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 let lastMsgTime = Date.now();
+let pendingPayload = null;
+
+// ── Renderiza el ÚLTIMO payload recibido a ritmo fijo (~4Hz), en vez de una
+// vez por cada mensaje MQTT (10Hz). Evita que el navegador se sature con
+// horas de sesión y termine "atorado" hasta refrescar. ──
+setInterval(function(){
+  if(pendingPayload){
+    var p = pendingPayload;
+    pendingPayload = null;
+    try{ updateDashboard(p); }catch(e){ console.error('Error en updateDashboard:', e); }
+  }
+}, 100);
+
 
 function setConn(connected){
   var dot=document.getElementById('ws-dot');
@@ -1177,7 +1190,10 @@ function connect(){
   try{ if(ws){ ws.onclose=null; ws.onerror=null; ws.close(); } }catch(e){}
   ws = new WebSocket(WS_URL);
   ws.onopen = ()=>{ setConn(true); lastMsgTime = Date.now(); };
-  ws.onmessage = (event)=>{ lastMsgTime = Date.now(); try{ updateDashboard(JSON.parse(event.data)); }catch(e){ console.error(e); } };
+  ws.onmessage = (event)=>{
+    lastMsgTime = Date.now();
+    try{ pendingPayload = JSON.parse(event.data); }catch(e){ console.error(e); }
+  };
   ws.onclose = ()=>{ setConn(false); setTimeout(connect,2000); };
   ws.onerror = ()=>{ try{ ws.close(); }catch(e){} };
 }
