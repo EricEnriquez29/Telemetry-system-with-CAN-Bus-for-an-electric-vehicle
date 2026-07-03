@@ -1155,6 +1155,7 @@ updateHorizon(0,0);
 
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
+let lastMsgTime = Date.now();
 
 function setConn(connected){
   var dot=document.getElementById('ws-dot');
@@ -1174,11 +1175,20 @@ function setMgtConn(connected){
 
 function connect(){
   ws = new WebSocket(WS_URL);
-  ws.onopen = ()=>setConn(true);
-  ws.onmessage = (event)=>{ try{ updateDashboard(JSON.parse(event.data)); }catch(e){ console.error(e); } };
+  ws.onopen = ()=>{ setConn(true); lastMsgTime = Date.now(); };
+  ws.onmessage = (event)=>{ lastMsgTime = Date.now(); try{ updateDashboard(JSON.parse(event.data)); }catch(e){ console.error(e); } };
   ws.onclose = ()=>{ setConn(false); setTimeout(connect,2000); };
   ws.onerror = ()=>ws.close();
 }
+
+// ── Watchdog: si el socket se queda "colgado" sin cerrar, forzar reconexión ──
+setInterval(function(){
+  if(ws && ws.readyState===WebSocket.OPEN && (Date.now()-lastMsgTime)>8000){
+    console.warn('WS sin datos por 8s, forzando reconexión');
+    ws.close();
+  }
+}, 3000);
+
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
