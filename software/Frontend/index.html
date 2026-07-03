@@ -9,6 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#080808;--col1:#0d0d0d;--sep:#1e1e1e;--border:#222;--text:#f0f0f0;--muted:#b0b0b0;
@@ -16,17 +17,13 @@
     *{margin:0;padding:0;box-sizing:border-box;}
     body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 
-    /* Encabezado grande */
     .title-bar{text-align:center;border-bottom:2px solid var(--orange);padding:12px 0 10px;}
     .title{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
     .subheader{display:flex;justify-content:center;align-items:center;gap:24px;padding:8px 0;font-size:12px;color:var(--muted);border-bottom:1px solid #1a1a1a;}
-    /* Botón hamburguesa */
     .menu-btn{position:fixed;top:10px;left:12px;z-index:1002;background:#120c08;border:1px solid var(--orange);color:var(--orange);width:38px;height:32px;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
     .menu-btn span{display:block;width:18px;height:2px;background:var(--orange);}
-    /* Overlay */
     .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;opacity:0;visibility:hidden;transition:opacity 0.2s;}
     .menu-overlay.open{opacity:1;visibility:visible;}
-    /* Drawer lateral */
     .menu-drawer{position:fixed;top:0;left:0;bottom:0;width:240px;background:#0d0d0d;border-right:2px solid var(--orange);z-index:1001;transform:translateX(-100%);transition:transform 0.25s ease;display:flex;flex-direction:column;}
     .menu-drawer.open{transform:translateX(0);}
     .menu-drawer-title{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--orange);letter-spacing:2px;padding:16px 16px 16px 62px;border-bottom:1px solid var(--sep);text-transform:uppercase;}
@@ -80,33 +77,27 @@
 
     .center{display:flex;flex-direction:column;overflow:hidden;background:#060606;}
 
-    /* Fila de gauges principales */
     .gauges-main{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:start;padding:8px 12px 0;gap:4px;}
     .gauge-col{display:flex;flex-direction:column;align-items:center;margin-top:8px;}
     .gauge-plotly{width:100%;max-width:300px;height:175px;}
     .soc-row{display:flex;justify-content:center;align-items:center;gap:32px;padding:4px 0 6px;border-top:1px solid var(--sep);border-bottom:1px solid var(--sep);}
     .gauge-label{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:-6px;}
 
-    /* SOC central */
     .soc-center{display:flex;flex-direction:column;align-items:center;gap:6px;}
     .soc-cap{font-size:9px;color:var(--muted);letter-spacing:1px;}
     .odo-box{text-align:center;}
     .odo-val{font-family:'Orbitron',monospace;font-size:16px;color:var(--cyan);}
     .odo-lbl{font-size:8px;color:var(--muted);letter-spacing:2px;}
 
-    /* Contactor */
     .contactor{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:2px;}
     .cont-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;}
 
-    /* Termómetros tipo pastilla horizontal */
     .thermos{display:flex;justify-content:center;align-items:flex-start;gap:14px;padding:10px 0 6px;}
     .thermo{display:flex;flex-direction:column;align-items:center;gap:5px;}
     .thermo-tube{width:110px;height:22px;background:#0a0a0a;border-radius:11px;position:relative;overflow:hidden;border:2px solid #1a1a1a;box-shadow:inset 0 1px 3px rgba(0,0,0,0.6);}
     .thermo-fill{position:absolute;top:0;bottom:0;left:0;border-radius:11px;transition:width 0.3s,background 0.3s;width:0%;min-width:22px;}
     .thermo-val{font-size:12px;font-weight:600;}
     .thermo-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
-
-    /* Barras Throttle/Brake (pedales) */
 
     .tb-prow{display:flex;align-items:center;gap:12px;}
     .tb-plbl{font-size:10px;letter-spacing:2px;width:90px;text-align:right;}
@@ -138,7 +129,6 @@
     .pmrpm-bar{flex:1;width:10px;border-radius:5px;background:linear-gradient(to top,#2266cc,#3ba776,#c2a838,#cc4055);}
     .pmrpm-cap{margin-top:2px;writing-mode:vertical-rl;color:var(--muted);letter-spacing:1px;}
 
-    /* Mapa */
     .map-box{padding:6px;}
     .map-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
     .meta-details{margin-top:6px;font-family:'Share Tech Mono',monospace;border:1px solid var(--sep);border-radius:2px;}
@@ -174,12 +164,15 @@
     .cs-lbl{font-size:8px;color:var(--muted);}
     .cs-val{font-size:13px;font-weight:600;}
 
+    .horizon-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 10px;}
+    .horizon-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;}
+    .horizon-lbl span{color:var(--cyan);font-weight:600;}
+
     ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:#050505;}::-webkit-scrollbar-thumb{background:#1e1e1e;}
   </style>
 </head>
 <body>
 
-<!-- Pantalla de carga -->
 <div id="loading-screen" style="
   position:fixed; inset:0; background:#0d0d0d; z-index:9999;
   display:flex; flex-direction:column;
@@ -218,7 +211,6 @@
   <div class="menu-item" onclick="switchTab(2)">Ploteo</div>
 </div>
 
-<!-- ══ Pestaña 0: Principal ══ -->
 <div id="tab-0">
 
 <div class="revbar" id="revbar">
@@ -228,7 +220,6 @@
 
 <div class="body">
 
-  <!-- ══ Sidebar izquierda ══ -->
   <div class="sidebar">
 
     <div class="sec src">Controlador / Motor</div>
@@ -248,6 +239,8 @@
     <div class="row"><span class="rl-key">Corriente Aux</span><span class="rl-val" id="d-iaux" style="color:var(--text)">0<span class="rl-unit">A</span></span></div>
     <div class="row"><span class="rl-key">SOC Aux</span><span class="rl-val" id="d-socaux" style="color:var(--green)">—<span class="rl-unit">%</span></span></div>
     <div class="row"><span class="rl-key">P. Aux</span><span class="rl-val" id="d-paux" style="color:var(--yellow)">0<span class="rl-unit">W</span></span></div>
+    <div class="row"><span class="rl-key">E. Aux</span><span class="rl-val" id="d-eaux" style="color:var(--yellow)">0<span class="rl-unit">Wh</span></span></div>
+    <div class="row"><span class="rl-key">Q. Aux</span><span class="rl-val" id="d-qaux" style="color:var(--yellow)">0<span class="rl-unit">Ah</span></span></div>
 
     <div class="sec src">Modulo de dinamica vehicular</div>
     <div id="gmeter-slot">
@@ -256,12 +249,20 @@
         <div class="gm-gz">Gz: <span id="gm-gz-val">0.00</span> G</div>
       </div>
     </div>
+    <div class="subsec">Giroscopio </div>
+    <div class="row"><span class="rl-key">Gyro X</span><span class="rl-val" id="d-gx" style="color:var(--red)">0<span class="rl-unit">°/s</span></span></div>
+    <div class="row"><span class="rl-key">Gyro Y</span><span class="rl-val" id="d-gy" style="color:var(--blue)">0<span class="rl-unit">°/s</span></span></div>
+    <div class="row"><span class="rl-key">Gyro Z</span><span class="rl-val" id="d-gz" style="color:var(--green)">0<span class="rl-unit">°/s</span></span></div>
+
+    <div class="subsec">Horizonte artificial</div>
+    <div class="horizon-wrap">
+      <div id="horizon-3d" style="width:150px;height:120px;"></div>
+      <div class="horizon-lbl">Roll: <span id="hz-roll">0.0°</span> · Pitch: <span id="hz-pitch">0.0°</span></div>
+    </div>
   </div>
 
-  <!-- ══ Centro ══ -->
   <div class="center">
 
-    <!-- Resumen de vueltas compacto -->
     <div class="lap-summary" id="lap-summary">
       <div class="lap-summary-cell ls-current"><span class="ls-label">Vuelta actual</span><span class="ls-val" id="ls-vuelta">—</span></div>
       <div class="lap-summary-cell ls-current"><span class="ls-label">Tiempo vuelta</span><span class="ls-val" id="ls-tvuelta">—</span></div>
@@ -273,7 +274,6 @@
       <div class="lap-summary-cell ls-best"><span class="ls-label">Mejor vuelta</span><span class="ls-val" id="ls-mejorvuelta">—</span></div>
     </div>
 
-    <!-- Gauges principales: 3 en línea -->
     <div class="gauges-main">
       <div class="gauge-col">
         <div id="gauge-spd" class="gauge-plotly"></div>
@@ -289,7 +289,6 @@
       </div>
     </div>
 
-    <!-- Throttle / Brake -->
     <div class="tb-pedals">
       <div class="tb-prow">
         <span class="tb-plbl" style="color:var(--orange)">ACELERADOR</span>
@@ -303,7 +302,6 @@
       </div>
     </div>
 
-    <!-- SOC + odómetro + contactor en fila -->
     <div class="soc-row">
       <div class="odo-box">
         <canvas id="odo-canvas" style="width:102px;height:31px;"></canvas>
@@ -319,7 +317,6 @@
       </div>
     </div>
 
-    <!-- Termómetros -->
     <div class="thermos">
       <div class="thermo">
         <div class="thermo-tube"><div class="thermo-fill" id="th-mot" style="width:0%"></div></div>
@@ -343,7 +340,6 @@
       </div>
     </div>
 
-    <!-- Charts -->
     <div class="charts">
       <div class="chart-block">
         <div class="cb-title"><span>Velocidad / RPM / Throttle</span><span class="cb-tag"></span></div>
@@ -372,9 +368,7 @@
     </div>
   </div>
 
-  <!-- ══ Sidebar derecha ══ -->
   <div class="sidebar sidebar-right">
-    <!-- Mapa arriba -->
     <div class="sec">GPS — Posición en pista</div>
     <div class="map-box">
       <div class="map-head"><span class="map-title-t">Pista</span><button class="map-btn" onclick="centerMap()">⊙ Centrar</button></div>
@@ -394,7 +388,6 @@
       </div>
     </details>
 
-    <!-- Celdas -->
     <div class="sec src">Baterías HV</div>
     <div class="cell-summary">
       <div class="cs-item"><div class="cs-lbl">V MAX</div><div class="cs-val" id="cs-max" style="color:var(--green)">—</div></div>
@@ -428,9 +421,8 @@
     <div class="cells-grid" id="rcells"></div>
   </div>
 </div>
-</div><!-- /tab-0 -->
+</div>
 
-<!-- ══ Pestaña 1: Tabla de Vueltas ══ -->
 <div id="tab-1" style="display:none;">
   <div class="laps-wrap">
     <div class="laps-head"><span class="laps-title">Tabla de Vueltas — Sesión Actual</span></div>
@@ -448,13 +440,11 @@
   </div>
 </div>
 
-<!-- ══ Pestaña 2: Ploteo ══ -->
 <div id="tab-2" style="display:none;">
   <div class="empty-tab">— Ploteo — en construcción —</div>
 </div>
 
 <script>
-// ── Menú lateral ──
 const menuItems=document.querySelectorAll('.menu-item');
 function toggleMenu(){
   document.getElementById('menu-drawer').classList.toggle('open');
@@ -474,12 +464,10 @@ function switchTab(i){
 
 setInterval(()=>{document.getElementById('sub-clock').textContent=new Date().toLocaleTimeString('es-MX');},1000);
 
-// Rev lights
 var rls=document.getElementById('revbar').children;
 var RLC=['#3ba776','#3ba776','#3ba776','#3ba776','#3ba776','#cc4055','#cc4055','#cc4055','#cc4055','#cc4055'];
 function updateRev(pct){var n=Math.floor(pct*10);for(var i=0;i<10;i++){rls[i].style.background=i<n?RLC[i]:'#111';rls[i].style.boxShadow=i<n?'0 0 6px '+RLC[i]:'none';}}
 
-// ── Plotly gauges ──
 function gaugeConfig(value,max,unit,color,steps){
   return [{
     type:"indicator",mode:"gauge+number",value:value,
@@ -503,7 +491,6 @@ Plotly.newPlot('gauge-rpm',gaugeConfig(0,5000,'rpm','#cc4055',[
   {range:[0,3000],color:'#0a1a1a'},{range:[3000,4000],color:'#1a1a0a'},{range:[4000,5000],color:'#1a0a0a'}
 ]),gaugeLayout,{displayModeBar:false,responsive:true});
 
-// ── Mapa Leaflet ──
 var GPS_CENTER=[20.736972,-103.484194];
 var map=L.map('map',{zoomControl:true,attributionControl:false}).setView(GPS_CENTER,18);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(map);
@@ -512,9 +499,8 @@ var marker=L.circleMarker(GPS_CENTER,{radius:6,color:'#fff',fillColor:'#d9621a',
 function centerMap(){map.setView(marker.getLatLng(),map.getZoom(),{animate:true,duration:0.5});}
 function updateMap(lat,lon){if(lat===0&&lon===0)return;marker.setLatLng([lat,lon]);}
 
-// ── Línea de meta ──
 var metaLine=null;
-var metaLineDrawn=null; // "latA,lonA,latB,lonB" ya dibujado, para no redibujar cada frame
+var metaLineDrawn=null;
 function drawMetaLine(latA,lonA,latB,lonB){
   if(latA==null||lonA==null||latB==null||lonB==null) return;
   var key=latA+','+lonA+','+latB+','+lonB;
@@ -550,7 +536,6 @@ function setMetaLine(){
     .catch(function(){ msg.textContent='No se pudo conectar al backend'; msg.className='meta-msg err'; });
 }
 
-// ── Termómetro helper ──
 function setThermo(prefix,val,max){
   var pct=Math.min(100,val/max*100);
   var col=val<max*0.6?'#3ba776':val<max*0.8?'#c2a838':'#cc4055';
@@ -559,13 +544,11 @@ function setThermo(prefix,val,max){
   document.getElementById('tv-'+prefix).textContent=val.toFixed(0)+'°';
 }
 
-// ── Celdas ──
 var cg=document.getElementById('cells');
 for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="cv'+i+'">—</div>';cg.appendChild(d);}
 var rcg=document.getElementById('rcells');
 for(var i=1;i<=16;i++){var d=document.createElement('div');d.className='cell-item';d.innerHTML='<div class="ci-n">C'+i+'</div><div class="ci-v" id="rc'+i+'">—</div>';rcg.appendChild(d);}
 
-// ── Charts ──
 var WMS=15000;
 function mkChart(id,datasets,scales){return new Chart(document.getElementById(id).getContext('2d'),{type:'line',data:{datasets},options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:8,font:{size:9,family:'Share Tech Mono'},color:'#ccc'}}},scales}});}
 var sx={type:'time',time:{unit:'second',displayFormats:{second:'HH:mm:ss'}},ticks:{color:'#888',maxTicksLimit:6,font:{size:8}},grid:{color:'#0d0d0d'}};
@@ -586,7 +569,6 @@ var cPWR=mkChart('chart-pwr',[
 ],{x:sx,yW2:{position:'left',min:0,suggestedMax:10000,ticks:{color:'#a85cc0',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yA2:{position:'left',min:0,max:200,display:false},yT2:{position:'right',min:0,max:100,ticks:{color:'#d9621a',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
 function push(ch,di,ts,v){var now=new Date(ts).getTime()||Date.now();ch.data.datasets[di].data.push({x:now,y:v});while(ch.data.datasets[di].data.length>0&&ch.data.datasets[di].data[0].x<now-WMS)ch.data.datasets[di].data.shift();}
 
-// ── Ícono batería (canvas, 10 segmentos) HiDPI 3x ──
 var battCv=document.getElementById('batt-canvas'),battCtx=battCv.getContext('2d');
 var BATT_W=122,BATT_H=77,BATT_SCALE=3;
 battCv.width=BATT_W*BATT_SCALE;battCv.height=BATT_H*BATT_SCALE;
@@ -597,12 +579,9 @@ function drawBattery(percent){
   var segments=10;
   var x=6,y=10,w=W-33,h=H-34;
   var terminalW=6,terminalH=h*0.45;
-  // contorno
   battCtx.strokeStyle="#fff";battCtx.lineWidth=2.5;
   battCtx.beginPath();battCtx.roundRect(x,y,w,h,5);battCtx.stroke();
-  // terminal
   battCtx.beginPath();battCtx.roundRect(x+w,y+(h-terminalH)/2,terminalW,terminalH,2);battCtx.stroke();
-  // segmentos
   var innerPad=4,gap=1.5;
   var usableW=w-innerPad*2-gap*(segments-1);
   var segW=usableW/segments;
@@ -619,18 +598,15 @@ function drawBattery(percent){
     }
   }
   battCtx.shadowBlur=0;
-  // texto %
   battCtx.fillStyle="#fff";battCtx.font="bold 17px Orbitron";battCtx.textAlign="center";
   battCtx.fillText(percent+"%",W/2,H-6);
 }
 drawBattery(0);
 
-// ── Display LCD 7 segmentos para odómetro ──
 var odoCv=document.getElementById('odo-canvas'),odoCtx=odoCv.getContext('2d');
 var ODO_W=102,ODO_H=31,ODO_SCALE=3,ODO_DIGITS=6;
 odoCv.width=ODO_W*ODO_SCALE;odoCv.height=ODO_H*ODO_SCALE;
 odoCtx.scale(ODO_SCALE,ODO_SCALE);
-// mapa de segmentos por dígito (a,b,c,d,e,f,g)
 var SEG_MAP={
   '0':[1,1,1,1,1,1,0],'1':[0,1,1,0,0,0,0],'2':[1,1,0,1,1,0,1],
   '3':[1,1,1,1,0,0,1],'4':[0,1,1,0,0,1,1],'5':[1,0,1,1,0,1,1],
@@ -638,12 +614,10 @@ var SEG_MAP={
   '9':[1,1,1,1,0,1,1],' ':[0,0,0,0,0,0,0]
 };
 function drawSeg(ctx,x,y,w,h,on,onColor,offColor){
-  // un dígito de 7 segmentos
-  var t=Math.max(2.2,w*0.16);   // grosor
-  var p=t*0.55;                 // gap entre segmentos
+  var t=Math.max(2.2,w*0.16);
+  var p=t*0.55;
   var col=on?onColor:offColor;
   ctx.fillStyle=col;
-  // helper para polígono horizontal
   function hseg(cx,cy){
     ctx.beginPath();
     ctx.moveTo(cx-w/2+p, cy);
@@ -665,30 +639,21 @@ function drawSeg(ctx,x,y,w,h,on,onColor,offColor){
     ctx.closePath();ctx.fill();
   }
   var cx=x+w/2, halfH=(h-t)/4;
-  // a (top)
   ctx.fillStyle=on[0]?onColor:offColor; hseg(cx,y+t/2);
-  // b (top-right)
   ctx.fillStyle=on[1]?onColor:offColor; vseg(x+w-t/2,y+h/4+t/4,halfH);
-  // c (bottom-right)
   ctx.fillStyle=on[2]?onColor:offColor; vseg(x+w-t/2,y+3*h/4-t/4,halfH);
-  // d (bottom)
   ctx.fillStyle=on[3]?onColor:offColor; hseg(cx,y+h-t/2);
-  // e (bottom-left)
   ctx.fillStyle=on[4]?onColor:offColor; vseg(x+t/2,y+3*h/4-t/4,halfH);
-  // f (top-left)
   ctx.fillStyle=on[5]?onColor:offColor; vseg(x+t/2,y+h/4+t/4,halfH);
-  // g (middle)
   ctx.fillStyle=on[6]?onColor:offColor; hseg(cx,y+h/2);
 }
 function drawOdo(value){
   var W=ODO_W,H=ODO_H;
   odoCtx.clearRect(0,0,W,H);
-  // fondo gris tipo LCD
   odoCtx.fillStyle="#aaaaa0";
   odoCtx.beginPath();odoCtx.roundRect(2,2,W-4,H-4,5);odoCtx.fill();
   odoCtx.strokeStyle="#33332a";odoCtx.lineWidth=2;
   odoCtx.beginPath();odoCtx.roundRect(2,2,W-4,H-4,5);odoCtx.stroke();
-  // string con padding a 6 dígitos
   var str=String(Math.floor(value)).padStart(ODO_DIGITS,'0');
   if(str.length>ODO_DIGITS) str=str.slice(-ODO_DIGITS);
   var padX=10, dW=(W-padX*2)/ODO_DIGITS, dH=H-16;
@@ -702,7 +667,6 @@ function drawOdo(value){
 }
 drawOdo(0);
 
-// ── Ícono contactor (canvas) HiDPI 3x ──
 var contCv=document.getElementById('cont-canvas'),contCtx=contCv.getContext('2d');
 var CONT_SZ=43,CONT_SCALE=3;
 contCv.width=CONT_SZ*CONT_SCALE;contCv.height=CONT_SZ*CONT_SCALE;
@@ -711,7 +675,6 @@ function drawContactor(cerrado){
   var W=CONT_SZ,H=CONT_SZ,cx=W/2,cy=H/2;
   var R=W*0.42,lw=W*0.10,jR=W*0.10,ijR=W*0.045;
   contCtx.clearRect(0,0,W,H);
-  // círculo
   contCtx.beginPath();contCtx.arc(cx,cy,R,0,Math.PI*2);
   contCtx.fillStyle=cerrado?'#0052B4':'#D30000';contCtx.fill();
   contCtx.lineWidth=2.5;contCtx.strokeStyle='#fff';contCtx.stroke();
@@ -732,56 +695,46 @@ function drawContactor(cerrado){
 }
 drawContactor(true);
 
-// ── G-meter Gx/Gy (HiDPI 3x) ──
 var gmCv=document.getElementById('gmeter-canvas'),gmCtx=gmCv.getContext('2d');
-var GM_SZ=150,GM_SCALE=3,GM_GMAX=2.0;  // rango ±2G
+var GM_SZ=150,GM_SCALE=3,GM_GMAX=2.0;
 gmCv.width=GM_SZ*GM_SCALE;gmCv.height=GM_SZ*GM_SCALE;gmCtx.scale(GM_SCALE,GM_SCALE);
 var gmTrail=[];
 function drawGMeter(gx,gy){
   var W=GM_SZ,H=GM_SZ,cx=W/2,cy=H/2,R=W/2-10;
   gmCtx.clearRect(0,0,W,H);
-  // anillos
   gmCtx.strokeStyle='#1a1a1a';gmCtx.lineWidth=1;
   for(var r=1;r<=2;r++){
     gmCtx.beginPath();gmCtx.arc(cx,cy,R*r/2,0,Math.PI*2);gmCtx.stroke();
   }
-  // cruz
   gmCtx.beginPath();gmCtx.moveTo(cx-R,cy);gmCtx.lineTo(cx+R,cy);
   gmCtx.moveTo(cx,cy-R);gmCtx.lineTo(cx,cy+R);gmCtx.stroke();
-  // etiquetas
   gmCtx.fillStyle='#999';gmCtx.font='7px Share Tech Mono';gmCtx.textAlign='center';
   gmCtx.fillText('ACEL',cx,cy-R-2);gmCtx.fillText('FRENO',cx,cy+R+7);
   gmCtx.textAlign='left';gmCtx.fillText('DER',cx+R-12,cy-3);
   gmCtx.textAlign='right';gmCtx.fillText('IZQ',cx-R+12,cy-3);
-  // posición: gx longitudinal (Y, acel arriba), gy lateral (X)
   var px=cx+(gy/GM_GMAX)*R, py=cy-(gx/GM_GMAX)*R;
   px=Math.max(cx-R,Math.min(cx+R,px)); py=Math.max(cy-R,Math.min(cy+R,py));
-  // estela
   gmTrail.push([px,py]); if(gmTrail.length>15) gmTrail.shift();
   for(var i=0;i<gmTrail.length;i++){
     var a=i/gmTrail.length;
     gmCtx.beginPath();gmCtx.arc(gmTrail[i][0],gmTrail[i][1],2,0,Math.PI*2);
     gmCtx.fillStyle='rgba(58,168,189,'+(a*0.4)+')';gmCtx.fill();
   }
-  // bolita
   gmCtx.beginPath();gmCtx.arc(px,py,5,0,Math.PI*2);
   gmCtx.fillStyle='#3aa8bd';gmCtx.shadowColor='#3aa8bd';gmCtx.shadowBlur=8;gmCtx.fill();gmCtx.shadowBlur=0;
 }
 drawGMeter(0,0);
 
-// ── Sag meter: Voltaje (Y) vs Corriente (X) ──
 var sagCv=document.getElementById('sag-canvas'),sagCtx=sagCv.getContext('2d');
 var SAG_SZ=150,SAG_SCALE=3;
-var SAG_VMIN=40,SAG_VMAX=60,SAG_IMAX=200;  // rangos ejes
+var SAG_VMIN=40,SAG_VMAX=60,SAG_IMAX=200;
 sagCv.width=SAG_SZ*SAG_SCALE;sagCv.height=SAG_SZ*SAG_SCALE;sagCtx.scale(SAG_SCALE,SAG_SCALE);
 var sagTrail=[];
 function drawSag(volt,curr){
   var W=SAG_SZ,H=SAG_SZ,pad=22;
   sagCtx.clearRect(0,0,W,H);
-  // ejes
   sagCtx.strokeStyle='#1a1a1a';sagCtx.lineWidth=1;
   sagCtx.beginPath();sagCtx.moveTo(pad,5);sagCtx.lineTo(pad,H-pad);sagCtx.lineTo(W-5,H-pad);sagCtx.stroke();
-  // etiquetas ejes
   sagCtx.fillStyle='#999';sagCtx.font='7px Share Tech Mono';
   sagCtx.textAlign='right';
   sagCtx.fillText(SAG_VMAX+'V',pad-2,12);sagCtx.fillText(SAG_VMIN+'V',pad-2,H-pad);
@@ -789,23 +742,19 @@ function drawSag(volt,curr){
   sagCtx.fillText('0',pad,H-pad+9);sagCtx.fillText(SAG_IMAX+'A',W-12,H-pad+9);
   sagCtx.save();sagCtx.translate(8,H/2);sagCtx.rotate(-Math.PI/2);sagCtx.fillText('Voltaje',0,0);sagCtx.restore();
   sagCtx.fillText('Corriente',(pad+W)/2,H-4);
-  // mapear punto
   var ix=Math.abs(curr)/SAG_IMAX, vy=(volt-SAG_VMIN)/(SAG_VMAX-SAG_VMIN);
   ix=Math.max(0,Math.min(1,ix)); vy=Math.max(0,Math.min(1,vy));
   var px=pad+ix*(W-5-pad), py=(H-pad)-vy*(H-pad-5);
-  // estela
   sagTrail.push([px,py]); if(sagTrail.length>20) sagTrail.shift();
   sagCtx.strokeStyle='rgba(194,168,56,0.3)';sagCtx.lineWidth=1;sagCtx.beginPath();
   for(var i=0;i<sagTrail.length;i++){ if(i===0)sagCtx.moveTo(sagTrail[i][0],sagTrail[i][1]);else sagCtx.lineTo(sagTrail[i][0],sagTrail[i][1]); }
   sagCtx.stroke();
-  // bolita: color según cuánto sag (verde poco, rojo mucho)
   var col = vy>0.7?'#3ba776':vy>0.4?'#c2a838':'#cc4055';
   sagCtx.beginPath();sagCtx.arc(px,py,5,0,Math.PI*2);
   sagCtx.fillStyle=col;sagCtx.shadowColor=col;sagCtx.shadowBlur=8;sagCtx.fill();sagCtx.shadowBlur=0;
 }
 drawSag(SAG_VMAX,0);
 
-// ── G-meter Potencia Mecánica vs RPM, color por η_total (60-100%) ──
 var pmCv=document.getElementById('pmrpm-canvas'),pmCtx=pmCv.getContext('2d');
 var PM_SCALE=3,PM_RPMMAX=5000,PM_PMAX=6000;
 var pmW=0,pmH=0;
@@ -815,10 +764,9 @@ function pmResize(){
   pmCv.width=pmW*PM_SCALE; pmCv.height=pmH*PM_SCALE;
   pmCtx.setTransform(PM_SCALE,0,0,PM_SCALE,0,0);
 }
-// color del gradiente azul(60)->verde->amarillo->rojo(100)
 function etaColor(eta){
   if(eta==null) return '#555';
-  var t=Math.max(0,Math.min(1,(eta-60)/40));  // 60..100 -> 0..1
+  var t=Math.max(0,Math.min(1,(eta-60)/40));
   var stops=[[0,[34,102,204]],[0.4,[59,167,118]],[0.7,[194,168,56]],[1,[204,64,85]]];
   for(var i=0;i<stops.length-1;i++){
     if(t>=stops[i][0]&&t<=stops[i+1][0]){
@@ -837,10 +785,8 @@ function drawPMRPM(rpm,pmec,eta){
   if(pmW===0) pmResize();
   var W=pmW,H=pmH,pad=30;
   pmCtx.clearRect(0,0,W,H);
-  // ejes
   pmCtx.strokeStyle='#1a1a1a';pmCtx.lineWidth=1;
   pmCtx.beginPath();pmCtx.moveTo(pad,8);pmCtx.lineTo(pad,H-pad);pmCtx.lineTo(W-8,H-pad);pmCtx.stroke();
-  // grid
   pmCtx.fillStyle='#999';pmCtx.font='8px Share Tech Mono';
   pmCtx.textAlign='right';
   for(var p=0;p<=PM_PMAX;p+=2000){var y=(H-pad)-(p/PM_PMAX)*(H-pad-8);pmCtx.fillText(p+'',pad-3,y+3);}
@@ -848,7 +794,6 @@ function drawPMRPM(rpm,pmec,eta){
   for(var r=0;r<=PM_RPMMAX;r+=1000){var x=pad+(r/PM_RPMMAX)*(W-8-pad);pmCtx.fillText(r+'',x,H-pad+10);}
   pmCtx.fillText('RPM',(pad+W)/2,H-4);
   pmCtx.save();pmCtx.translate(9,H/2);pmCtx.rotate(-Math.PI/2);pmCtx.fillText('P.Mec (W)',0,0);pmCtx.restore();
-  // punto
   var px=pad+(Math.min(rpm,PM_RPMMAX)/PM_RPMMAX)*(W-8-pad);
   var py=(H-pad)-(Math.min(pmec,PM_PMAX)/PM_PMAX)*(H-pad-8);
   pmTrail.push([px,py,eta]); if(pmTrail.length>25) pmTrail.shift();
@@ -859,7 +804,6 @@ function drawPMRPM(rpm,pmec,eta){
     pmCtx.fillStyle=c.replace('rgb','rgba').replace(')',','+a+')');
     pmCtx.fill();
   }
-  // bolita actual
   var col=etaColor(eta);
   pmCtx.beginPath();pmCtx.arc(px,py,7,0,Math.PI*2);
   pmCtx.fillStyle=col;pmCtx.shadowColor=col;pmCtx.shadowBlur=10;pmCtx.fill();pmCtx.shadowBlur=0;
@@ -867,7 +811,122 @@ function drawPMRPM(rpm,pmec,eta){
 setTimeout(pmResize,100);
 window.addEventListener('resize',pmResize);
 
-// ── WebSocket — datos reales del servidor ──
+// ── Horizonte artificial 3D (Three.js) — pitch/roll del vehículo ──
+var hzScene = new THREE.Scene();
+var hzCamera = new THREE.PerspectiveCamera(40, 150/120, 0.1, 100);
+hzCamera.position.set(3.2, 2.3, 3.8);
+hzCamera.lookAt(0, 0.25, 0);
+var hzRenderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+hzRenderer.setSize(150, 120);
+document.getElementById('horizon-3d').appendChild(hzRenderer.domElement);
+
+var hzGroup = new THREE.Group();
+hzScene.add(hzGroup);
+
+(function buildKart(){
+  var orangeMat = new THREE.MeshStandardMaterial({color: 0xd85a30});
+  var darkMat = new THREE.MeshStandardMaterial({color: 0x2c2c2a});
+  var seatMat = new THREE.MeshStandardMaterial({color: 0x444441});
+  var frameMat = new THREE.MeshStandardMaterial({color: 0x999990, metalness:0.7, roughness:0.35});
+
+  var L = 2.2, W = 1.2, H = 0.1;
+
+  var floorPan = new THREE.Mesh(new THREE.BoxGeometry(L, H, W), orangeMat);
+  hzGroup.add(floorPan);
+
+  var noseCover = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, W*0.9), orangeMat);
+  noseCover.position.set(L/2 - 0.05, 0.13, 0);
+  hzGroup.add(noseCover);
+
+  var seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.62), seatMat);
+  seatBack.position.set(-0.35, 0.33, 0);
+  hzGroup.add(seatBack);
+  var seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.1, 0.62), seatMat);
+  seatBase.position.set(0.0, 0.1, 0);
+  hzGroup.add(seatBase);
+
+  function tube(r, h){ return new THREE.CylinderGeometry(r, r, h, 10); }
+  var TR = 0.03;
+
+  var rearX = -0.75, frontX = 0.55, halfW = 0.55;
+  var rearH = 0.85, frontH = 0.5;
+
+  function addPost(x, z, h){
+    var p = new THREE.Mesh(tube(TR, h), frameMat);
+    p.position.set(x, h/2 + H/2, z);
+    hzGroup.add(p);
+  }
+  addPost(rearX, halfW, rearH);
+  addPost(rearX, -halfW, rearH);
+  addPost(frontX, halfW, frontH);
+  addPost(frontX, -halfW, frontH);
+
+  function addCrossBar(x, y, w){
+    var b = new THREE.Mesh(tube(TR, w), frameMat);
+    b.rotation.x = Math.PI/2;
+    b.position.set(x, y, 0);
+    hzGroup.add(b);
+  }
+  addCrossBar(rearX, rearH + H/2, W*0.92);
+  addCrossBar(frontX, frontH + H/2, W*0.92);
+
+  function diagBrace(x1,y1,z1,x2,y2,z2){
+    var dx=x2-x1, dy=y2-y1, dz=z2-z1;
+    var len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    var m = new THREE.Mesh(tube(0.022, len), frameMat);
+    m.position.set((x1+x2)/2,(y1+y2)/2,(z1+z2)/2);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(dx,dy,dz).normalize());
+    hzGroup.add(m);
+  }
+  diagBrace(rearX, rearH+H/2, halfW, frontX, frontH+H/2, halfW);
+  diagBrace(rearX, rearH+H/2, -halfW, frontX, frontH+H/2, -halfW);
+  diagBrace(rearX, rearH+H/2, halfW, rearX, H/2, -halfW);
+  diagBrace(frontX, frontH+H/2, halfW, frontX, H/2, -halfW);
+
+  var steer = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 8, 16), darkMat);
+  steer.rotation.x = Math.PI/2.3;
+  steer.position.set(0.4, 0.42, 0);
+  hzGroup.add(steer);
+  var steerCol = new THREE.Mesh(tube(0.025, 0.3), darkMat);
+  steerCol.rotation.z = Math.PI/2.6;
+  steerCol.position.set(0.25, 0.28, 0);
+  hzGroup.add(steerCol);
+
+  var wheelR = 0.28;
+  var wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.2, 20);
+  var wheelPositions = [[0.85,0,0.62],[0.85,0,-0.62],[-0.85,0,0.62],[-0.85,0,-0.62]];
+  wheelPositions.forEach(function(p){
+    var wheel = new THREE.Mesh(wheelGeo, darkMat);
+    wheel.rotation.x = Math.PI/2;
+    wheel.position.set(p[0], p[1], p[2]);
+    hzGroup.add(wheel);
+    var hub = new THREE.Mesh(tube(0.08, 0.22), frameMat);
+    hub.rotation.x = Math.PI/2;
+    hub.position.set(p[0], p[1], p[2]);
+    hzGroup.add(hub);
+  });
+})();
+
+var hzGrid = new THREE.GridHelper(6, 12, 0x888880, 0x333330);
+hzScene.add(hzGrid);
+var hzAmbient = new THREE.AmbientLight(0xffffff, 0.75);
+hzScene.add(hzAmbient);
+var hzDir = new THREE.DirectionalLight(0xffffff, 0.6);
+hzDir.position.set(3,5,2);
+hzScene.add(hzDir);
+var hzFill = new THREE.DirectionalLight(0xffffff, 0.3);
+hzFill.position.set(-3,2,-2);
+hzScene.add(hzFill);
+
+function updateHorizon(rollDeg, pitchDeg){
+  hzGroup.rotation.z = -rollDeg * Math.PI/180;
+  hzGroup.rotation.x = pitchDeg * Math.PI/180;
+  hzRenderer.render(hzScene, hzCamera);
+  document.getElementById('hz-roll').textContent = rollDeg.toFixed(1)+'°';
+  document.getElementById('hz-pitch').textContent = pitchDeg.toFixed(1)+'°';
+}
+updateHorizon(0,0);
+
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 
@@ -960,58 +1019,48 @@ function updateDashboard(payload){
   const ts = payload.timestamp || new Date().toISOString();
   const tms = new Date(ts.replace(" ","T")).getTime() || Date.now();
 
-  // Valores crudos
   var spd=num(d.speed_v), rpm=Math.abs(num(d.rpm)), thr=num(d.throttle), brk=num(d.brake);
   var curr_p=num(d.curr_p), volt_p=num(d.volt_p), soc=num(d.soc);
   var curr_rms=num(d.curr_rms), batt_curr=num(d.batt_curr), ksy=num(d.ksy_v);
   var tmot=num(d.tmp_mot), tcont=num(d.tmp_cont), tcap=num(d.tmp_cap), tmax=num(d.tmp_max);
   var vaux=num(d.volt_a), iaux=num(d.curr_a);
   var odo=num(d.odo_veh), cont=Math.round(num(d.cont_st));
-  var torq = num(d.tau_est);  // ya calculado en el backend
+  var torq = num(d.tau_est);
 
-  // ── Línea de meta (redibuja solo si cambian coordenadas) ──
   drawMetaLine(d.meta_lat_a, d.meta_lon_a, d.meta_lat_b, d.meta_lon_b);
 
-  // ── Conteo de vueltas ──
   renderLapsTable(d.laps, !!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), num(d.d_vuelta), d.E_vuelta_actual, d.E_regen_vuelta_actual, d.n_opt);
   renderEstimates(d.d_rest, d.n_rest, d.t_rest);
   updateLapSummary(!!d.armado, Math.round(num(d.n_lap)), num(d.t_vuelta), d.laps, d.n_rest, d.t_rest, d.n_opt);
 
-  // ── Header ──
   document.getElementById('sub-ts').textContent = ts;
   document.getElementById('sub-veh').textContent = payload.vehicle_id != null ? payload.vehicle_id : '—';
   document.getElementById('sub-sess').textContent = payload.session_id != null ? payload.session_id : '—';
   setMgtConn(d.mgt_conectado);
 
-  // ── Rev lights + gauges ──
   updateRev(rpm/5000);
   Plotly.update('gauge-spd',{value:[spd]},{},[0]);
   Plotly.update('gauge-rpm',{value:[rpm]},{},[0]);
   Plotly.update('gauge-curr',{value:[Math.abs(curr_p)]},{},[0]);
 
-  // ── Batería SOC + odómetro + contactor ──
   drawBattery(Math.round(soc));
   drawOdo(odo);
   drawContactor(cont===1);
   document.getElementById('cont-lbl').textContent = cont===1 ? 'CONTACTOR CERRADO' : 'CONTACTOR ABIERTO';
 
-  // ── Termómetros ──
   setThermo('mot',tmot,150); setThermo('cont',tcont,100);
   setThermo('cap',tcap,100); setThermo('batt',tmax,60);
 
-  // ── Barras throttle/brake ──
   document.getElementById('tbp-thr').style.width=thr+'%';
   document.getElementById('tbp-brk').style.width=brk+'%';
   document.getElementById('tbn-thr').textContent=thr.toFixed(0)+'%';
   document.getElementById('tbn-brk').textContent=brk.toFixed(0)+'%';
 
-  // ── Derivadas necesarias del snapshot (ya calculadas en el backend) ──
-  var p_mec=num(d.p_mec), p_hv=d.p_hv;          // p_hv puede ser null
-  var v_rest=d.v_rest_pack;                       // null si no hay reposo medido
-  var eta    = d.eta;       // eficiencia motor/controlador, viene del backend
-  var etabat = d.eta_bat;   // eficiencia batería, viene del backend
+  var p_mec=num(d.p_mec), p_hv=d.p_hv;
+  var v_rest=d.v_rest_pack;
+  var eta    = d.eta;
+  var etabat = d.eta_bat;
 
-  // ── Sidebar izquierda: Controlador/Motor ──
   document.getElementById('d-eta').innerHTML=(eta!=null?eta.toFixed(1):'—')+'<span class="rl-unit">%</span>';
   document.getElementById('d-irms').innerHTML=curr_rms.toFixed(1)+'<span class="rl-unit">A</span>';
   document.getElementById('d-ksy').innerHTML=ksy.toFixed(1)+'<span class="rl-unit">V</span>';
@@ -1022,7 +1071,6 @@ function updateDashboard(payload){
   document.getElementById('d-ehvrest').innerHTML=num(d.E_HV_rest).toFixed(1)+'<span class="rl-unit">Wh</span>';
   document.getElementById('d-qhvrest').innerHTML=num(d.Q_HV_rest).toFixed(2)+'<span class="rl-unit">Ah</span>';
 
-  // ── MCA — Auxiliar ──
   document.getElementById('d-vaux').innerHTML=vaux.toFixed(1)+'<span class="rl-unit">V</span>';
   document.getElementById('d-iaux').innerHTML=iaux.toFixed(1)+'<span class="rl-unit">A</span>';
   document.getElementById('d-socaux').innerHTML=(d.soc_aux!=null?num(d.soc_aux).toFixed(1):'—')+'<span class="rl-unit">%</span>';
@@ -1030,28 +1078,24 @@ function updateDashboard(payload){
   document.getElementById('d-eaux').innerHTML=num(d.E_aux).toFixed(1)+'<span class="rl-unit">Wh</span>';
   document.getElementById('d-qaux').innerHTML=num(d.Q_aux).toFixed(2)+'<span class="rl-unit">Ah</span>';
 
-  // ── MDV — Giroscopio ──
   document.getElementById('d-gx').innerHTML=num(d.gyro_x).toFixed(2)+'<span class="rl-unit">°/s</span>';
   document.getElementById('d-gy').innerHTML=num(d.gyro_y).toFixed(2)+'<span class="rl-unit">°/s</span>';
   document.getElementById('d-gz').innerHTML=num(d.gyro_z).toFixed(2)+'<span class="rl-unit">°/s</span>';
 
-  // ── G-meter (aceleraciones compensadas Gx/Gy/Gz) ──
   var Gx=num(d.Gx), Gy=num(d.Gy), Gz=num(d.Gz);
   drawGMeter(Gx,Gy);
   document.getElementById('gm-gz-val').textContent=Gz.toFixed(2);
 
-  // ── Sidebar derecha: Batería HV ──
+  updateHorizon(num(d.phi), num(d.theta));
+
   document.getElementById('d-volt').innerHTML=volt_p.toFixed(1)+'<span class="rl-unit">V</span>';
   document.getElementById('d-etabat').innerHTML=(etabat!=null?etabat.toFixed(1):'—')+'<span class="rl-unit">%</span>';
 
-  // ── Sag meter: voltaje vs corriente ──
   drawSag(volt_p, curr_p);
 
-  // Salud de batería
   document.getElementById('d-sohc').innerHTML=(d.soh_c!=null?num(d.soh_c).toFixed(1):'—')+'<span class="rl-unit">%</span>';
   document.getElementById('d-rpack').innerHTML=(d.r_pack!=null?(num(d.r_pack)*1000).toFixed(1):'—')+'<span class="rl-unit">mΩ</span>';
   document.getElementById('d-vrest').innerHTML=(v_rest!=null?num(v_rest).toFixed(1):'—')+'<span class="rl-unit">V</span>';
-  // Panel diagnóstico SOH
   var sohAct=d.soh_activo===true;
   var elAct=document.getElementById('d-sohact');
   elAct.textContent=sohAct?'activo':'inactivo';
@@ -1059,7 +1103,6 @@ function updateDashboard(payload){
   document.getElementById('d-sohsoc').textContent=(d.soh_soc_inicio!=null?num(d.soh_soc_inicio).toFixed(1)+' %':'—');
   document.getElementById('d-sohq').textContent=(d.soh_Q_SOH!=null?num(d.soh_Q_SOH).toFixed(3)+' Ah':'—');
   document.getElementById('d-treposo').textContent=num(d.t_reposo_s).toFixed(0)+' s';
-  // Resistencias de celda
   var rcells=d.r_cells||{};
   for(var i=1;i<=16;i++){
     var rv=rcells['r_cell_'+i];
@@ -1068,10 +1111,8 @@ function updateDashboard(payload){
     else{ rel.textContent='—'; rel.className='ci-v'; }
   }
 
-  // ── Mapa GPS ──
   updateMap(num(d.gps_lat), num(d.gps_lon));
 
-  // ── Celdas + resumen Vmax/Vmin/ΔV ──
   var cells = d.cells || {};
   var vmax=-99,vmin=99,hayCeldas=false;
   for(var i=1;i<=16;i++){
@@ -1092,18 +1133,15 @@ function updateDashboard(payload){
     document.getElementById('cs-delta').textContent=(vmax-vmin).toFixed(3);
   }
 
-  // ── Gráficas (ventana 15s) ──
   push(cA,0,tms,spd); push(cA,1,tms,rpm/50); push(cA,2,tms,thr);
   push(cTM,0,tms,torq); push(cTM,1,tms,p_mec); push(cTM,2,tms,(p_hv!=null?p_hv:0));
   push(cPWR,0,tms,(p_hv!=null?p_hv:0)); push(cPWR,1,tms,Math.abs(curr_p)); push(cPWR,2,tms,thr);
   cA.update('none'); cTM.update('none'); cPWR.update('none');
 
-  // ── G-meter Potencia Mecánica vs RPM (color = eficiencia total TME) ──
-  var eta_total = (d.eta_total != null) ? d.eta_total : eta; // fallback si aún no hay v_rest
+  var eta_total = (d.eta_total != null) ? d.eta_total : eta;
   drawPMRPM(rpm, p_mec, eta_total);
 }
 
-// ── Pantalla de carga (750 ms) ──────────────────────────────────────────
 (function() {
   var cv  = document.getElementById('loading-canvas');
   var ctx = cv.getContext('2d');
