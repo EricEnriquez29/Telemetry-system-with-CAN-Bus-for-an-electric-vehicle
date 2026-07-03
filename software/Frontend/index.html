@@ -317,7 +317,7 @@
       </div>
       <div class="gauge-col">
         <div id="gauge-curr" class="gauge-plotly"></div>
-        <div class="gauge-label">Corriente Pack A</div>
+        <div class="gauge-label">Corriente de Descarga A</div>
       </div>
     </div>
 
@@ -1321,7 +1321,7 @@ function updateDashboard(payload){
   updateRev(rpm/5000);
   Plotly.update('gauge-spd',{value:[spd]},{},[0]);
   Plotly.update('gauge-rpm',{value:[rpm]},{},[0]);
-  Plotly.update('gauge-curr',{value:[Math.abs(curr_p)]},{},[0]);
+  Plotly.update('gauge-curr',{value:[curr_p<0 ? Math.abs(curr_p) : 0]},{},[0]);
 
   drawBattery(Math.round(soc));
   drawOdo(odo);
