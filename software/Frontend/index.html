@@ -195,9 +195,9 @@
     .laps-stat-cell{background:#0a0a0a;padding:10px;text-align:center;}
     .laps-stat-cell .lsc-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
     .laps-stat-cell .lsc-val{font-size:20px;color:var(--text);}
-    .lap-row{display:grid;grid-template-columns:40px 55px 60px 65px 90px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+    .lap-row{display:grid;grid-template-columns:40px 55px 60px 65px 65px 65px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
     .lap-cell{background:#0d0d0d;padding:6px 4px;text-align:center;color:var(--text);font-size:9px;}
-    .lap-row-head{display:grid;grid-template-columns:40px 55px 60px 65px 90px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;margin-bottom:6px;}
+    .lap-row-head{display:grid;grid-template-columns:40px 55px 60px 65px 65px 65px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;margin-bottom:6px;}
     .lap-row-head span{font-size:7px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;text-align:center;padding:0 3px;}
     .lap-cell .lc-unit{font-size:9px;color:var(--muted);}
     .lap-row.optimal .lap-cell{color:var(--green);}
@@ -495,7 +495,7 @@
     </div>
 
     <div class="lap-row-head">
-      <span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E cons/regen</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span>
+      <span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span>
     </div>
     <div id="laps-cells">
       <div class="laps-empty-msg" id="laps-empty-msg">Esperando cruces de meta…</div>
@@ -636,11 +636,12 @@ function renderHistSummary(sum){
       +'<div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div>'
       +'<div class="lap-cell">'+deltaStr+'</div>'
       +'<div class="lap-cell">'+l.d_vuelta.toFixed(3)+'<span class="lc-unit"> km</span></div>'
-      +'<div class="lap-cell">'+eV+'/'+eR+'<span class="lc-unit"> Wh</span></div>'
+      +'<div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div>'
+      +'<div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div>'
       +'<div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div>'
       +'<div class="lap-cell">'+fmtMP(l.vel_max,l.vel_prom,1)+'<span class="lc-unit"> km/h</span></div>'
       +'<div class="lap-cell">'+fmtMP(l.p_hv_max,l.p_hv_prom)+'<span class="lc-unit"> W</span></div>'
-      +'<div class="lap-cell">'+fmtMP(l.p_regen_max,l.p_regen_prom)+'<span class="lc-unit"> W</span></div>'
+      +'<div class="lap-cell">'+fmtMP(l.p_regen_max,l.p_regen_prom,0,true)+'<span class="lc-unit"> W</span></div>'
       +'<div class="lap-cell">'+fmtMP(l.p_mec_max,l.p_mec_prom)+'<span class="lc-unit"> W</span></div>'
       +'<div class="lap-cell">'+((l.Gx_max!=null)?l.Gx_max.toFixed(2):'—')+'</div>'
       +'<div class="lap-cell">'+((l.Gy_max!=null)?l.Gy_max.toFixed(2):'—')+'</div>'
@@ -703,7 +704,7 @@ function renderHistSummary(sum){
     + '<div class="hist-top3">'+topRow(sum.top_optimas,'','score')+'</div>'
 
     + '<div class="hist-sec-title" style="color:var(--orange)">Tabla de vueltas (idéntica a la vista en vivo)</div>'
-    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E cons/regen</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span></div>'
+    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span></div>'
     + '<div>'+ (lapsRows || '<div class="laps-empty-msg">Sin vueltas registradas en esta sesión</div>') +'</div>'
 
     + '<button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>';
@@ -1222,10 +1223,11 @@ setInterval(function(){
 
 function num(v){ return (v===null||v===undefined||isNaN(v)) ? 0 : parseFloat(v); }
 
-function fmtMP(mx, pr, dec){
+function fmtMP(mx, pr, dec, zeroIfNull){
   dec = dec!=null?dec:0;
-  var m = (mx!=null) ? mx.toFixed(dec) : '—';
-  var p = (pr!=null) ? pr.toFixed(dec) : '—';
+  var fallback = zeroIfNull ? (0).toFixed(dec) : '—';
+  var m = (mx!=null) ? mx.toFixed(dec) : fallback;
+  var p = (pr!=null) ? pr.toFixed(dec) : fallback;
   return m+'/'+p;
 }
 
@@ -1238,11 +1240,12 @@ function lapCellRow(nLap, tVuelta, deltaMejor, dVuelta, eV, eR, etaV, velMax, ve
     '<div class="lap-cell">'+tVuelta+'<span class="lc-unit"> s</span></div>' +
     '<div class="lap-cell">'+deltaStr+'</div>' +
     '<div class="lap-cell">'+dVuelta+'<span class="lc-unit"> km</span></div>' +
-    '<div class="lap-cell">'+eV+'/'+eR+'<span class="lc-unit"> Wh</span></div>' +
+    '<div class="lap-cell">'+eV+'<span class="lc-unit"> Wh</span></div>' +
+    '<div class="lap-cell">'+eR+'<span class="lc-unit"> Wh</span></div>' +
     '<div class="lap-cell">'+etaV+'<span class="lc-unit"> Wh/km</span></div>' +
     '<div class="lap-cell">'+fmtMP(velMax,velProm,1)+'<span class="lc-unit"> km/h</span></div>' +
     '<div class="lap-cell">'+fmtMP(phvMax,phvProm)+'<span class="lc-unit"> W</span></div>' +
-    '<div class="lap-cell">'+fmtMP(pregenMax,pregenProm)+'<span class="lc-unit"> W</span></div>' +
+    '<div class="lap-cell">'+fmtMP(pregenMax,pregenProm,0,true)+'<span class="lc-unit"> W</span></div>' +
     '<div class="lap-cell">'+fmtMP(pmecMax,pmecProm)+'<span class="lc-unit"> W</span></div>' +
     '<div class="lap-cell">'+((gxMax!=null)?gxMax.toFixed(2):'—')+'</div>' +
     '<div class="lap-cell">'+((gyMax!=null)?gyMax.toFixed(2):'—')+'</div>' +
