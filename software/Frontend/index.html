@@ -31,24 +31,14 @@
     .menu-item.active{color:var(--orange);border-left:3px solid var(--orange);background:#120c08;}
     .empty-tab{color:#888;font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
     .laps-wrap{padding:20px;font-family:'Share Tech Mono',monospace;overflow-x:auto;}
-    .laps-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-    .laps-title{font-size:12px;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
-    .laps-table{width:100%;border-collapse:collapse;font-size:12px;}
-    .laps-table th{text-align:left;padding:6px 10px;color:var(--muted);font-size:9px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--sep);}
-    .laps-table td{padding:6px 10px;border-bottom:1px solid var(--sep);color:var(--text);}
-    .laps-table tr:nth-child(even){background:#0a0a0a;}
-    .laps-empty-row td{text-align:center;color:#666;padding:30px;}
-    .laps-current td{color:var(--orange);font-weight:700;background:#150d05;}
-    .laps-optimal td{color:var(--green);}
-    .laps-optimal td:first-child::after{content:' ★';}
+
     .lap-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;margin-bottom:-40px;font-family:'Share Tech Mono',monospace;overflow:hidden;}
     .lap-summary-cell{background:#0a0a0a;padding:4px 8px;text-align:center;}
     .lap-summary-cell .ls-label{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;}
     .lap-summary-cell .ls-val{font-size:12px;color:var(--text);}
     .lap-summary-cell.ls-current .ls-val{color:var(--orange);}
     .lap-summary-cell.ls-best .ls-val{color:var(--green);}
-    .laps-estimates{display:flex;gap:30px;margin:14px 0 4px;font-size:11px;color:var(--muted);}
-    .laps-estimates b{color:var(--text);}
+
     .ws-ind{display:flex;align-items:center;gap:8px;}
     .ws-dot{width:9px;height:9px;border-radius:50%;background:#e74c3c;transition:background 0.3s;}
     .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
@@ -173,21 +163,21 @@
     .hist-btn{position:absolute;right:0;top:0;font-family:inherit;font-size:10px;padding:7px 14px;background:transparent;color:var(--cyan);border:1px solid var(--cyan);cursor:pointer;border-radius:2px;}
     .hist-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
     .hist-overlay.open{display:flex;}
-    .hist-modal{background:#0d0d0d;border:1px solid var(--orange);border-radius:8px;padding:18px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;font-family:'Share Tech Mono',monospace;}
+    .hist-modal{background:#0d0d0d;border:1px solid var(--orange);border-radius:8px;padding:22px;width:96vw;max-width:1600px;max-height:92vh;overflow-y:auto;overflow-x:auto;font-family:'Share Tech Mono',monospace;}
     .hist-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-    .hist-head-title{font-family:'Orbitron',sans-serif;font-size:12px;color:var(--orange);letter-spacing:1px;}
+    .hist-head-title{font-family:'Orbitron',sans-serif;font-size:16px;color:var(--orange);letter-spacing:1px;}
     .hist-close{background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;}
     .hist-picker{display:flex;gap:8px;margin-bottom:14px;}
     .hist-picker input,.hist-picker select{flex:1;background:#050505;border:1px solid var(--sep);color:var(--text);font-family:inherit;font-size:11px;padding:7px 8px;border-radius:2px;}
     .hist-load{width:100%;font-family:inherit;font-size:11px;padding:9px;background:transparent;color:var(--orange);border:1px solid var(--orange);cursor:pointer;border-radius:2px;}
     .hist-back{margin-top:12px;font-family:inherit;font-size:10px;padding:6px 12px;background:transparent;color:var(--muted);border:1px solid #333;cursor:pointer;border-radius:2px;}
-    .hist-sec-title{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;}
-    .hist-grid{display:grid;gap:1px;background:var(--sep);margin-bottom:8px;}
-    .hist-grid > div{background:#0a0a0a;padding:7px;text-align:center;}
-    .hist-grid .hg-lbl{font-size:7px;color:var(--muted);text-transform:uppercase;display:block;}
-    .hist-grid .hg-val{font-size:12px;color:var(--text);}
-    .hist-top3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
-    .hist-top3 div{background:#0d0d0d;border:1px solid var(--sep);padding:6px;text-align:center;font-size:11px;}
+    .hist-sec-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:14px 0 6px;font-weight:600;}
+    .hist-grid{display:grid;gap:1px;background:var(--sep);margin-bottom:10px;}
+    .hist-grid > div{background:#0a0a0a;padding:11px;text-align:center;}
+    .hist-grid .hg-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:3px;}
+    .hist-grid .hg-val{font-size:16px;color:var(--text);}
+    .hist-top3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+    .hist-top3 div{background:#0d0d0d;border:1px solid var(--sep);padding:10px;text-align:center;font-size:14px;}
     .hist-err{color:var(--red);font-size:11px;text-align:center;padding:20px;}
     .hist-loading{color:var(--muted);font-size:11px;text-align:center;padding:20px;}
     .laps-title-big{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
@@ -195,11 +185,11 @@
     .laps-stat-cell{background:#0a0a0a;padding:10px;text-align:center;}
     .laps-stat-cell .lsc-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
     .laps-stat-cell .lsc-val{font-size:20px;color:var(--text);}
-    .lap-row{display:grid;grid-template-columns:40px 55px 60px 65px 65px 65px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
-    .lap-cell{background:#0d0d0d;padding:6px 4px;text-align:center;color:var(--text);font-size:9px;}
-    .lap-row-head{display:grid;grid-template-columns:40px 55px 60px 65px 65px 65px 80px 90px 100px 100px 90px 55px 55px 90px 70px;gap:1px;margin-bottom:6px;}
-    .lap-row-head span{font-size:7px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;text-align:center;padding:0 3px;}
-    .lap-cell .lc-unit{font-size:9px;color:var(--muted);}
+    .lap-row{display:grid;grid-template-columns:minmax(40px,0.7fr) minmax(55px,0.9fr) minmax(60px,0.9fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(90px,1.1fr) minmax(100px,1.3fr) minmax(110px,1.3fr) minmax(110px,1.3fr) minmax(100px,1.3fr) minmax(60px,0.8fr) minmax(60px,0.8fr) minmax(100px,1.2fr) minmax(80px,0.9fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+    .lap-cell{background:#0d0d0d;padding:9px 6px;text-align:center;color:var(--text);font-size:12px;}
+    .lap-row-head{display:grid;grid-template-columns:minmax(40px,0.7fr) minmax(55px,0.9fr) minmax(60px,0.9fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(90px,1.1fr) minmax(100px,1.3fr) minmax(110px,1.3fr) minmax(110px,1.3fr) minmax(100px,1.3fr) minmax(60px,0.8fr) minmax(60px,0.8fr) minmax(100px,1.2fr) minmax(80px,0.9fr);gap:1px;margin-bottom:6px;}
+    .lap-row-head span{font-size:10px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;text-align:center;padding:0 4px;font-weight:600;}
+    .lap-cell .lc-unit{font-size:10px;color:var(--muted);}
     .lap-row.optimal .lap-cell{color:var(--green);}
     .lap-row.optimal .lap-cell:first-child::after{content:' ★';}
     .lap-row.current{border-color:var(--orange);}
@@ -659,8 +649,8 @@ function renderHistSummary(sum){
 
   var html = ''
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-    +   '<span style="font-size:11px;color:var(--green)">Sesión '+sum.session_id+' — '+sum.date+' · '+sum.n_vueltas+' vueltas</span>'
-    +   '<span style="font-size:10px;color:var(--muted)">Duración: <b style="color:var(--text)">'+fmtDur(sum.duracion_s)+'</b></span>'
+    +   '<span style="font-size:15px;color:var(--green)">Sesión '+sum.session_id+' — '+sum.date+' · '+sum.n_vueltas+' vueltas</span>'
+    +   '<span style="font-size:13px;color:var(--muted)">Duración: <b style="color:var(--text)">'+fmtDur(sum.duracion_s)+'</b></span>'
     + '</div>'
 
     + '<div class="hist-sec-title">Batería HV / Aux</div>'
@@ -712,11 +702,13 @@ function renderHistSummary(sum){
   document.getElementById('hist-result-view').innerHTML = html;
 }
 
+var histRequestToken = 0;
 function loadHistSession(){
   var date = document.getElementById('hist-date').value;
   var sess = document.getElementById('hist-session').value;
   if(!date || !sess){ alert('Completa fecha y número de sesión'); return; }
 
+  var myToken = ++histRequestToken;
   var resultView = document.getElementById('hist-result-view');
   document.getElementById('hist-picker-view').style.display='none';
   resultView.style.display='block';
@@ -725,10 +717,14 @@ function loadHistSession(){
   fetch(HIST_URL_BASE+'?date='+encodeURIComponent(date)+'&session_id='+encodeURIComponent(sess))
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
     .then(function(res){
+      if(myToken !== histRequestToken) return; // respuesta vieja, ya se pidió otra sesión — ignorar
       if(res.ok){ renderHistSummary(res.body); }
       else { resultView.innerHTML = '<div class="hist-err">Error: '+(res.body.error||'desconocido')+'</div><button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>'; }
     })
-    .catch(function(){ resultView.innerHTML = '<div class="hist-err">No se pudo conectar al backend</div><button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>'; });
+    .catch(function(){
+      if(myToken !== histRequestToken) return;
+      resultView.innerHTML = '<div class="hist-err">No se pudo conectar al backend</div><button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>';
+    });
 }
 
 
@@ -1157,19 +1153,6 @@ updateHorizon(0,0);
 const WS_URL = "ws://23.94.237.163:8050/ws";
 let ws = null;
 let lastMsgTime = Date.now();
-let pendingPayload = null;
-
-// ── Renderiza el ÚLTIMO payload recibido a ritmo fijo (~4Hz), en vez de una
-// vez por cada mensaje MQTT (10Hz). Evita que el navegador se sature con
-// horas de sesión y termine "atorado" hasta refrescar. ──
-setInterval(function(){
-  if(pendingPayload){
-    var p = pendingPayload;
-    pendingPayload = null;
-    try{ updateDashboard(p); }catch(e){ console.error('Error en updateDashboard:', e); }
-  }
-}, 100);
-
 
 function setConn(connected){
   var dot=document.getElementById('ws-dot');
@@ -1178,7 +1161,6 @@ function setConn(connected){
   if(lbl){ lbl.textContent = connected ? 'Servidor conectado' : 'Servidor reconectando…'; }
 }
 
-var lastMgtConnected = null;
 function setMgtConn(connected){
   var dot=document.getElementById('mgt-dot');
   var lbl=document.getElementById('mgt-label');
@@ -1186,14 +1168,6 @@ function setMgtConn(connected){
   if(connected===null||connected===undefined){ lbl.textContent='MGT desconocido'; dot.classList.remove('connected'); }
   else if(connected){ dot.classList.add('connected'); lbl.textContent='MGT conectado'; }
   else{ dot.classList.remove('connected'); lbl.textContent='MGT desconectado'; }
-
-  if(connected===true && lastMgtConnected===false){
-    console.warn('MGT reconectado — limpiando estado del frontend');
-    pendingPayload = null;
-    gmTrail = []; sagTrail = []; pmTrail = [];
-    lastMsgTime = Date.now();
-  }
-  lastMgtConnected = connected;
 }
 
 function connect(){
@@ -1204,7 +1178,7 @@ function connect(){
   ws.onopen = ()=>{ setConn(true); lastMsgTime = Date.now(); };
   ws.onmessage = (event)=>{
     lastMsgTime = Date.now();
-    try{ pendingPayload = JSON.parse(event.data); }catch(e){ console.error(e); }
+    try{ updateDashboard(JSON.parse(event.data)); }catch(e){ console.error('Error en updateDashboard:', e); }
   };
   ws.onclose = ()=>{ setConn(false); setTimeout(connect,2000); };
   ws.onerror = ()=>{ try{ ws.close(); }catch(e){} };
