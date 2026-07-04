@@ -189,6 +189,7 @@
     .lap-cell{background:#0d0d0d;padding:9px 6px;text-align:center;color:var(--text);font-size:12px;}
     .lap-row-head{display:grid;grid-template-columns:minmax(40px,0.7fr) minmax(55px,0.9fr) minmax(60px,0.9fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(90px,1.1fr) minmax(100px,1.3fr) minmax(110px,1.3fr) minmax(110px,1.3fr) minmax(100px,1.3fr) minmax(60px,0.8fr) minmax(60px,0.8fr) minmax(100px,1.2fr) minmax(80px,0.9fr);gap:1px;margin-bottom:6px;}
     .lap-row-head span{font-size:10px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;text-align:center;padding:0 4px;font-weight:600;}
+    .lap-row.no-estado, .lap-row-head.no-estado{grid-template-columns:minmax(40px,0.7fr) minmax(55px,0.9fr) minmax(60px,0.9fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(90px,1.1fr) minmax(100px,1.3fr) minmax(110px,1.3fr) minmax(110px,1.3fr) minmax(100px,1.3fr) minmax(60px,0.8fr) minmax(60px,0.8fr) minmax(100px,1.2fr);}
     .lap-cell .lc-unit{font-size:10px;color:var(--muted);}
     .lap-row.optimal .lap-cell{color:var(--green);}
     .lap-row.optimal .lap-cell:first-child::after{content:' ★';}
@@ -590,7 +591,7 @@ function fetchSessionsForDate(){
   if(!date){ return; }
   sel.innerHTML = '<option value="">Cargando…</option>';
   msg.textContent = '';
-  fetch(HIST_URL_BASE.replace('/session_summary','/sessions_for_date')+'?date='+encodeURIComponent(date))
+  fetch(HIST_URL_BASE.replace('/session_summary','/sessions_for_date')+'?date='+encodeURIComponent(date), {cache:'no-store'})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
     .then(function(res){
       if(res.ok && res.body.sessions && res.body.sessions.length>0){
@@ -621,7 +622,7 @@ function renderHistSummary(sum){
     var etaV = (l.eta_vuelta!=null) ? l.eta_vuelta.toFixed(1) : '—';
     var deltaStr = (l.delta_mejor==null) ? '—' : (l.delta_mejor===0 ? '—' : '+'+l.delta_mejor.toFixed(1)+'s');
     var cls = (nOptHist!=null && l.n_lap===nOptHist) ? ' optimal' : '';
-    return '<div class="lap-row'+cls+'">'
+    return '<div class="lap-row no-estado'+cls+'">'
       +'<div class="lap-cell">'+l.n_lap+'</div>'
       +'<div class="lap-cell">'+l.t_vuelta.toFixed(1)+'<span class="lc-unit"> s</span></div>'
       +'<div class="lap-cell">'+deltaStr+'</div>'
@@ -636,7 +637,6 @@ function renderHistSummary(sum){
       +'<div class="lap-cell">'+((l.Gx_max!=null)?l.Gx_max.toFixed(2):'—')+'</div>'
       +'<div class="lap-cell">'+((l.Gy_max!=null)?l.Gy_max.toFixed(2):'—')+'</div>'
       +'<div class="lap-cell">'+fmtMP(l.rpm_max,l.rpm_prom)+'</div>'
-      +'<div class="lap-cell">Completa</div>'
       +'</div>';
   }).join('');
 
@@ -694,7 +694,7 @@ function renderHistSummary(sum){
     + '<div class="hist-top3">'+topRow(sum.top_optimas,'','score')+'</div>'
 
     + '<div class="hist-sec-title" style="color:var(--orange)">Tabla de vueltas (idéntica a la vista en vivo)</div>'
-    + '<div class="lap-row-head"><span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span><span>Estado</span></div>'
+    + '<div class="lap-row-head no-estado"><span>Vuelta</span><span>Tiempo</span><span>Δ mejor</span><span>Distancia</span><span>E consumida</span><span>E regenerada</span><span>Eficiencia</span><span>Vel máx/prom</span><span>P.HV máx/prom</span><span>P.Regen máx/prom</span><span>P.Mec máx/prom</span><span>G-X máx</span><span>G-Y máx</span><span>RPM máx/prom</span></div>'
     + '<div>'+ (lapsRows || '<div class="laps-empty-msg">Sin vueltas registradas en esta sesión</div>') +'</div>'
 
     + '<button class="hist-back" onclick="backToHistPicker()">← Elegir otra sesión</button>';
@@ -714,7 +714,7 @@ function loadHistSession(){
   resultView.style.display='block';
   resultView.innerHTML = '<div class="hist-loading">Consultando InfluxDB…</div>';
 
-  fetch(HIST_URL_BASE+'?date='+encodeURIComponent(date)+'&session_id='+encodeURIComponent(sess))
+  fetch(HIST_URL_BASE+'?date='+encodeURIComponent(date)+'&session_id='+encodeURIComponent(sess), {cache:'no-store'})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
     .then(function(res){
       if(myToken !== histRequestToken) return; // respuesta vieja, ya se pidió otra sesión — ignorar
@@ -790,7 +790,13 @@ var cRegen=mkChart('chart-regen',[
   {label:'Freno%',data:[],borderColor:'#cc4055',backgroundColor:'rgba(204,64,85,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0,yAxisID:'yBR'},
   {label:'Corriente regen A',data:[],borderColor:'#3aa8bd',borderWidth:1.5,pointRadius:0,fill:false,tension:0,yAxisID:'yAR',spanGaps:false},
 ],{x:sx,yWR:{position:'left',min:0,suggestedMax:3000,ticks:{color:'#3ba776',font:{size:8,family:'Share Tech Mono'}},grid:{color:'#0d0d0d'}},yBR:{position:'right',min:0,max:100,ticks:{color:'#cc4055',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}},yAR:{position:'left',min:0,max:250,ticks:{color:'#3aa8bd',font:{size:8,family:'Share Tech Mono'}},grid:{drawOnChartArea:false}}});
-function push(ch,di,ts,v){var now=new Date(ts).getTime()||Date.now();ch.data.datasets[di].data.push({x:now,y:v});while(ch.data.datasets[di].data.length>0&&ch.data.datasets[di].data[0].x<now-WMS)ch.data.datasets[di].data.shift();}
+function push(ch,di,ts,v){
+  var now=new Date(ts).getTime()||Date.now();
+  ch.data.datasets[di].data.push({x:now,y:v});
+  while(ch.data.datasets[di].data.length>0&&ch.data.datasets[di].data[0].x<now-WMS)ch.data.datasets[di].data.shift();
+  ch.options.scales.x.min = now-WMS;
+  ch.options.scales.x.max = now;
+}
 
 var battCv=document.getElementById('batt-canvas'),battCtx=battCv.getContext('2d');
 var BATT_W=122,BATT_H=77,BATT_SCALE=3;
