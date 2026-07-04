@@ -584,16 +584,19 @@ function backToHistPicker(){
   document.getElementById('hist-result-view').style.display='none';
 }
 
+var sessionsRequestToken = 0;
 function fetchSessionsForDate(){
   var date = document.getElementById('hist-date').value;
   var sel = document.getElementById('hist-session');
   var msg = document.getElementById('hist-picker-msg');
   if(!date){ return; }
+  var myToken = ++sessionsRequestToken;
   sel.innerHTML = '<option value="">Cargando…</option>';
   msg.textContent = '';
   fetch(HIST_URL_BASE.replace('/session_summary','/sessions_for_date')+'?date='+encodeURIComponent(date), {cache:'no-store'})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
     .then(function(res){
+      if(myToken !== sessionsRequestToken) return; // respuesta vieja — ignorar
       if(res.ok && res.body.sessions && res.body.sessions.length>0){
         sel.innerHTML = res.body.sessions.map(function(s){ return '<option value="'+s+'">Sesión '+s+'</option>'; }).join('');
       } else {
@@ -601,6 +604,7 @@ function fetchSessionsForDate(){
       }
     })
     .catch(function(){
+      if(myToken !== sessionsRequestToken) return;
       sel.innerHTML = '<option value="">— error al consultar —</option>';
       msg.textContent = 'No se pudo conectar al backend';
     });
