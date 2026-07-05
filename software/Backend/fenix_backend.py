@@ -48,6 +48,7 @@ DT              = 0.1
 # ─── Constantes conteo de vueltas ────────────────────────────────────────────
 LAP_DEBOUNCE    = 10.0    # s mínimos entre dos cruces válidos
 LAP_T_MIN       = 15.0   # s mínimos de duración de una vuelta — FIJO, no cambiar sin que Payo lo pida
+TZ_OFFSET_HOURS = 6      # México Centro (UTC-6). Medianoche local = 06:00 UTC.
 LAP_N_CAL       = 5       # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL       = 0.15    # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM      = 6371.0
@@ -512,9 +513,10 @@ def _r(v, dec=None):
 
 
 def build_session_summary(date_str: str, session_id: str) -> dict:
-    start = f"{date_str}T00:00:00Z"
-    stop_dt = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
-    stop = stop_dt.strftime("%Y-%m-%dT00:00:00Z")
+    day_start_local = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(hours=TZ_OFFSET_HOURS)
+    start = day_start_local.strftime("%Y-%m-%dT%H:%M:%SZ")
+    stop_dt = day_start_local + timedelta(days=1)
+    stop = stop_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     campos_base = ["soc", "E_HV", "Q_HV", "soc_aux", "E_aux", "Q_aux",
                    "speed_v", "rpm", "Gx", "Gy", "Gz", "p_hv", "p_regen",
@@ -730,9 +732,10 @@ from(bucket: "{INFLUX_BUCKET}")
 
 def get_sessions_for_date(date_str: str) -> list:
     """Devuelve la lista de session_id distintos con datos en ese día."""
-    start = f"{date_str}T00:00:00Z"
-    stop_dt = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
-    stop = stop_dt.strftime("%Y-%m-%dT00:00:00Z")
+    day_start_local = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(hours=TZ_OFFSET_HOURS)
+    start = day_start_local.strftime("%Y-%m-%dT%H:%M:%SZ")
+    stop_dt = day_start_local + timedelta(days=1)
+    stop = stop_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     flux = f'''
 from(bucket: "{INFLUX_BUCKET}")
   |> range(start: {start}, stop: {stop})
