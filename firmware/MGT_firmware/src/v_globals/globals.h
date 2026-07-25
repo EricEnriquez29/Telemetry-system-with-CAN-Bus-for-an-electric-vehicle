@@ -4,29 +4,29 @@
 // ─────────────────────────────────────────
 //  CURTIS ACF4-A — 13 variables
 // ─────────────────────────────────────────
-extern float current_rms;
-extern float speed_vehicle;
-extern float odometer_vehicle;
-extern float temp_motor;
-extern float temp_ctrl;
-extern float temp_capacitors;
-extern float motor_torque;
-extern float battery_current;
+extern float curr_rms;
+extern float speed_v;
+extern float odo_veh;
+extern float tmp_mot;
+extern float tmp_cont;
+extern float tmp_cap;
+extern float mot_torq;
+extern float batt_curr;
 extern float rpm;
-extern float throttle_input;
-extern float brake_input;
-extern float contactor_state;
-extern float keyswitch_voltage;
+extern float throttle;
+extern float brake;
+extern float cont_st;
+extern float ksy_v;
 
 // ─────────────────────────────────────────
 //  BMS — 19 variables
 // ─────────────────────────────────────────
-extern float voltage_pack;
-extern float current_pack;
+extern float volt_p;
+extern float curr_p;
 extern float soc;
-extern float cell_voltage[16];
-extern float temp_max;
-extern float temp_min;
+extern float cell_volts[16];
+extern float tmp_max;
+extern float tmp_min;
 
 // ─────────────────────────────────────────
 //  MDV — 8 variables
@@ -43,8 +43,8 @@ extern float gyro_z;
 // ─────────────────────────────────────────
 //  MCA — 2 variables
 // ─────────────────────────────────────────
-extern float voltage_aux;
-extern float current_aux;
+extern float volt_a;
+extern float curr_a;
 
 // ─────────────────────────────────────────
 //  WIFI
@@ -65,27 +65,27 @@ struct Snapshot {
     uint64_t timestamp;
 
     // Curtis
-    float current_rms;
-    float speed_vehicle;
-    float odometer_vehicle;
-    float temp_motor;
-    float temp_ctrl;
-    float temp_capacitors;
-    float motor_torque;
-    float battery_current;
+    float curr_rms;
+    float speed_v;
+    float odo_veh;
+    float tmp_mot;
+    float tmp_cont;
+    float tmp_cap;
+    float mot_torq;
+    float batt_curr;
     float rpm;
-    float throttle_input;
-    float brake_input;
-    float contactor_state;
-    float keyswitch_voltage;
+    float throttle;
+    float brake;
+    float cont_st;
+    float ksy_v;
 
     // BMS
-    float voltage_pack;
-    float current_pack;
+    float volt_p;
+    float curr_p;
     float soc;
-    float cell_voltage[16];
-    float temp_max;
-    float temp_min;
+    float cell_volts[16];
+    float tmp_max;
+    float tmp_min;
 
     // MDV
     float gps_lat;
@@ -98,8 +98,8 @@ struct Snapshot {
     float gyro_z;
 
     // MCA
-    float voltage_aux;
-    float current_aux;
+    float volt_a;
+    float curr_a;
 };
 
 // ─────────────────────────────────────────

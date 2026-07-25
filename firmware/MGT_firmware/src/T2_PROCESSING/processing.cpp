@@ -28,105 +28,105 @@ static uint16_t be16(uint8_t* d, int i) {
 // ─────────────────────────────────────────
 
 // Curtis TPDO1 — 0x1A7
-// Bytes 0-1: current_rms    LE ×10
-// Bytes 2-3: speed_vehicle  LE ×10
-// Bytes 4-7: odometer       LE ×10
+// Bytes 0-1: curr_rms  LE ×10
+// Bytes 2-3: speed_v   LE ×10
+// Bytes 4-7: odo_veh   LE ×10
 static void decode_1A7(uint8_t* d) {
-    float v_current_rms = le16(d, 0) / 10.0f;
-    float v_speed_vehicle = le16(d, 2) / 10.0f;
-    float v_odometer_vehicle = le32(d, 4) / 10.0f;
+    float v_curr_rms = le16(d, 0) / 10.0f;
+    float v_speed_v = le16(d, 2) / 10.0f;
+    float v_odo_veh = le32(d, 4) / 10.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        current_rms = v_current_rms;
-        speed_vehicle = v_speed_vehicle;
-        odometer_vehicle = v_odometer_vehicle;
+        curr_rms = v_curr_rms;
+        speed_v = v_speed_v;
+        odo_veh = v_odo_veh;
         xSemaphoreGive(globals_mutex);
     } else {
-        current_rms = v_current_rms;
-        speed_vehicle = v_speed_vehicle;
-        odometer_vehicle = v_odometer_vehicle;
+        curr_rms = v_curr_rms;
+        speed_v = v_speed_v;
+        odo_veh = v_odo_veh;
     }
 }
 
 // Curtis TPDO2 — 0x2A7
-// Bytes 0-1: temp_motor      LE ×10
-// Bytes 2-3: temp_ctrl       LE ×10
-// Bytes 4-5: temp_capacitors LE ×10
-// Bytes 6-7: motor_torque    LE ×10
+// Bytes 0-1: tmp_mot  LE ×10
+// Bytes 2-3: tmp_cont LE ×10
+// Bytes 4-5: tmp_cap  LE ×10
+// Bytes 6-7: mot_torq LE ×10
 static void decode_2A7(uint8_t* d) {
-    float v_temp_motor = le16(d, 0) / 10.0f;
-    float v_temp_ctrl = le16(d, 2) / 10.0f;
-    float v_temp_capacitors = le16(d, 4) / 10.0f;
-    float v_motor_torque = le16(d, 6) / 10.0f;
+    float v_tmp_mot = le16(d, 0) / 10.0f;
+    float v_tmp_cont = le16(d, 2) / 10.0f;
+    float v_tmp_cap = le16(d, 4) / 10.0f;
+    float v_mot_torq = le16(d, 6) / 10.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        temp_motor = v_temp_motor;
-        temp_ctrl = v_temp_ctrl;
-        temp_capacitors = v_temp_capacitors;
-        motor_torque = v_motor_torque;
+        tmp_mot = v_tmp_mot;
+        tmp_cont = v_tmp_cont;
+        tmp_cap = v_tmp_cap;
+        mot_torq = v_mot_torq;
         xSemaphoreGive(globals_mutex);
     } else {
-        temp_motor = v_temp_motor;
-        temp_ctrl = v_temp_ctrl;
-        temp_capacitors = v_temp_capacitors;
-        motor_torque = v_motor_torque;
+        tmp_mot = v_tmp_mot;
+        tmp_cont = v_tmp_cont;
+        tmp_cap = v_tmp_cap;
+        mot_torq = v_mot_torq;
     }
 }
 
 // Curtis TPDO3 — 0x3A7
-// Bytes 0-1: battery_current LE ×10
-// Bytes 2-3: rpm             LE ×10
-// Bytes 4-5: throttle_input  LE ×10
-// Bytes 6-7: brake_input     LE ×10
+// Bytes 0-1: batt_curr LE ×10
+// Bytes 2-3: rpm       LE ×10
+// Bytes 4-5: throttle  LE ×10
+// Bytes 6-7: brake     LE ×10
 static void decode_3A7(uint8_t* d) {
-    float v_battery_current = le16(d, 0) / 10.0f;
+    float v_batt_curr = le16(d, 0) / 10.0f;
     float v_rpm = le16(d, 2) / 10.0f;
-    float v_throttle_input = le16(d, 4) / 10.0f;
-    float v_brake_input = le16(d, 6) / 10.0f;
+    float v_throttle = le16(d, 4) / 10.0f;
+    float v_brake = le16(d, 6) / 10.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        battery_current = v_battery_current;
+        batt_curr = v_batt_curr;
         rpm = v_rpm;
-        throttle_input = v_throttle_input;
-        brake_input = v_brake_input;
+        throttle = v_throttle;
+        brake = v_brake;
         xSemaphoreGive(globals_mutex);
     } else {
-        battery_current = v_battery_current;
+        batt_curr = v_batt_curr;
         rpm = v_rpm;
-        throttle_input = v_throttle_input;
-        brake_input = v_brake_input;
+        throttle = v_throttle;
+        brake = v_brake;
     }
 }
 
 // Curtis TPDO4 — 0x4A7
-// Byte 0:    contactor_state  uint8
-// Bytes 1-2: keyswitch_voltage LE ×10
+// Byte 0:    cont_st  uint8
+// Bytes 1-2: ksy_v    LE ×10
 static void decode_4A7(uint8_t* d) {
-    float v_contactor_state = d[0];
-    float v_keyswitch_voltage = le16(d, 1) / 10.0f;
+    float v_cont_st = d[0];
+    float v_ksy_v = le16(d, 1) / 10.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        contactor_state = v_contactor_state;
-        keyswitch_voltage = v_keyswitch_voltage;
+        cont_st = v_cont_st;
+        ksy_v = v_ksy_v;
         xSemaphoreGive(globals_mutex);
     } else {
-        contactor_state = v_contactor_state;
-        keyswitch_voltage = v_keyswitch_voltage;
+        cont_st = v_cont_st;
+        ksy_v = v_ksy_v;
     }
 }
 
 // BMS Pack — 0x200
-// Bytes 0-1: voltage_pack BE ÷10
-// Bytes 2-3: current_pack BE -30000 ÷10
-// Bytes 4-5: soc          BE ÷10
+// Bytes 0-1: volt_p BE ÷10
+// Bytes 2-3: curr_p BE -30000 ÷10
+// Bytes 4-5: soc    BE ÷10
 static void decode_200(uint8_t* d) {
-    float v_voltage_pack = be16(d, 0) / 10.0f;
-    float v_current_pack = ((int16_t)be16(d, 2) - 30000) / 10.0f;
+    float v_volt_p = be16(d, 0) / 10.0f;
+    float v_curr_p = ((int16_t)be16(d, 2) - 30000) / 10.0f;
     float v_soc = be16(d, 4) / 10.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        voltage_pack = v_voltage_pack;
-        current_pack = v_current_pack;
+        volt_p = v_volt_p;
+        curr_p = v_curr_p;
         soc = v_soc;
         xSemaphoreGive(globals_mutex);
     } else {
-        voltage_pack = v_voltage_pack;
-        current_pack = v_current_pack;
+        volt_p = v_volt_p;
+        curr_p = v_curr_p;
         soc = v_soc;
     }
 }
@@ -138,26 +138,26 @@ static void decode_cells(uint8_t* d, int offset) {
     float tmp[4];
     for (int i = 0; i < 4; i++) tmp[i] = be16(d, i*2) / 1000.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        for (int i = 0; i < 4; i++) cell_voltage[offset + i] = tmp[i];
+        for (int i = 0; i < 4; i++) cell_volts[offset + i] = tmp[i];
         xSemaphoreGive(globals_mutex);
     } else {
-        for (int i = 0; i < 4; i++) cell_voltage[offset + i] = tmp[i];
+        for (int i = 0; i < 4; i++) cell_volts[offset + i] = tmp[i];
     }
 }
 
 // BMS Temperaturas — 0x210
-// Byte 0: temp_max int8
-// Byte 1: temp_min int8
+// Byte 0: tmp_max int8
+// Byte 1: tmp_min int8
 static void decode_210(uint8_t* d) {
-    int8_t v_temp_max = (int8_t)d[0];
-    int8_t v_temp_min = (int8_t)d[1];
+    int8_t v_tmp_max = (int8_t)d[0];
+    int8_t v_tmp_min = (int8_t)d[1];
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        temp_max = v_temp_max;
-        temp_min = v_temp_min;
+        tmp_max = v_tmp_max;
+        tmp_min = v_tmp_min;
         xSemaphoreGive(globals_mutex);
     } else {
-        temp_max = v_temp_max;
-        temp_min = v_temp_min;
+        tmp_max = v_tmp_max;
+        tmp_min = v_tmp_min;
     }
 }
 
@@ -218,18 +218,18 @@ static void decode_402(uint8_t* d) {
 }
 
 // MCA — 0x500
-// Bytes 0-1: voltage_aux LE ÷100
-// Bytes 2-3: current_aux LE ÷100
+// Bytes 0-1: volt_a LE ÷100
+// Bytes 2-3: curr_a LE ÷100
 static void decode_500(uint8_t* d) {
-    float v_voltage_aux = le16(d, 0) / 100.0f;
-    float v_current_aux = le16(d, 2) / 100.0f;
+    float v_volt_a = le16(d, 0) / 100.0f;
+    float v_curr_a = le16(d, 2) / 100.0f;
     if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        voltage_aux = v_voltage_aux;
-        current_aux = v_current_aux;
+        volt_a = v_volt_a;
+        curr_a = v_curr_a;
         xSemaphoreGive(globals_mutex);
     } else {
-        voltage_aux = v_voltage_aux;
-        current_aux = v_current_aux;
+        volt_a = v_volt_a;
+        curr_a = v_curr_a;
     }
 }
 

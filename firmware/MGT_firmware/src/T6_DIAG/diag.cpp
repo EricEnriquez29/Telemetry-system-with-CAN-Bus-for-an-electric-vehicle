@@ -135,38 +135,38 @@ void taskDiagnostics(void* pvParameters) {
                 status_can = false;
                 if (globals_mutex != NULL && xSemaphoreTake(globals_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     switch (i) {
-                        case 0:  current_rms = speed_vehicle = odometer_vehicle = -1; break;
-                        case 1:  temp_motor = temp_ctrl = temp_capacitors = motor_torque = -1; break;
-                        case 2:  battery_current = rpm = throttle_input = brake_input = -1; break;
-                        case 3:  contactor_state = keyswitch_voltage = -1; break;
-                        case 4:  voltage_pack = current_pack = soc = -1; break;
-                        case 5:  cell_voltage[0] = cell_voltage[1] = cell_voltage[2] = cell_voltage[3] = -1; break;
-                        case 6:  cell_voltage[4] = cell_voltage[5] = cell_voltage[6] = cell_voltage[7] = -1; break;
-                        case 7:  cell_voltage[8] = cell_voltage[9] = cell_voltage[10] = cell_voltage[11] = -1; break;
-                        case 8:  cell_voltage[12] = cell_voltage[13] = cell_voltage[14] = cell_voltage[15] = -1; break;
-                        case 9:  temp_max = temp_min = -1; break;
+                        case 0:  curr_rms = speed_v = odo_veh = -1; break;
+                        case 1:  tmp_mot = tmp_cont = tmp_cap = mot_torq = -1; break;
+                        case 2:  batt_curr = rpm = throttle = brake = -1; break;
+                        case 3:  cont_st = ksy_v = -1; break;
+                        case 4:  volt_p = curr_p = soc = -1; break;
+                        case 5:  cell_volts[0] = cell_volts[1] = cell_volts[2] = cell_volts[3] = -1; break;
+                        case 6:  cell_volts[4] = cell_volts[5] = cell_volts[6] = cell_volts[7] = -1; break;
+                        case 7:  cell_volts[8] = cell_volts[9] = cell_volts[10] = cell_volts[11] = -1; break;
+                        case 8:  cell_volts[12] = cell_volts[13] = cell_volts[14] = cell_volts[15] = -1; break;
+                        case 9:  tmp_max = tmp_min = -1; break;
                         case 10: gps_lat = gps_lon = -1; break;
                         case 11: acc_x = acc_y = acc_z = -1; break;
                         case 12: gyro_x = gyro_y = gyro_z = -1; break;
-                        case 13: voltage_aux = current_aux = -1; break;
+                        case 13: volt_a = curr_a = -1; break;
                     }
                     xSemaphoreGive(globals_mutex);
                 } else {
                     switch (i) {
-                        case 0:  current_rms = speed_vehicle = odometer_vehicle = -1; break;
-                        case 1:  temp_motor = temp_ctrl = temp_capacitors = motor_torque = -1; break;
-                        case 2:  battery_current = rpm = throttle_input = brake_input = -1; break;
-                        case 3:  contactor_state = keyswitch_voltage = -1; break;
-                        case 4:  voltage_pack = current_pack = soc = -1; break;
-                        case 5:  cell_voltage[0] = cell_voltage[1] = cell_voltage[2] = cell_voltage[3] = -1; break;
-                        case 6:  cell_voltage[4] = cell_voltage[5] = cell_voltage[6] = cell_voltage[7] = -1; break;
-                        case 7:  cell_voltage[8] = cell_voltage[9] = cell_voltage[10] = cell_voltage[11] = -1; break;
-                        case 8:  cell_voltage[12] = cell_voltage[13] = cell_voltage[14] = cell_voltage[15] = -1; break;
-                        case 9:  temp_max = temp_min = -1; break;
+                        case 0:  curr_rms = speed_v = odo_veh = -1; break;
+                        case 1:  tmp_mot = tmp_cont = tmp_cap = mot_torq = -1; break;
+                        case 2:  batt_curr = rpm = throttle = brake = -1; break;
+                        case 3:  cont_st = ksy_v = -1; break;
+                        case 4:  volt_p = curr_p = soc = -1; break;
+                        case 5:  cell_volts[0] = cell_volts[1] = cell_volts[2] = cell_volts[3] = -1; break;
+                        case 6:  cell_volts[4] = cell_volts[5] = cell_volts[6] = cell_volts[7] = -1; break;
+                        case 7:  cell_volts[8] = cell_volts[9] = cell_volts[10] = cell_volts[11] = -1; break;
+                        case 8:  cell_volts[12] = cell_volts[13] = cell_volts[14] = cell_volts[15] = -1; break;
+                        case 9:  tmp_max = tmp_min = -1; break;
                         case 10: gps_lat = gps_lon = -1; break;
                         case 11: acc_x = acc_y = acc_z = -1; break;
                         case 12: gyro_x = gyro_y = gyro_z = -1; break;
-                        case 13: voltage_aux = current_aux = -1; break;
+                        case 13: volt_a = curr_a = -1; break;
                     }
                 }
             }
@@ -248,49 +248,49 @@ void taskDiagnostics(void* pvParameters) {
             Serial.print(t.tm_sec); Serial.print(".");
             Serial.println(ms);
 
-            Serial.print(" Spd=");  Serial.print(s.speed_vehicle,     1);
-            Serial.print(" Irms="); Serial.print(s.current_rms,       1);
-            Serial.print(" Odo=");  Serial.println(s.odometer_vehicle, 3);
+            Serial.print(" Spd=");  Serial.print(s.speed_v,     1);
+            Serial.print(" Irms="); Serial.print(s.curr_rms,       1);
+            Serial.print(" Odo=");  Serial.println(s.odo_veh, 3);
 
-            Serial.print(" Tmot="); Serial.print(s.temp_motor,      1);
-            Serial.print(" Tctrl=");Serial.print(s.temp_ctrl,       1);
-            Serial.print(" Tcap="); Serial.print(s.temp_capacitors, 1);
-            Serial.print(" Trq=");  Serial.println(s.motor_torque,  1);
+            Serial.print(" Tmot="); Serial.print(s.tmp_mot,      1);
+            Serial.print(" Tctrl=");Serial.print(s.tmp_cont,       1);
+            Serial.print(" Tcap="); Serial.print(s.tmp_cap, 1);
+            Serial.print(" Trq=");  Serial.println(s.mot_torq,  1);
 
-            Serial.print(" Ibat="); Serial.print(s.battery_current, 1);
+            Serial.print(" Ibat="); Serial.print(s.batt_curr, 1);
             Serial.print(" RPM=");  Serial.print(s.rpm,             0);
-            Serial.print(" Thr=");  Serial.print(s.throttle_input,  1);
-            Serial.print(" Brk=");  Serial.println(s.brake_input,   1);
+            Serial.print(" Thr=");  Serial.print(s.throttle,  1);
+            Serial.print(" Brk=");  Serial.println(s.brake,   1);
 
-            Serial.print(" Cont="); Serial.print((int)s.contactor_state);
-            Serial.print(" Vkey="); Serial.println(s.keyswitch_voltage, 1);
+            Serial.print(" Cont="); Serial.print((int)s.cont_st);
+            Serial.print(" Vkey="); Serial.println(s.ksy_v, 1);
 
-            Serial.print(" Vpack="); Serial.print(s.voltage_pack, 1);
-            Serial.print(" Ipack="); Serial.print(s.current_pack, 1);
+            Serial.print(" Vpack="); Serial.print(s.volt_p, 1);
+            Serial.print(" Ipack="); Serial.print(s.curr_p, 1);
             Serial.print(" SOC=");   Serial.println(s.soc,         1);
 
-            Serial.print(" C1=");  Serial.print(s.cell_voltage[0],  3);
-            Serial.print(" C2=");  Serial.print(s.cell_voltage[1],  3);
-            Serial.print(" C3=");  Serial.print(s.cell_voltage[2],  3);
-            Serial.print(" C4=");  Serial.println(s.cell_voltage[3],3);
+            Serial.print(" C1=");  Serial.print(s.cell_volts[0],  3);
+            Serial.print(" C2=");  Serial.print(s.cell_volts[1],  3);
+            Serial.print(" C3=");  Serial.print(s.cell_volts[2],  3);
+            Serial.print(" C4=");  Serial.println(s.cell_volts[3],3);
 
-            Serial.print(" C5=");  Serial.print(s.cell_voltage[4],  3);
-            Serial.print(" C6=");  Serial.print(s.cell_voltage[5],  3);
-            Serial.print(" C7=");  Serial.print(s.cell_voltage[6],  3);
-            Serial.print(" C8=");  Serial.println(s.cell_voltage[7],3);
+            Serial.print(" C5=");  Serial.print(s.cell_volts[4],  3);
+            Serial.print(" C6=");  Serial.print(s.cell_volts[5],  3);
+            Serial.print(" C7=");  Serial.print(s.cell_volts[6],  3);
+            Serial.print(" C8=");  Serial.println(s.cell_volts[7],3);
 
-            Serial.print(" C9=");  Serial.print(s.cell_voltage[8],   3);
-            Serial.print(" C10="); Serial.print(s.cell_voltage[9],   3);
-            Serial.print(" C11="); Serial.print(s.cell_voltage[10],  3);
-            Serial.print(" C12="); Serial.println(s.cell_voltage[11],3);
+            Serial.print(" C9=");  Serial.print(s.cell_volts[8],   3);
+            Serial.print(" C10="); Serial.print(s.cell_volts[9],   3);
+            Serial.print(" C11="); Serial.print(s.cell_volts[10],  3);
+            Serial.print(" C12="); Serial.println(s.cell_volts[11],3);
 
-            Serial.print(" C13="); Serial.print(s.cell_voltage[12],  3);
-            Serial.print(" C14="); Serial.print(s.cell_voltage[13],  3);
-            Serial.print(" C15="); Serial.print(s.cell_voltage[14],  3);
-            Serial.print(" C16="); Serial.println(s.cell_voltage[15],3);
+            Serial.print(" C13="); Serial.print(s.cell_volts[12],  3);
+            Serial.print(" C14="); Serial.print(s.cell_volts[13],  3);
+            Serial.print(" C15="); Serial.print(s.cell_volts[14],  3);
+            Serial.print(" C16="); Serial.println(s.cell_volts[15],3);
 
-            Serial.print(" Tmax="); Serial.print((int)s.temp_max);
-            Serial.print(" Tmin="); Serial.println((int)s.temp_min);
+            Serial.print(" Tmax="); Serial.print((int)s.tmp_max);
+            Serial.print(" Tmin="); Serial.println((int)s.tmp_min);
 
             Serial.print(" Lat="); Serial.print(s.gps_lat,  6);
             Serial.print(" Lon="); Serial.println(s.gps_lon, 6);
@@ -303,8 +303,8 @@ void taskDiagnostics(void* pvParameters) {
             Serial.print(" GyroY="); Serial.print(s.gyro_y,  2);
             Serial.print(" GyroZ="); Serial.println(s.gyro_z,2);
 
-            Serial.print(" Vaux="); Serial.print(s.voltage_aux,  2);
-            Serial.print(" Iaux="); Serial.println(s.current_aux,2);
+            Serial.print(" Vaux="); Serial.print(s.volt_a,  2);
+            Serial.print(" Iaux="); Serial.println(s.curr_a,2);
 
         } else {
             Serial.println(" Sin snapshots aun");

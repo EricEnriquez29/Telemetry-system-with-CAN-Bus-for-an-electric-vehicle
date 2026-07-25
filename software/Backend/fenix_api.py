@@ -11,6 +11,7 @@ Uso:
 
 import asyncio
 import json
+import os
 import threading
 from typing import Any, Dict, Optional, Set
 
@@ -20,9 +21,31 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Fénix Telemetry API")
 
+# ─── CORS ──────────────────────────────────────────────────────────────────
+# Antes: allow_origins=["*"] fijo en el código, sin forma de restringirlo.
+# Ahora: se lee de FENIX_ALLOWED_ORIGINS (lista separada por comas, p.ej.
+# "https://dashboard.escuderiafenix.mx,http://192.168.1.50:8080"). Si no se
+# define, sigue permitiendo cualquier origen — mismo comportamiento de
+# antes — pero avisa en el arranque para que no quede así "por accidente".
+#
+# Nota: esto solo restringe qué páginas web (navegador) pueden leer las
+# respuestas de esta API vía JS. No protege /internal/snapshot contra un
+# cliente que no sea un navegador (curl, otro script) — eso requeriría
+# autenticación real en ese endpoint, igual que se hizo con /set_meta en
+# fenix_backend.py.
+_origins_env = os.environ.get("FENIX_ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
+
+if ALLOWED_ORIGINS == ["*"]:
+    print(
+        "[WARN] CORS abierto a todos los orígenes (*). "
+        "Define FENIX_ALLOWED_ORIGINS con el dominio real del dashboard antes de producción.",
+        flush=True,
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )

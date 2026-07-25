@@ -1,0 +1,57 @@
+:root{--bg:#11151c;--col1:#11151c;--sep:#1e1e1e;--border:#222;--text:#f0f0f0;--muted:#b0b0b0;
+      --orange:#EF5E20;--cyan:#3aa8bd;--green:#3ba776;--red:#cc4055;--yellow:#c2a838;--purple:#a85cc0;--blue:#4a90b8;--white:#e8e8e8;
+      /* Antes hardcodeados en cada archivo — ahora sí controlados desde aquí */
+      --panel-deep:#0a0a0a; --panel-deeper:#070707; --panel-canvas:#11151c; --panel-darkest:#050505;
+      --panel-hover:#0f0f0f; --menu-hover:#161616; --divider2:#1a1a1a; --track:#111;
+      --brand-dark:#120c08; --brand-border:#2a1a0a; --brand-dark2:#150d05;
+      --muted2:#888; --muted3:#999; --muted4:#666; --light1:#ccc; --light2:#aaa;
+      --border2:#333; --disconnected:#e74c3c; --grad-blue:#2266cc;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+
+    /* Clases de color utilitarias — reemplazan los style="color:var(--x)"
+       que estaban repetidos ~30 veces en index.html. Para cambiar el color
+       de todos los valores "orange" del dashboard, se edita SOLO la
+       variable --orange de arriba o la regla .txt-orange de aquí, nunca
+       hay que tocar el HTML. */
+    .txt-orange{color:var(--orange);}
+    .txt-green{color:var(--green);}
+    .txt-yellow{color:var(--yellow);}
+    .txt-red{color:var(--red);}
+    .txt-cyan{color:var(--cyan);}
+    .txt-blue{color:var(--blue);}
+    .txt-text{color:var(--text);}
+
+    .title-bar{text-align:center;border-bottom:2px solid var(--orange);padding:12px 0 10px;}
+    .title{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
+    .subheader{display:flex;justify-content:center;align-items:center;gap:24px;padding:8px 0;font-size:12px;color:var(--muted);border-bottom:1px solid var(--divider2);}
+    .menu-btn{position:fixed;top:10px;left:12px;z-index:1002;background:transparent;border:none;color:var(--orange);width:38px;height:32px;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;-webkit-tap-highlight-color:transparent;outline:none;transform:none!important;transition:none!important;}
+    .menu-btn:active{transform:none;background:transparent;}
+    .menu-btn span{display:block;width:18px;height:2px;background:var(--orange);}
+    .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;opacity:0;visibility:hidden;transition:opacity 0.2s;}
+    .menu-overlay.open{opacity:1;visibility:visible;}
+    .menu-drawer{position:fixed;top:0;left:0;bottom:0;width:240px;background:var(--col1);border-right:2px solid var(--orange);z-index:1001;transform:translateX(-100%);transition:transform 0.25s ease;display:flex;flex-direction:column;}
+    .menu-drawer.open{transform:translateX(0);}
+    .menu-drawer-title{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--orange);letter-spacing:2px;padding:16px 16px 16px 62px;border-bottom:1px solid var(--sep);text-transform:uppercase;}
+    .menu-item{padding:14px 18px;font-size:13px;color:var(--muted2);cursor:pointer;border-bottom:1px solid var(--menu-hover);letter-spacing:1px;text-transform:uppercase;transition:background 0.15s,color 0.15s;}
+    .menu-item:hover{background:var(--menu-hover);color:var(--light1);}
+    .menu-item.active{color:var(--orange);border-left:3px solid var(--orange);background:var(--brand-dark);}
+    .empty-tab{color:var(--muted2);font-size:13px;text-align:center;padding:80px 20px;letter-spacing:2px;font-family:'Share Tech Mono',monospace;}
+    .laps-wrap{padding:20px;font-family:'Share Tech Mono',monospace;overflow-x:auto;}
+
+    .lap-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--sep);border:1px solid var(--sep);border-radius:2px;margin-bottom:-40px;font-family:'Share Tech Mono',monospace;overflow:hidden;}
+    .lap-summary-cell{background:var(--panel-deep);padding:4px 8px;text-align:center;}
+    .lap-summary-cell .ls-label{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;}
+    .lap-summary-cell .ls-val{font-size:12px;color:var(--text);}
+    .lap-summary-cell.ls-current .ls-val{color:var(--orange);}
+    .lap-summary-cell.ls-best .ls-val{color:var(--green);}
+
+    .ws-ind{display:flex;align-items:center;gap:8px;}
+    .ws-dot{width:9px;height:9px;border-radius:50%;background:var(--disconnected);transition:background 0.3s;}
+    .ws-dot.connected{background:var(--green);box-shadow:0 0 5px var(--green);}
+
+    .revbar{background:var(--panel-darkest);border-bottom:1px solid var(--track);height:14px;display:flex;align-items:center;justify-content:center;gap:3px;flex-shrink:0;}
+    .rl{width:20px;height:8px;border-radius:1px;background:var(--track);transition:all 0.05s;}
+
+    .body{flex:1;display:grid;grid-template-columns:230px 1fr 260px;min-height:0;}
+    ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:var(--panel-darkest);}::-webkit-scrollbar-thumb{background:var(--sep);}

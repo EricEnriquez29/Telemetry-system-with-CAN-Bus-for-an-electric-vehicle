@@ -34,28 +34,28 @@ static bool serializar_snapshot(Snapshot& s, char* buf, size_t buf_size) {
     doc["veh_id"]    = VEHICLE_ID;
     doc["sess_id"]   = session_ID;
     doc["times"]     = ts;
-    doc["curr_rms"]  = s.current_rms;
-    doc["speed_v"]   = s.speed_vehicle;
-    doc["odo_veh"]   = s.odometer_vehicle;
-    doc["tmp_mot"]   = s.temp_motor;
-    doc["tmp_cont"]  = s.temp_ctrl;
-    doc["tmp_cap"]   = s.temp_capacitors;
-    doc["mot_torq"]  = s.motor_torque;
-    doc["batt_curr"] = s.battery_current;
+    doc["curr_rms"]  = s.curr_rms;
+    doc["speed_v"]   = s.speed_v;
+    doc["odo_veh"]   = s.odo_veh;
+    doc["tmp_mot"]   = s.tmp_mot;
+    doc["tmp_cont"]  = s.tmp_cont;
+    doc["tmp_cap"]   = s.tmp_cap;
+    doc["mot_torq"]  = s.mot_torq;
+    doc["batt_curr"] = s.batt_curr;
     doc["rpm"]       = s.rpm;
-    doc["throttle"]  = s.throttle_input;
-    doc["brake"]     = s.brake_input;
-    doc["cont_st"]   = s.contactor_state;
-    doc["ksy_v"]     = s.keyswitch_voltage;
-    doc["volt_p"]    = s.voltage_pack;
-    doc["curr_p"]    = s.current_pack;
+    doc["throttle"]  = s.throttle;
+    doc["brake"]     = s.brake;
+    doc["cont_st"]   = s.cont_st;
+    doc["ksy_v"]     = s.ksy_v;
+    doc["volt_p"]    = s.volt_p;
+    doc["curr_p"]    = s.curr_p;
     doc["soc"]       = s.soc;
 
     JsonArray cells = doc["cell_volts"].to<JsonArray>();
-    for (int i = 0; i < 16; i++) cells.add(s.cell_voltage[i]);
+    for (int i = 0; i < 16; i++) cells.add(s.cell_volts[i]);
 
-    doc["tmp_max"] = s.temp_max;
-    doc["tmp_min"] = s.temp_min;
+    doc["tmp_max"] = s.tmp_max;
+    doc["tmp_min"] = s.tmp_min;
     doc["gps_lat"] = s.gps_lat;
     doc["gps_lon"] = s.gps_lon;
     doc["acc_x"]   = s.acc_x;
@@ -64,8 +64,8 @@ static bool serializar_snapshot(Snapshot& s, char* buf, size_t buf_size) {
     doc["gyro_x"]  = s.gyro_x;
     doc["gyro_y"]  = s.gyro_y;
     doc["gyro_z"]  = s.gyro_z;
-    doc["volt_a"]  = s.voltage_aux;
-    doc["curr_a"]  = s.current_aux;
+    doc["volt_a"]  = s.volt_a;
+    doc["curr_a"]  = s.curr_a;
     doc["sesion_act"] = sesion_activa;
 
     return serializeJson(doc, buf, buf_size) > 0;
