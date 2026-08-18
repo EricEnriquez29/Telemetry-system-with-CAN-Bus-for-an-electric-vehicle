@@ -85,6 +85,11 @@
   .item.done .item-title { text-decoration: line-through; text-decoration-thickness: 2px; }
   .item.done p { text-decoration: line-through; }
   .item.done p.resolved { text-decoration: none; color: var(--ok); font-size: 0.9rem; }
+  .item p.deferred {
+    color: var(--muted); font-size: 0.86rem;
+    border-left: 2px solid var(--line); padding-left: 0.8rem;
+  }
+  .item p.deferred strong { color: var(--warning); }
   .resolved::before {
     content: "Resuelto "; font-family: var(--mono); font-size: 0.68rem;
     letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.4rem;
@@ -162,6 +167,9 @@
       <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Todo el tráfico viaja sin cifrar</h3></div>
       <p>El dashboard se conecta por <code>ws://</code> y <code>http://</code>. Cualquiera en la misma red (el wifi de un evento, por ejemplo) puede leer la telemetría e interceptar el código de acceso de la línea de meta cuando se envía.</p>
       <p class="what">configurar TLS en el servidor (certificado, aunque sea autofirmado o por túnel) y cambiar las URLs a <code>wss://</code>/<code>https://</code> en <code>js/config.js</code>. El Frontend ya está listo para el cambio.</p>
+      <p class="deferred"><strong>Pospuesto a propósito (18 ago 2026).</strong> Lo único con riesgo real es el código de la línea de meta: quien lo capture puede marcar vueltas falsas. La telemetría en sí no es secreta. Para que el ataque ocurra hacen falta tres cosas simultáneas — alguien en la misma red, con capacidad técnica para esnifar tráfico, y con intención de sabotear a otra escudería — lo que en un Electratón universitario es poco probable. El riesgo además solo existe durante un evento, mientras que el de los servicios corriendo como <code>root</code> es continuo: por eso ese va primero.</p>
+      <p class="deferred"><strong>Ruta decidida:</strong> subdominio gratuito de DuckDNS (no hay dominio propio) + Caddy como proxy en el 443, que gestiona el certificado de Let's Encrypt solo. Verificado el 18 ago: los puertos 80 y 443 están libres en el servidor. Falta registrar el subdominio.</p>
+      <p class="deferred"><strong>Mitigaciones baratas mientras tanto:</strong> cambiar el código de la meta antes de cada competencia (una línea del <code>.env</code>, así una captura solo sirve ese día), o restringir <code>set_meta</code> a la red local. <strong>Alcance:</strong> esto cifra dashboard y API, no el MQTT del vehículo — el ESP32 seguiría transmitiendo en claro por el 1883.</p>
     </div>
 
     <div class="item warn">

@@ -1,0 +1,31 @@
+# ── Secretos ──
+# Nunca versionar el .env real: contiene la contraseña de MQTT, el token de
+# InfluxDB y el token de la línea de meta. La plantilla sin valores es
+# software/Backend/.env.example, que sí se versiona.
+.env
+*.env
+!.env.example
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.pytest_cache/
+*.egg-info/
+
+# ── Respaldos y temporales ──
+*.bak
+*.tmp
+*~
+
+# ── Sistema operativo ──
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── Editores ──
+.idea/
+*.swp
