@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pendientes — Telemetría Fénix</title>
+<style>
+  :root {
+    --bg: #0F1319; --surface: #161B23; --surface-2: #1C222C; --line: #262E3A;
+    --text: #E6E9EF; --muted: #8A94A6; --accent: #EF5E20;
+    --critical: #E5484D; --warning: #E8A33D; --ok: #3BA776; --info: #4A90B8;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #FBFAF9; --surface: #FFFFFF; --surface-2: #F4F5F7; --line: #E1E4E9;
+      --text: #1A1F27; --muted: #5C6675; --accent: #C9491A;
+      --critical: #C62A2F; --warning: #9A6512; --ok: #2A7A55; --info: #2E6B8C;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FBFAF9; --surface: #FFFFFF; --surface-2: #F4F5F7; --line: #E1E4E9;
+    --text: #1A1F27; --muted: #5C6675; --accent: #C9491A;
+    --critical: #C62A2F; --warning: #9A6512; --ok: #2A7A55; --info: #2E6B8C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    line-height: 1.6; margin: 0; padding: 0 1.25rem 5rem;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; display: flex; flex-direction: column; gap: 2.5rem; }
+  header {
+    padding-top: 3.5rem; display: flex; flex-direction: column; gap: 0.75rem;
+    border-bottom: 1px solid var(--line); padding-bottom: 2rem;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-size: clamp(1.75rem, 4vw, 2.4rem); line-height: 1.15; margin: 0;
+    text-wrap: balance; font-weight: 650; letter-spacing: -0.02em;
+  }
+  .lede { color: var(--muted); max-width: 40rem; margin: 0; }
+  .meta {
+    font-family: var(--mono); font-size: 0.75rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.5rem;
+  }
+  .tally {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden;
+  }
+  .tally-cell { background: var(--surface); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+  .tally-num { font-family: var(--mono); font-size: 1.75rem; font-variant-numeric: tabular-nums; line-height: 1; font-weight: 600; }
+  .tally-label { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .n-crit { color: var(--critical); } .n-warn { color: var(--warning); }
+  .n-info { color: var(--info); } .n-ok { color: var(--ok); }
+  section { display: flex; flex-direction: column; gap: 1rem; }
+  h2 {
+    font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--text); margin: 0; padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--accent); display: flex;
+    justify-content: space-between; align-items: baseline; gap: 1rem;
+  }
+  h2 .count { color: var(--muted); font-weight: 400; letter-spacing: 0.06em; }
+  .section-note { color: var(--muted); font-size: 0.9rem; margin: 0; }
+  .item {
+    background: var(--surface); border: 1px solid var(--line); border-left-width: 3px;
+    border-radius: 5px; padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .item.crit { border-left-color: var(--critical); }
+  .item.warn { border-left-color: var(--warning); }
+  .item.info { border-left-color: var(--info); }
+  .item-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 3px;
+    border: 1px solid currentColor; flex-shrink: 0;
+  }
+  .chip.crit { color: var(--critical); } .chip.warn { color: var(--warning); } .chip.info { color: var(--info); }
+  .chip.ok { color: var(--ok); }
+  .item.done { border-left-color: var(--ok); opacity: 0.72; }
+  .item.done .item-title { text-decoration: line-through; text-decoration-thickness: 2px; }
+  .item.done p { text-decoration: line-through; }
+  .item.done p.resolved { text-decoration: none; color: var(--ok); font-size: 0.9rem; }
+  .resolved::before {
+    content: "Resuelto "; font-family: var(--mono); font-size: 0.68rem;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.4rem;
+  }
+  .item-title { font-weight: 600; font-size: 1rem; margin: 0; }
+  .item p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .item p.what { color: var(--text); padding-top: 0.15rem; }
+  .what::before {
+    content: "Falta "; font-family: var(--mono); font-size: 0.68rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-right: 0.4rem;
+  }
+  code {
+    font-family: var(--mono); font-size: 0.85em; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 3px; padding: 0.08em 0.35em; word-break: break-word;
+  }
+  .closing {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .closing h3 {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em;
+    text-transform: uppercase; margin: 0; color: var(--ok);
+  }
+  .closing p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .done-list {
+    margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.9rem;
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Escudería Fénix · UPIITA-IPN</div>
+    <h1>Pendientes y correcciones del sistema de telemetría</h1>
+    <p class="lede">Todo lo que quedó identificado pero sin aplicar durante la sesión de refactorización. Ordenado por severidad dentro de cada área.</p>
+    <div class="meta">
+      <span>25 jul 2026</span>
+      <span>Último commit: <code>24d2e94</code></span>
+      <span>Repo y servidor sincronizados</span>
+    </div>
+  </header>
+
+  <div class="tally">
+    <div class="tally-cell"><span class="tally-num n-crit">1</span><span class="tally-label">Bloqueantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-warn">7</span><span class="tally-label">Importantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-info">8</span><span class="tally-label">Menores</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">18</span><span class="tally-label">Ya resueltos</span></div>
+  </div>
+
+  <section>
+    <h2>Sin verificar <span class="count">1</span></h2>
+    <p class="section-note">Trabajo terminado en código, pero que nadie ha confirmado que funcione en el mundo real.</p>
+
+    <div class="item crit">
+      <div class="item-head"><span class="chip crit">Bloqueante</span><h3 class="item-title">El firmware renombrado no se ha compilado ni flasheado</h3></div>
+      <p>Se renombraron 17 variables internas en 6 archivos C++ (<code>globals.h/.cpp</code>, <code>processing.cpp</code>, <code>snap.cpp</code>, <code>mqtt.cpp</code>, <code>diag.cpp</code>). La revisión fue línea por línea y un <code>grep</code> confirmó que no quedaron nombres viejos, pero no hay PlatformIO disponible para compilar aquí.</p>
+      <p><strong>No hay prisa ni riesgo de incompatibilidad:</strong> el JSON que sale por MQTT no cambió, así que el ESP32 puede seguir con el firmware viejo indefinidamente y el sistema funciona igual.</p>
+      <p class="what">compilar con PlatformIO y probar en el ESP32 real antes de subirlo al vehículo.</p>
+    </div>
+
+    <div class="item done">
+      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Los servicios del servidor quizá siguen con el código viejo</h3></div>
+      <p>El <code>git pull</code> en <code>/opt/fenix</code> trajo todo el código nuevo, pero systemd no recarga solo: hasta que se reinicien, <code>fenix_backend</code> y <code>fenix_api</code> siguen ejecutando la versión anterior en memoria.</p>
+      <p class="resolved">18 ago 2026. Confirmado: los tres llevaban corriendo desde el 18 de julio, o sea una semana antes del <code>git pull</code> — el código nuevo estuvo un mes en disco sin ejecutarse. Se reiniciaron los tres; PIDs nuevos, ningún error de import, sin bucle de reinicio, y el par backend→API (<code>POST /internal/snapshot</code> 200 OK cada 5 s) verificado. Corriendo <code>24d2e94</code>. El prefijo de hora en los logs del backend confirma que el <code>logging</code> nuevo está activo. Pendiente solo la prueba con telemetría real cuando se encienda el ESP32.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Seguridad <span class="count">4</span></h2>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Todo el tráfico viaja sin cifrar</h3></div>
+      <p>El dashboard se conecta por <code>ws://</code> y <code>http://</code>. Cualquiera en la misma red (el wifi de un evento, por ejemplo) puede leer la telemetría e interceptar el código de acceso de la línea de meta cuando se envía.</p>
+      <p class="what">configurar TLS en el servidor (certificado, aunque sea autofirmado o por túnel) y cambiar las URLs a <code>wss://</code>/<code>https://</code> en <code>js/config.js</code>. El Frontend ya está listo para el cambio.</p>
+    </div>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Los secretos siguen usando los valores por defecto</h3></div>
+      <p>Se preparó <code>.env.example</code> para que la contraseña de MQTT, el token de InfluxDB y el código de la línea de meta (<code>fenix25</code>) salgan de variables de entorno — pero mientras no exista un <code>.env</code> real en el servidor, se siguen usando los valores que están escritos en el código y visibles en GitHub.</p>
+      <p class="what">crear el <code>.env</code> en el servidor con valores nuevos, y rotar el token de InfluxDB y la contraseña de MQTT, que ya estuvieron expuestos en el repositorio.</p>
+    </div>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">CORS sigue abierto a cualquier origen</h3></div>
+      <p><code>fenix_api.py</code> ya lee <code>FENIX_ALLOWED_ORIGINS</code>, pero como no está definida acepta peticiones de cualquier sitio web y lo avisa al arrancar. Cualquier página podría consultar la API de telemetría desde el navegador de quien la visite.</p>
+      <p class="what">definir <code>FENIX_ALLOWED_ORIGINS</code> con el dominio real del dashboard.</p>
+    </div>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">El repositorio no tiene <code>.gitignore</code></h3></div>
+      <p>Ya causó un problema concreto: un archivo <code>.pyc</code> versionado bloqueó el <code>git pull</code> en el servidor. El riesgo mayor es que, cuando se cree el <code>.env</code> con credenciales reales, nada impide que se suba a GitHub por accidente.</p>
+      <p class="what">crear <code>.gitignore</code> con <code>__pycache__/</code>, <code>*.pyc</code>, <code>.env</code> y <code>venv/</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Servidor <span class="count">5</span></h2>
+    <p class="section-note">Los cuatro primeros son el plan de 3 pasos que quedó acordado: usuario y venv juntos, luego los servicios al repo, y al final la zona horaria.</p>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Zona horaria del servidor en Asia/Kolkata</h3></div>
+      <p>El servidor está configurado con hora de India, no de México. Afecta logs y timestamps del sistema.</p>
+      <p>Antes de cambiarla hay que revisar <code>TZ_OFFSET_HOURS = 6</code> en <code>backend_core/config.py</code>, que compensa UTC−6 al consultar sesiones históricas: hay que confirmar si ese offset queda correcto o hay que ajustarlo, y verificar que las sesiones ya guardadas se sigan encontrando con el filtro por fecha.</p>
+      <p class="what">investigar el flujo de fechas completo, ajustar el código si aplica, y solo entonces correr <code>timedatectl set-timezone America/Mexico_City</code>.</p>
+    </div>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Los servicios corren como <code>root</code></h3></div>
+      <p>Si alguien lograra ejecutar código a través del backend, tendría control total del servidor: llaves SSH, base de datos, todo. InfluxDB y mosquitto ya usan usuarios propios y limitados; los servicios de Fénix no.</p>
+      <p class="what">crear el usuario <code>fenix</code>, darle propiedad de <code>/opt/fenix</code>, y cambiar <code>User=root</code> por <code>User=fenix</code> en los tres servicios.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Sin entorno virtual de Python</h3></div>
+      <p>Los servicios usan el Python del sistema, y por eso <code>pip install</code> falla con <code>externally-managed-environment</code>. Instalar librerías así puede romper herramientas del propio Debian.</p>
+      <p class="what">crear el venv en <code>/opt/fenix/venv</code>, instalar ahí las dependencias, y apuntar el <code>ExecStart=</code> de los tres servicios a <code>/opt/fenix/venv/bin/python</code>. La instalación se documenta en el README, sin recrear <code>requirements.txt</code>.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Los archivos <code>.service</code> solo existen en el servidor</h3></div>
+      <p>Los tres viven sueltos en <code>/etc/systemd/system/</code> y no están versionados. Si el servidor se pierde o se migra, hay que reescribirlos de memoria.</p>
+      <p class="what">meterlos al repo (por ejemplo en <code>software/deploy/</code>) con su propio README, y mencionarlos en el README de <code>software/</code>.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Archivos sueltos por limpiar</h3></div>
+      <p>En <code>/root</code> hay 66 MB de instaladores de InfluxDB ya usados y cuatro archivos vacíos creados por accidente (<code>Alias</code>, <code>Aplicaciones</code>, <code>python3</code>, <code>Configuración</code>). En <code>/opt/fenix</code> quedó un <code>software/Frontend/index.html.bak</code> sin versionar.</p>
+      <p class="what">borrarlos cuando convenga. Ninguno estorba hoy.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Frontend <span class="count">4</span></h2>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Los estados de alerta se comunican solo por color</h3></div>
+      <p>Las temperaturas y los voltajes de celda fuera de rango cambian de verde a amarillo a rojo, sin ningún otro indicador. Alguien con daltonismo no distingue una celda en advertencia de una normal.</p>
+      <p class="what">agregar un ícono, borde o patrón además del color cuando el valor entra en rango de advertencia o crítico.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Telemetría que llega pero no se muestra</h3></div>
+      <p><code>gyro_x</code>, <code>gyro_y</code>, <code>gyro_z</code> y <code>tmp_min</code> viajan desde el vehículo, el backend los procesa y los guarda en InfluxDB, pero el dashboard no los usa en ningún lado.</p>
+      <p class="what">decidir si vale la pena mostrarlos (los giroscopios podrían servir en la vista de dinámica vehicular) o dejarlos solo como dato histórico a propósito.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">La pestaña «Ploteo» sigue vacía</h3></div>
+      <p>Muestra el texto «en construcción». No es un error, es una función que nunca se terminó.</p>
+      <p class="what">definir qué debería graficar, o quitar la pestaña si ya no se planea.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Three.js llegó al final de su rama compatible</h3></div>
+      <p>Se actualizó de <code>r128</code> (2021) a <code>0.160.0</code>, que es la última versión que todavía publica el build clásico. Las versiones más nuevas obligan a reescribir el Frontend con módulos ES e <code>import</code>.</p>
+      <p class="what">nada por ahora. Cuando haya que actualizar más, será un cambio de arquitectura, no una línea.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Backend <span class="count">2</span></h2>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
+      <p>Hoy uno se entera de que algo se cayó cuando el dashboard se queda congelado. No existe un endpoint que responda «estoy vivo, MQTT conectado, InfluxDB respondiendo».</p>
+      <p class="what">agregar un <code>/health</code> que reporte el estado de las conexiones, útil sobre todo antes de una competencia.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Dos módulos quedan fuera de las pruebas automatizadas</h3></div>
+      <p><code>historicos.py</code> y el ciclo principal de <code>mqtt_listener.py</code> necesitan InfluxDB y un broker MQTT reales para probarse, así que no están cubiertos por <code>pytest</code>. Todo lo demás (física, conteo de vueltas, validación de entrada) sí lo está.</p>
+      <p class="what">seguir verificándolos a mano, o montar un entorno de pruebas con servicios reales si el proyecto crece.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ya resuelto <span class="count">18</span></h2>
+    <div class="closing">
+      <h3>No hace falta volver a estos</h3>
+      <ul class="done-list">
+        <li><strong>18 ago 2026 —</strong> Servicios reiniciados: los tres corren por fin el código de <code>24d2e94</code></li>
+        <li>Contraseña de la línea de meta movida al backend, validada con token por header</li>
+        <li>Validación de entrada contra inyección en las consultas a InfluxDB</li>
+        <li>Hashes SRI en las cinco librerías de CDN</li>
+        <li><code>base.css</code> duplicado eliminado; CSS muerto retirado; <code>.tb-pedals</code> sin estilo, corregido</li>
+        <li>URLs del backend centralizadas en <code>config.js</code></li>
+        <li>Fila de tabla de vueltas unificada en <code>utils.js</code> (estaba duplicada)</li>
+        <li><code>updateDashboard()</code> con manejo de errores completo</li>
+        <li>Cada archivo JS aislado en su propio ámbito</li>
+        <li>Colores centralizados: cambiar el tema es editar una variable</li>
+        <li>Backend partido en ocho módulos con responsabilidades separadas</li>
+        <li>Estado global reemplazado por una instancia única con bloqueo de concurrencia</li>
+        <li>Fallo de InfluxDB aislado: ya no tumba la telemetría en vivo</li>
+        <li>CORS configurable por variable de entorno</li>
+        <li>Registro con <code>logging</code> en lugar de <code>print()</code></li>
+        <li>30 pruebas automatizadas (19 backend, 11 frontend)</li>
+        <li>Nombres de variables unificados de punta a punta, del firmware al navegador</li>
+        <li>Seis README nuevos, de <code>software/</code> hacia abajo</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
