@@ -6,6 +6,11 @@
 *.env
 !.env.example
 
+# Credenciales del firmware (WiFi y MQTT). La plantilla versionada es
+# firmware/MGT_firmware/include/secrets.h.example
+secrets.h
+!secrets.h.example
+
 # ── Python ──
 __pycache__/
 *.py[cod]

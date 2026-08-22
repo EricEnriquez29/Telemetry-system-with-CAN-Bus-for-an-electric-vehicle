@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "../../include/secrets.h"
 
 // ─────────────────────────────────────────
 //  CURTIS ACF4-A
@@ -51,8 +52,8 @@ float curr_a = -1;
 // ─────────────────────────────────────────
 //  WIFI
 // ─────────────────────────────────────────
-const char* WIFI_SSID = "ARRIS-FED2";
-const char* WIFI_PASS = "C704208B40622E42";
+const char* WIFI_SSID = SECRET_WIFI_SSID;
+const char* WIFI_PASS = SECRET_WIFI_PASS;
 
 // ─────────────────────────────────────────
 //  TIMESTAMP

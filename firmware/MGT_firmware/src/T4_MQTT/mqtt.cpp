@@ -1,6 +1,7 @@
 #include "mqtt.h"
 #include "../v_globals/globals.h"
 #include "../../include/config.h"
+#include "../../include/secrets.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -8,8 +9,8 @@
 
 #define MQTT_HOST      "23.94.237.163"
 #define MQTT_PORT      1883
-#define MQTT_USER      "fenix25"
-#define MQTT_PASS      "pswTeleFenix"
+#define MQTT_USER      SECRET_MQTT_USER
+#define MQTT_PASS      SECRET_MQTT_PASS
 #define MQTT_TOPIC     "fenix/mgt/snapshot"
 #define MQTT_LWT_TOPIC "fenix/mgt/status"
 #define MQTT_LWT_MSG   "offline"
