@@ -151,6 +151,7 @@
       <p>Se renombraron 17 variables internas en 6 archivos C++ (<code>globals.h/.cpp</code>, <code>processing.cpp</code>, <code>snap.cpp</code>, <code>mqtt.cpp</code>, <code>diag.cpp</code>). La revisión fue línea por línea y un <code>grep</code> confirmó que no quedaron nombres viejos, pero no hay PlatformIO disponible para compilar aquí.</p>
       <p><strong>No hay prisa ni riesgo de incompatibilidad:</strong> el JSON que sale por MQTT no cambió, así que el ESP32 puede seguir con el firmware viejo indefinidamente y el sistema funciona igual.</p>
       <p class="what">compilar con PlatformIO y probar en el ESP32 real antes de subirlo al vehículo.</p>
+      <p class="deferred"><strong>Se le suman dos trabajos (18 ago 2026).</strong> El firmware ahora lee sus credenciales de <code>include/secrets.h</code>, así que hay que crearlo antes de compilar (<code>cp secrets.h.example secrets.h</code>) — está documentado en <code>firmware/README.md</code>. Y la rotación de la contraseña de MQTT quedó atada a este flasheo: cambiarla en mosquitto deja al vehículo sin transmitir hasta que el ESP32 lleve la nueva. Conviene hacer las tres cosas en la misma sesión, con la placa a la mano.</p>
     </div>
 
     <div class="item done">
@@ -176,6 +177,10 @@
       <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Los secretos siguen usando los valores por defecto</h3></div>
       <p>Se preparó <code>.env.example</code> para que la contraseña de MQTT, el token de InfluxDB y el código de la línea de meta (<code>fenix25</code>) salgan de variables de entorno — pero mientras no exista un <code>.env</code> real en el servidor, se siguen usando los valores que están escritos en el código y visibles en GitHub.</p>
       <p class="what">crear el <code>.env</code> en el servidor con valores nuevos, y rotar el token de InfluxDB y la contraseña de MQTT, que ya estuvieron expuestos en el repositorio.</p>
+      <p class="deferred"><strong>Avance del 18 ago 2026.</strong> El repositorio es <strong>público</strong>, y la revisión encontró una credencial más de las tres que listaba este reporte: el <strong>SSID y la contraseña del WiFi</strong> (<code>globals.cpp</code>), que es una red física real. También la IP del servidor en tres archivos — no es una credencial, pero le indica a cualquiera contra qué máquina usar las demás.</p>
+      <p class="deferred"><strong>Ya ocultado:</strong> WiFi y credenciales MQTT del firmware, movidas a <code>include/secrets.h</code> (no versionado, con <code>secrets.h.example</code> como plantilla). Creado el <code>.gitignore</code> de la raíz, que protege <code>.env</code>, <code>secrets.h</code> y <code>__pycache__</code>. Limpiado <code>.env.example</code>, que tenía los valores reales estando versionado.</p>
+      <p class="deferred"><strong>Falta — lado servidor:</strong> crear el <code>.env</code> en <code>/opt/fenix/software/Backend/</code> con <code>chmod 600</code>, añadir <code>EnvironmentFile=</code> a los servicios <code>fenix_backend</code> y <code>fenix_api</code>, verificar que se lee, y solo entonces quitar los valores de respaldo de <code>config.py</code>.</p>
+      <p class="deferred"><strong>Falta — rotaciones:</strong> el token de InfluxDB (el de mayor alcance, y el único que se rota sin tocar el vehículo). La contraseña de MQTT queda <strong>pendiente hasta tener el ESP32 a la mano</strong>: cambiarla en mosquitto deja el coche sin transmitir hasta reflashear, así que va junto con el flasheo del firmware renombrado. Decidido no rotar el WiFi (solo ocultarlo) ni el token de meta.</p>
     </div>
 
     <div class="item warn">
