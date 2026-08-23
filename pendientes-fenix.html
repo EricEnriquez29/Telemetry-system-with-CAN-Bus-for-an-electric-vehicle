@@ -85,6 +85,12 @@
   .item.done .item-title { text-decoration: line-through; text-decoration-thickness: 2px; }
   .item.done p { text-decoration: line-through; }
   .item.done p.resolved { text-decoration: none; color: var(--ok); font-size: 0.9rem; }
+  .item p.urgent {
+    color: var(--text); font-size: 0.92rem; font-weight: 500;
+    background: var(--surface-2); border-left: 3px solid var(--critical);
+    padding: 0.7rem 0.9rem; border-radius: 4px;
+  }
+  .item p.urgent strong { color: var(--critical); }
   .item p.deferred {
     color: var(--muted); font-size: 0.86rem;
     border-left: 2px solid var(--line); padding-left: 0.8rem;
@@ -151,7 +157,13 @@
       <p>Se renombraron 17 variables internas en 6 archivos C++ (<code>globals.h/.cpp</code>, <code>processing.cpp</code>, <code>snap.cpp</code>, <code>mqtt.cpp</code>, <code>diag.cpp</code>). La revisión fue línea por línea y un <code>grep</code> confirmó que no quedaron nombres viejos, pero no hay PlatformIO disponible para compilar aquí.</p>
       <p><strong>No hay prisa ni riesgo de incompatibilidad:</strong> el JSON que sale por MQTT no cambió, así que el ESP32 puede seguir con el firmware viejo indefinidamente y el sistema funciona igual.</p>
       <p class="what">compilar con PlatformIO y probar en el ESP32 real antes de subirlo al vehículo.</p>
-      <p class="deferred"><strong>Se le suman dos trabajos (18 ago 2026).</strong> El firmware ahora lee sus credenciales de <code>include/secrets.h</code>, así que hay que crearlo antes de compilar (<code>cp secrets.h.example secrets.h</code>) — está documentado en <code>firmware/README.md</code>. Y la rotación de la contraseña de MQTT quedó atada a este flasheo: cambiarla en mosquitto deja al vehículo sin transmitir hasta que el ESP32 lleve la nueva. Conviene hacer las tres cosas en la misma sesión, con la placa a la mano.</p>
+      <p class="urgent"><strong>⚠ El vehículo NO puede transmitir desde el 23 ago 2026.</strong> Se rotó la contraseña de MQTT en el broker; el ESP32 sigue con la vieja, así que mosquitto le rechaza la conexión. Fue una decisión consciente — se prefirió cerrar la credencial expuesta sin esperar a tener la placa. La telemetría vuelve en cuanto se flashee.</p>
+      <p class="deferred"><strong>Checklist para la sesión de flasheo</strong> (todo junto, con la placa y cable USB a la mano):</p>
+      <p class="deferred"><strong>1. Antes de compilar:</strong> verificar que existe <code>firmware/MGT_firmware/include/secrets.h</code>. En la PC de trabajo ya está creado y con la contraseña MQTT nueva. En cualquier otra máquina hay que crearlo: <code>cp secrets.h.example secrets.h</code> y rellenar los cuatro valores (ver <code>firmware/README.md</code>). Sin él la compilación falla con <code>fatal error: secrets.h: No such file or directory</code>.</p>
+      <p class="deferred"><strong>2. Compilar y flashear:</strong> <code>pio run</code> y luego <code>pio run --target upload</code>. Este build lleva dos cambios sin probar nunca en hardware: las <strong>17 variables renombradas</strong> en 6 archivos C++ (revisadas línea por línea y con <code>grep</code>, pero jamás compiladas) y las <strong>credenciales movidas a <code>secrets.h</code></strong> — los <code>#define</code> de <code>globals.cpp</code> y <code>mqtt.cpp</code> ahora apuntan ahí.</p>
+      <p class="deferred"><strong>3. Verificar en el monitor serie</strong> (<code>pio device monitor</code>, 115200): que conecte al WiFi, y que conecte al broker MQTT con la contraseña nueva. Ese segundo punto es el que confirma que <code>secrets.h</code> se compiló bien.</p>
+      <p class="deferred"><strong>4. Verificar del lado del servidor:</strong> <code>journalctl -u fenix_backend -f</code> debe dejar de mostrar <code>[WD] Sin datos MQTT</code> y empezar a recibir snapshots reales. Es la primera prueba con telemetría en vivo de todo lo refactorizado: nombres de variables unificados, backend en ocho módulos y el <code>.env</code>.</p>
+      <p class="deferred"><strong>5. Si algo falla:</strong> la contraseña vieja (<code>pswTeleFenix</code>) ya no sirve — mosquitto responde <code>not authorised</code>. Comparar <code>SECRET_MQTT_PASS</code> del <code>secrets.h</code> contra <code>FENIX_MQTT_PASS</code> del <code>.env</code> del servidor: tienen que ser idénticas.</p>
     </div>
 
     <div class="item done">
@@ -182,7 +194,9 @@
       <p class="deferred"><strong>Falta — lado servidor:</strong> crear el <code>.env</code> en <code>/opt/fenix/software/Backend/</code> con <code>chmod 600</code>, añadir <code>EnvironmentFile=</code> a los servicios <code>fenix_backend</code> y <code>fenix_api</code>, verificar que se lee, y solo entonces quitar los valores de respaldo de <code>config.py</code>.</p>
       <p class="deferred"><strong>Hecho — servidor:</strong> creado el <code>.env</code> con <code>chmod 600</code>, añadido <code>EnvironmentFile=</code> a <code>fenix_backend</code> y <code>fenix_api</code>, y verificado que las 12 variables llegan al proceso. Quitados los valores de respaldo de <code>config.py</code>: ya no hay ninguna credencial en archivos versionados (barrido confirmado, 19 tests siguen pasando).</p>
       <p class="deferred"><strong>Hecho — InfluxDB rotado.</strong> El token expuesto tenía permisos de <em>operator</em>: control total del servidor de InfluxDB. Se reemplazó por uno acotado a lectura/escritura del bucket <code>Telemetria</code> y se borró el viejo — verificado que ahora responde <code>401 Unauthorized</code>. Quedan dos tokens: <code>fenix backend v3</code> y <code>admin cli v2</code>.</p>
-      <p class="deferred"><strong>Falta — MQTT:</strong> rotar la contraseña queda <strong>pendiente hasta tener el ESP32 a la mano</strong>, porque cambiarla en mosquitto deja el coche sin transmitir hasta reflashear. Va junto con el flasheo del firmware renombrado. Decidido no rotar el WiFi (solo ocultarlo) ni el token de meta.</p>
+      <p class="deferred"><strong>Hecho — MQTT y token de meta rotados (23 ago 2026).</strong> Se cambió la contraseña del usuario <code>fenix25</code> en mosquitto y el token de <code>/set_meta</code>; ambos verificados (la contraseña vieja responde <code>not authorised</code>). La nueva de MQTT ya está en el <code>secrets.h</code> local, lista para el flasheo. <strong>Consecuencia asumida:</strong> el vehículo no puede transmitir hasta que se flashee el ESP32 — ver el pendiente del firmware.</p>
+      <p class="deferred"><strong>Avisar al equipo</strong> del token nuevo de la línea de meta: es el que se escribe en el formulario del dashboard, y <code>fenix25</code> ya no funciona.</p>
+      <p class="deferred"><strong>No rotado a propósito:</strong> la contraseña del WiFi, solo ocultada en <code>secrets.h</code>. Sigue siendo válida y sigue siendo recuperable del historial de git, que es público. Lo mismo aplica a todo lo rotado: los valores viejos siguen en el historial, pero ya no abren nada.</p>
       <p class="deferred"><strong>Lección del proceso:</strong> <code>influx auth create</code> imprime el token en pantalla, y eso lo filtró tres veces a canales donde no debía estar. La forma segura es que el comando escriba directo a su destino sin mostrarlo: <code>T=$(influx auth create ... --json | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])") &amp;&amp; sed -i "s|^FENIX_INFLUX_TOKEN=.*|FENIX_INFLUX_TOKEN=$T|" .env &amp;&amp; unset T</code></p>
     </div>
 
