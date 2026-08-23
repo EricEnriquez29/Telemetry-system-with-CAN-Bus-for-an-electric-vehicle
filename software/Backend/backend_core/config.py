@@ -2,11 +2,17 @@
 config.py — Configuración central de fenix_backend.
 
 Todos los valores sensibles (contraseñas, tokens) se leen de variables de
-entorno con `os.environ.get(NOMBRE, default)`. El default es el valor
-histórico que ya usaba el equipo, para que el backend siga funcionando
-igual si nadie define las variables de entorno — pero ahora SÍ se puede
-sobreescribir cada uno sin tocar código (ver README.md para la lista de
-variables de entorno soportadas).
+entorno, SIN valor por defecto: si la variable no está definida, la constante
+queda en None y el backend fallará al conectarse. Es deliberado — antes había
+defaults hardcodeados aquí, visibles en el repositorio público.
+
+Las variables se definen en `software/Backend/.env` (no versionado; ver
+`.env.example` para la plantilla). Los servicios systemd lo cargan con
+`EnvironmentFile=/opt/fenix/software/Backend/.env`; sin esa línea el .env
+existe pero nadie lo lee.
+
+El resto de este archivo —constantes de física, conteo de vueltas, tabla OCV—
+sí se versiona a propósito: es la calibración del vehículo.
 """
 
 import logging
@@ -26,17 +32,14 @@ logging.basicConfig(
 # ─── MQTT ────────────────────────────────────────────────────────────────
 MQTT_HOST = os.environ.get("FENIX_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("FENIX_MQTT_PORT", "1883"))
-MQTT_USER = os.environ.get("FENIX_MQTT_USER", "fenix25")
-MQTT_PASS = os.environ.get("FENIX_MQTT_PASS", "pswTeleFenix")
+MQTT_USER = os.environ.get("FENIX_MQTT_USER")
+MQTT_PASS = os.environ.get("FENIX_MQTT_PASS")
 MQTT_TOPIC = "fenix/mgt/snapshot"
 MQTT_STATUS_TOPIC = "fenix/mgt/status"
 
 # ─── InfluxDB ────────────────────────────────────────────────────────────
 INFLUX_URL = os.environ.get("FENIX_INFLUX_URL", "http://localhost:8086")
-INFLUX_TOKEN = os.environ.get(
-    "FENIX_INFLUX_TOKEN",
-    "LIYzY_Q_DaHCXNDQ3fpkfnTxh9Lx_-wITjXy-3jlGyccx0LpB0yozjM-dpVf6_0YMHjZxS7m4ZTvG7wHVtzrjg==",
-)
+INFLUX_TOKEN = os.environ.get("FENIX_INFLUX_TOKEN")
 INFLUX_ORG = os.environ.get("FENIX_INFLUX_ORG", "Escuderia Fenix UPIITA")
 INFLUX_BUCKET = os.environ.get("FENIX_INFLUX_BUCKET", "Telemetria")
 
@@ -69,7 +72,7 @@ META_HTTP_PORT = int(os.environ.get("FENIX_META_HTTP_PORT", "8060"))
 # el código fuente del navegador). Ahora la validación real ocurre en el
 # backend (meta_server.py), comparando este token contra el header
 # X-Meta-Token — el frontend nunca lo compara localmente.
-META_ACCESS_TOKEN = os.environ.get("FENIX_META_TOKEN", "fenix25")
+META_ACCESS_TOKEN = os.environ.get("FENIX_META_TOKEN")
 
 # ─── Watchdog ─────────────────────────────────────────────────────────────
 WATCHDOG_TIMEOUT = 5.0  # segundos sin datos MQTT → enviar ceros

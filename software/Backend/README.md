@@ -139,27 +139,44 @@ pytest       (solo para correr test_automatizado.py, no es necesario en producci
 
 ## Configuración — variables de entorno
 
-Todos los valores sensibles o dependientes del entorno se pueden sobreescribir sin tocar código. Copia `.env.example` a `.env` (o defínelas directo en tu servicio/systemd) — si no las defines, el backend usa los valores por default que ya tenía:
+Los valores sensibles **no tienen default**: se leen del entorno y, si faltan, el backend arranca pero falla al conectarse. Es deliberado — antes estaban hardcodeados en `config.py`, visibles en el repositorio público.
+
+Copia `.env.example` a `.env` y rellena los valores:
+
+```bash
+cd software/Backend
+cp .env.example .env
+nano .env
+chmod 600 .env
+```
+
+El `.env` no se versiona (`.gitignore`). Para que los servicios lo lean, cada uno necesita esta línea bajo `[Service]`:
+
+```
+EnvironmentFile=/opt/fenix/software/Backend/.env
+```
+
+Sin ella el archivo existe pero nadie lo carga. Tras editarlo: `systemctl daemon-reload && systemctl restart fenix_backend fenix_api`.
 
 | Variable | Default | Para qué es |
 |---|---|---|
 | `FENIX_MQTT_HOST` | `localhost` | Host del broker MQTT |
 | `FENIX_MQTT_PORT` | `1883` | Puerto del broker MQTT |
-| `FENIX_MQTT_USER` / `FENIX_MQTT_PASS` | `fenix25` / `pswTeleFenix` | Credenciales MQTT |
+| `FENIX_MQTT_USER` / `FENIX_MQTT_PASS` | **sin default** | Credenciales MQTT. Deben coincidir con `secrets.h` del firmware |
 | `FENIX_INFLUX_URL` | `http://localhost:8086` | URL de InfluxDB |
-| `FENIX_INFLUX_TOKEN` | (token histórico) | Token de acceso a InfluxDB |
+| `FENIX_INFLUX_TOKEN` | **sin default** | Token de InfluxDB. Basta uno acotado a lectura/escritura del bucket |
 | `FENIX_INFLUX_ORG` | `Escuderia Fenix UPIITA` | Organización en InfluxDB |
 | `FENIX_INFLUX_BUCKET` | `Telemetria` | Bucket de InfluxDB |
 | `FENIX_API_INTERNAL_URL` | `http://localhost:8050/internal/snapshot` | A dónde le empuja `fenix_backend.py` cada snapshot |
 | `FENIX_META_HTTP_PORT` | `8060` | Puerto del servidor de `/set_meta` |
-| `FENIX_META_TOKEN` | `fenix25` | Token que valida `POST /set_meta` (lo envía el Frontend por header `X-Meta-Token`) |
+| `FENIX_META_TOKEN` | **sin default** | Token que valida `POST /set_meta` (lo envía el Frontend por header `X-Meta-Token`) |
 | `FENIX_ALLOWED_ORIGINS` | *(vacío → `*`)* | Orígenes permitidos por CORS en `fenix_api.py`, separados por coma. **Vacío = abierto a cualquier origen** — defínelo con el dominio real del dashboard antes de producción. |
 
 ## Convenciones
 
 - **Sin variables globales sueltas**: el estado mutable del backend vive en `backend_core/estado.py`, no como `global` sueltos por archivo.
 - **Separación controlador / lógica de negocio**: solo `mqtt_listener.py` y `meta_server.py` reciben entrada externa (MQTT/HTTP); el resto son funciones puras o de acceso a datos.
-- **Nunca secretos en el código**: contraseñas y tokens se leen de variables de entorno (ver arriba), con el valor histórico como default para no romper despliegues existentes.
+- **Nunca secretos en el código**: contraseñas y tokens se leen de variables de entorno (ver arriba), sin default. Si falta una, el fallo es inmediato y visible — preferible a arrancar con una credencial hardcodeada.
 - **Validación en el borde**: `meta_server.py` valida formato y autentica antes de tocar InfluxDB o el conteo de vueltas.
 - **Logging, no `print()` suelto**: mensajes vía `logging`, mismo formato de tags (`[LAP]`, `[SOH]`, `[MGT]`, etc.) que antes.
 - **Concurrencia controlada**: `estado.lock` (un `RLock`) protege el estado compartido entre el hilo de MQTT y los hilos HTTP de `meta_server.py` — evita que un `POST /set_meta` se mezcle con un mensaje MQTT a medio procesar.
