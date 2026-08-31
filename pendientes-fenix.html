@@ -137,27 +137,29 @@
     <div class="meta">
       <span>Creado 25 jul 2026 · actualizado 23 ago 2026</span>
       <span>Repo y servidor sincronizados</span>
-      <span>Vehículo sin transmitir hasta flashear</span>
+      <span>Telemetría en vivo verificada 30 ago 2026</span>
     </div>
   </header>
 
   <div class="tally">
-    <div class="tally-cell"><span class="tally-num n-crit">1</span><span class="tally-label">Bloqueantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-crit">0</span><span class="tally-label">Bloqueantes</span></div>
     <div class="tally-cell"><span class="tally-num n-warn">4</span><span class="tally-label">Importantes</span></div>
     <div class="tally-cell"><span class="tally-num n-info">9</span><span class="tally-label">Menores</span></div>
-    <div class="tally-cell"><span class="tally-num n-ok">21</span><span class="tally-label">Resueltos</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">22</span><span class="tally-label">Resueltos</span></div>
   </div>
 
   <section>
-    <h2>Sin verificar <span class="count">1 abierto · 1 resuelto</span></h2>
+    <h2>Sin verificar <span class="count">2 resueltos</span></h2>
     <p class="section-note">Trabajo terminado en código, pero que nadie ha confirmado que funcione en el mundo real.</p>
 
-    <div class="item crit">
-      <div class="item-head"><span class="chip crit">Bloqueante</span><h3 class="item-title">El firmware renombrado no se ha compilado ni flasheado</h3></div>
+    <div class="item done">
+      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">El firmware renombrado no se ha compilado ni flasheado</h3></div>
       <p>Se renombraron 17 variables internas en 6 archivos C++ (<code>globals.h/.cpp</code>, <code>processing.cpp</code>, <code>snap.cpp</code>, <code>mqtt.cpp</code>, <code>diag.cpp</code>). La revisión fue línea por línea y un <code>grep</code> confirmó que no quedaron nombres viejos, pero no hay PlatformIO disponible para compilar aquí.</p>
       <p><strong>No hay prisa ni riesgo de incompatibilidad:</strong> el JSON que sale por MQTT no cambió, así que el ESP32 puede seguir con el firmware viejo indefinidamente y el sistema funciona igual.</p>
       <p class="what">compilar con PlatformIO y probar en el ESP32 real antes de subirlo al vehículo.</p>
-      <p class="urgent"><strong>⚠ El vehículo NO puede transmitir desde el 23 ago 2026.</strong> Se rotó la contraseña de MQTT en el broker; el ESP32 sigue con la vieja, así que mosquitto le rechaza la conexión. Fue una decisión consciente — se prefirió cerrar la credencial expuesta sin esperar a tener la placa. La telemetría vuelve en cuanto se flashee.</p>
+      <p class="resolved">30 ago 2026 — <strong>flasheado y verificado en hardware.</strong> Cadena completa funcionando: el ESP32 conecta al broker con la contraseña nueva, el backend recibe, e InfluxDB guarda con el token rotado (<code>[InfluxDB] guardado</code> cada ~130 ms, sin errores). Valida de golpe las 17 variables renombradas, el backend en ocho módulos y el <code>.env</code> — nada de eso se había probado nunca con datos reales.</p>
+      <p class="deferred"><strong>Falta la prueba con el vehículo encendido.</strong> Los campos llegan en <code>-1</code> (sin dato del bus CAN), así que lo verificado es la tubería de transporte, no las lecturas de los sensores. El backend descarta correctamente lo inválido (<code>[AUX] Muestra descartada</code>).</p>
+      <p class="deferred"><strong>Dato para el pendiente de zona horaria:</strong> en los logs, un snapshot registrado a las <code>07:50 IST</code> del servidor se guarda con marca <code>2026-08-30 20:20</code>. Es <code>TZ_OFFSET_HOURS = 6</code> haciendo su trabajo — los datos quedan en hora de México — pero confirma que hay dos husos en juego y que tocar la zona horaria del sistema sin revisar ese offset movería las marcas de tiempo.</p>
       <p class="deferred"><strong>Checklist para la sesión de flasheo</strong> (todo junto, con la placa y cable USB a la mano):</p>
       <p class="deferred"><strong>1. Antes de compilar:</strong> verificar que existe <code>firmware/MGT_firmware/include/secrets.h</code>. En la PC de trabajo ya está creado y con la contraseña MQTT nueva. En cualquier otra máquina hay que crearlo: <code>cp secrets.h.example secrets.h</code> y rellenar los cuatro valores (ver <code>firmware/README.md</code>). Sin él la compilación falla con <code>fatal error: secrets.h: No such file or directory</code>.</p>
       <p class="deferred"><strong>2. Compilar y flashear:</strong> <code>pio run</code> y luego <code>pio run --target upload</code>. Este build lleva dos cambios sin probar nunca en hardware: las <strong>17 variables renombradas</strong> en 6 archivos C++ (revisadas línea por línea y con <code>grep</code>, pero jamás compiladas) y las <strong>credenciales movidas a <code>secrets.h</code></strong> — los <code>#define</code> de <code>globals.cpp</code> y <code>mqtt.cpp</code> ahora apuntan ahí.</p>
