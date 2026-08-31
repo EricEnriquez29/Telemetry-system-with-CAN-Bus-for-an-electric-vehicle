@@ -182,24 +182,31 @@ from(bucket: "{config.INFLUX_BUCKET}")
         e_v = (max(grp["ehv"]) - min(grp["ehv"])) if grp["ehv"] else None
         er_v = (max(grp["ereg"]) - min(grp["ereg"])) if grp["ereg"] else None
         eta_v = _r(e_v / d_v, 2) if (e_v is not None and d_v > 0) else None
-        vel_max, vel_prom = maxprom(grp["spd"], 1)
-        phv_max, phv_prom = maxprom(grp["phv"])
-        pregen_max, pregen_prom = maxprom(grp["pregen"])
-        pmec_max, pmec_prom = maxprom(grp["pmec"])
-        gx_max = _r(max(grp["gx"]), 2) if grp["gx"] else None
-        gy_max = _r(max(grp["gy"]), 2) if grp["gy"] else None
-        rpm_max, rpm_prom = maxprom(grp["rpm"])
+        # OJO: estas variables llevan prefijo lap_ a propósito. Antes se
+        # llamaban phv_max, pregen_max, pmec_max, gx_max, gy_max y rpm_max —
+        # los mismos nombres que los acumuladores del resumen de sesión de
+        # más arriba — así que cada vuelta los pisaba, y el resumen acababa
+        # devolviendo los máximos de la ÚLTIMA vuelta en vez de los de toda
+        # la sesión. Los promedios no se veían afectados porque el resumen
+        # los calcula aparte, con sus propios *_sum / *_n.
+        lap_vel_max, lap_vel_prom = maxprom(grp["spd"], 1)
+        lap_phv_max, lap_phv_prom = maxprom(grp["phv"])
+        lap_pregen_max, lap_pregen_prom = maxprom(grp["pregen"])
+        lap_pmec_max, lap_pmec_prom = maxprom(grp["pmec"])
+        lap_gx_max = _r(max(grp["gx"]), 2) if grp["gx"] else None
+        lap_gy_max = _r(max(grp["gy"]), 2) if grp["gy"] else None
+        lap_rpm_max, lap_rpm_prom = maxprom(grp["rpm"])
         laps.append({
             "n_lap": lap_n, "t_vuelta": _r(t_v, 1), "d_vuelta": _r(d_v, 4),
             "E_vuelta": _r(e_v, 3) if e_v is not None else None,
             "E_regen_vuelta": _r(er_v, 3) if er_v is not None else None,
             "eta_vuelta": eta_v,
-            "vel_max": vel_max, "vel_prom": vel_prom,
-            "p_hv_max": phv_max, "p_hv_prom": phv_prom,
-            "p_regen_max": pregen_max, "p_regen_prom": pregen_prom,
-            "p_mec_max": pmec_max, "p_mec_prom": pmec_prom,
-            "Gx_max": gx_max, "Gy_max": gy_max,
-            "rpm_max": rpm_max, "rpm_prom": rpm_prom,
+            "vel_max": lap_vel_max, "vel_prom": lap_vel_prom,
+            "p_hv_max": lap_phv_max, "p_hv_prom": lap_phv_prom,
+            "p_regen_max": lap_pregen_max, "p_regen_prom": lap_pregen_prom,
+            "p_mec_max": lap_pmec_max, "p_mec_prom": lap_pmec_prom,
+            "Gx_max": lap_gx_max, "Gy_max": lap_gy_max,
+            "rpm_max": lap_rpm_max, "rpm_prom": lap_rpm_prom,
         })
 
     if laps:
