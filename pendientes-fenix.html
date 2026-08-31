@@ -135,7 +135,7 @@
     <h1>Pendientes y correcciones del sistema de telemetría</h1>
     <p class="lede">Todo lo que quedó identificado pero sin aplicar durante la sesión de refactorización. Ordenado por severidad dentro de cada área.</p>
     <div class="meta">
-      <span>Creado 25 jul 2026 · actualizado 23 ago 2026</span>
+      <span>Creado 25 jul 2026 · actualizado 30 ago 2026</span>
       <span>Repo y servidor sincronizados</span>
       <span>Telemetría en vivo verificada 30 ago 2026</span>
     </div>
@@ -143,9 +143,9 @@
 
   <div class="tally">
     <div class="tally-cell"><span class="tally-num n-crit">0</span><span class="tally-label">Bloqueantes</span></div>
-    <div class="tally-cell"><span class="tally-num n-warn">4</span><span class="tally-label">Importantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-warn">5</span><span class="tally-label">Importantes</span></div>
     <div class="tally-cell"><span class="tally-num n-info">9</span><span class="tally-label">Menores</span></div>
-    <div class="tally-cell"><span class="tally-num n-ok">22</span><span class="tally-label">Resueltos</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">23</span><span class="tally-label">Resueltos</span></div>
   </div>
 
   <section>
@@ -281,7 +281,16 @@
   </section>
 
   <section>
-    <h2>Backend <span class="count">2</span></h2>
+    <h2>Backend <span class="count">3</span></h2>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Valores de telemetría con escala imposible o congelados</h3></div>
+      <p>Detectado el 30 ago 2026 revisando la sesión 32 (3 jul, anterior al refactor — no lo causó el renombrado). Tres síntomas distintos en los datos que se guardan, no en cómo se muestran:</p>
+      <p><strong>1. Temperaturas imposibles:</strong> motor 2663°, controlador 2268°, capacitores 2400°. Con un factor ÷100 darían 26.6°, 22.7° y 24° — coherentes con temperatura ambiente. La batería marca 127°, que con ÷10 daría 12.7°. Que los divisores no coincidan entre sí apunta a escalado por trama, no a un error único de unidades.</p>
+      <p><strong>2. Fuerzas G disparatadas:</strong> <code>Gy</code> salta entre 19 y 105 dentro de la misma sesión (un piloto se desmaya sobre 5 g). Si fuera solo escala, el factor sería constante.</p>
+      <p><strong>3. Valores congelados:</strong> <code>P.MEC 4653/4653</code>, <code>VEL 61.2/61.2</code> y <code>RPM 1554/1554</code> — máximo idéntico al promedio — en 12 de las 14 vueltas. Un valor que no varía en toda una vuelta no es plausible en un coche que acelera y frena. Las únicas vueltas con variación real son la 2 y la 4, justo las que registran regeneración.</p>
+      <p class="what">seguir la cadena CAN → firmware → <code>fisica.py</code> comparando una trama cruda contra lo que acaba en InfluxDB. Empezar por las temperaturas, que son las que tienen una hipótesis clara (÷100).</p>
+    </div>
 
     <div class="item info">
       <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
@@ -301,6 +310,8 @@
     <div class="closing">
       <h3>No hace falta volver a estos</h3>
       <ul class="done-list">
+        <li><strong>30 ago 2026 —</strong> Corregidos los máximos del resumen de sesión: el bucle de vueltas pisaba los acumuladores y devolvía los de la última vuelta</li>
+        <li><strong>30 ago 2026 —</strong> CORS cerrado en los dos servidores: <code>meta_server.py</code> tenía <code>*</code> escrito a mano</li>
         <li><strong>18 ago 2026 —</strong> Servicios reiniciados: los tres corren por fin el código de <code>24d2e94</code></li>
         <li>Contraseña de la línea de meta movida al backend, validada con token por header</li>
         <li>Validación de entrada contra inyección en las consultas a InfluxDB</li>
