@@ -1,0 +1,13 @@
+[Unit]
+Description=Fenix Telemetry Frontend
+After=network.target
+
+[Service]
+User=fenix
+WorkingDirectory=/opt/fenix/software/Frontend
+ExecStart=/opt/fenix/venv/bin/python -m http.server 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

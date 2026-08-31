@@ -1,0 +1,13 @@
+[Unit]
+Description=Fenix Backend MQTT to InfluxDB
+After=network.target mosquitto.service influxdb.service
+
+[Service]
+EnvironmentFile=/opt/fenix/software/Backend/.env
+ExecStart=/opt/fenix/venv/bin/python /opt/fenix/software/Backend/fenix_backend.py
+Restart=always
+RestartSec=5
+User=fenix
+
+[Install]
+WantedBy=multi-user.target

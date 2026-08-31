@@ -1,0 +1,14 @@
+[Unit]
+Description=Fenix Telemetry API
+After=network.target fenix_backend.service
+
+[Service]
+User=fenix
+EnvironmentFile=/opt/fenix/software/Backend/.env
+WorkingDirectory=/opt/fenix/software/Backend
+ExecStart=/opt/fenix/venv/bin/python -m uvicorn fenix_api:app --host 0.0.0.0 --port 8050
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
