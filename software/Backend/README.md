@@ -132,10 +132,39 @@ paho-mqtt
 influxdb-client
 requests
 fastapi
-uvicorn
-pydantic
-pytest       (solo para correr test_automatizado.py, no es necesario en producción)
+uvicorn[standard]   el extra trae websockets, necesario para el WebSocket del dashboard
+pydantic            lo instala fastapi
+pytest              solo para test_automatizado.py, no hace falta en producción
 ```
+
+### Instalación en el servidor (entorno virtual)
+
+Debian bloquea `pip install` sobre el Python del sistema
+(`externally-managed-environment`), y con razón: instalar ahí puede romper
+herramientas del propio sistema operativo. Las dependencias van en un entorno
+virtual en `/opt/fenix/venv`, aislado del resto.
+
+Se crea como el usuario `fenix`, que es quien corre los servicios, para que la
+propiedad de los archivos quede correcta desde el principio:
+
+```bash
+apt install -y python3.13-venv          # una sola vez
+runuser -u fenix -- python3 -m venv /opt/fenix/venv
+runuser -u fenix -- /opt/fenix/venv/bin/pip install fastapi uvicorn[standard] influxdb-client paho-mqtt requests
+```
+
+Los tres servicios systemd apuntan a ese intérprete:
+
+```
+ExecStart=/opt/fenix/venv/bin/python ...
+```
+
+Para añadir o actualizar una dependencia más adelante, usar siempre el pip del
+venv (`/opt/fenix/venv/bin/pip`), nunca el del sistema. Si el venv se corrompe,
+se borra la carpeta y se repiten los dos últimos comandos — no afecta a nada
+más del servidor.
+
+No se versiona un `requirements.txt`: la lista de arriba es la referencia.
 
 ## Configuración — variables de entorno
 
