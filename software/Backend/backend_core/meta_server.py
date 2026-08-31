@@ -31,12 +31,34 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class _MetaHandler(BaseHTTPRequestHandler):
 
+    def _cors_origin(self):
+        """Origen a devolver en Access-Control-Allow-Origin, o None si no se
+        permite. Antes era "*" fijo: cualquier página web podía leer estas
+        respuestas desde el navegador de quien la visitara. Ahora respeta
+        FENIX_ALLOWED_ORIGINS, igual que fenix_api.py.
+
+        Con lista blanca hay que devolver el origen concreto de la petición
+        (el navegador rechaza una lista, y "*" anularía la restricción), por
+        eso se compara contra el header Origin y se responde con ese mismo
+        valor. Si no está permitido, se omite la cabecera y el navegador
+        bloquea la lectura.
+        """
+        if config.ALLOWED_ORIGINS == ["*"]:
+            return "*"
+        origen = self.headers.get("Origin", "")
+        return origen if origen in config.ALLOWED_ORIGINS else None
+
     def _send(self, code, payload):
         body = json.dumps(payload).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        origen = self._cors_origin()
+        if origen:
+            self.send_header("Access-Control-Allow-Origin", origen)
+            # Sin Vary, un proxy o caché podría servirle a un origen la
+            # respuesta que se generó para otro.
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Meta-Token")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()

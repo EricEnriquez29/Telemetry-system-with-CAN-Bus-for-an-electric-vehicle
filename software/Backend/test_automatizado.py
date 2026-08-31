@@ -17,7 +17,7 @@ Ver la sección "Pruebas automatizadas" en README.md para más contexto.
 
 import pytest
 
-from backend_core import fisica, meta_server, vueltas
+from backend_core import config, fisica, meta_server, vueltas
 from backend_core.estado import estado
 
 
@@ -166,3 +166,34 @@ class TestValidacionMetaServer:
     def test_intento_de_inyeccion_no_pasa_regex(self):
         assert not meta_server._SESSION_ID_RE.match('1" or true or "')
         assert not meta_server._SESSION_ID_RE.match("1; DROP TABLE x")
+
+
+# ─── meta_server.py — CORS ──────────────────────────────────────────────────
+
+class TestCorsMetaServer:
+    """El header Access-Control-Allow-Origin estaba fijo en "*": cualquier
+    página web podía leer estas respuestas desde el navegador de quien la
+    visitara. Ahora respeta FENIX_ALLOWED_ORIGINS."""
+
+    class _Peticion:
+        """Lo mínimo que _cors_origin necesita de BaseHTTPRequestHandler."""
+        def __init__(self, origin=None):
+            self.headers = {"Origin": origin} if origin else {}
+        _cors_origin = meta_server._MetaHandler._cors_origin
+
+    def test_sin_lista_blanca_permite_cualquier_origen(self, monkeypatch):
+        monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["*"])
+        assert self._Peticion("http://cualquiera.com")._cors_origin() == "*"
+
+    def test_origen_en_la_lista_se_devuelve_tal_cual(self, monkeypatch):
+        monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["http://23.94.237.163:8080"])
+        peticion = self._Peticion("http://23.94.237.163:8080")
+        assert peticion._cors_origin() == "http://23.94.237.163:8080"
+
+    def test_origen_ajeno_no_recibe_cabecera(self, monkeypatch):
+        monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["http://23.94.237.163:8080"])
+        assert self._Peticion("http://sitio-ajeno.com")._cors_origin() is None
+
+    def test_peticion_sin_origen_no_recibe_cabecera(self, monkeypatch):
+        monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["http://23.94.237.163:8080"])
+        assert self._Peticion()._cors_origin() is None

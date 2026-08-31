@@ -43,6 +43,13 @@ INFLUX_TOKEN = os.environ.get("FENIX_INFLUX_TOKEN")
 INFLUX_ORG = os.environ.get("FENIX_INFLUX_ORG", "Escuderia Fenix UPIITA")
 INFLUX_BUCKET = os.environ.get("FENIX_INFLUX_BUCKET", "Telemetria")
 
+# ─── CORS ────────────────────────────────────────────────────────────────
+# Lista separada por comas con los orígenes que pueden consumir la API desde
+# un navegador. Vacía = "*" (cualquiera), que es lo que había antes.
+# La usan meta_server.py (puerto 8060) y fenix_api.py (puerto 8050).
+_origins_env = os.environ.get("FENIX_ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
+
 # ─── URL interna de fenix_api ────────────────────────────────────────────
 API_INTERNAL_URL = os.environ.get(
     "FENIX_API_INTERNAL_URL", "http://localhost:8050/internal/snapshot"
