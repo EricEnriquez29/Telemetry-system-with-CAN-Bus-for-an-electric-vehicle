@@ -233,7 +233,7 @@
       <p>Si alguien lograra ejecutar código a través del backend, tendría control total del servidor: llaves SSH, base de datos, todo. InfluxDB y mosquitto ya usan usuarios propios y limitados; los servicios de Fénix no.</p>
       <p class="what">crear el usuario <code>fenix</code>, darle propiedad de <code>/opt/fenix</code>, y cambiar <code>User=root</code> por <code>User=fenix</code> en los tres servicios.</p>
       <p class="resolved">30 ago 2026. Usuario de sistema <code>fenix</code> (uid 997, <code>nologin</code>, sin home), propiedad de <code>/opt/fenix</code> traspasada, y <code>User=fenix</code> en los tres servicios. Solo <code>fenix_backend</code> tenía la línea <code>User=</code>; los otros dos corrían como root por omisión, así que hubo que añadirla. Verificado con <code>ps</code>: los tres procesos son del usuario <code>fenix</code>, y siguen conectando a MQTT, escribiendo en InfluxDB y sirviendo el WebSocket. Antes de tocar nada se comprobó que el backend no escribe archivos fuera de <code>/opt/fenix</code> y que sus tres puertos están por encima de 1024. Copias de respaldo de los <code>.service</code> en <code>.bak2</code>.</p>
-      <p class="deferred"><strong>Cambia la rutina de despliegue:</strong> un <code>git pull</code> como root deja los archivos nuevos con propiedad de root. Usar <code>sudo -u fenix git -C /opt/fenix pull</code>.</p>
+      <p class="deferred"><strong>Cambia la rutina de despliegue:</strong> un <code>git pull</code> como root deja los archivos nuevos con propiedad de root. Usar <code>runuser -u fenix -- git -C /opt/fenix pull</code> (el servidor no tiene <code>sudo</code> instalado). Después, <code>systemctl restart</code> de lo que corresponda.</p>
     </div>
 
     <div class="item info">
