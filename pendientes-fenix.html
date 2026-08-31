@@ -143,9 +143,9 @@
 
   <div class="tally">
     <div class="tally-cell"><span class="tally-num n-crit">0</span><span class="tally-label">Bloqueantes</span></div>
-    <div class="tally-cell"><span class="tally-num n-warn">4</span><span class="tally-label">Importantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-warn">3</span><span class="tally-label">Importantes</span></div>
     <div class="tally-cell"><span class="tally-num n-info">9</span><span class="tally-label">Menores</span></div>
-    <div class="tally-cell"><span class="tally-num n-ok">23</span><span class="tally-label">Resueltos</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">24</span><span class="tally-label">Resueltos</span></div>
   </div>
 
   <section>
@@ -176,7 +176,7 @@
   </section>
 
   <section>
-    <h2>Seguridad <span class="count">2 abiertos · 2 resueltos</span></h2>
+    <h2>Seguridad <span class="count">1 abierto · 3 resueltos</span></h2>
 
     <div class="item warn">
       <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Todo el tráfico viaja sin cifrar</h3></div>
@@ -202,10 +202,11 @@
       <p class="deferred"><strong>Lección del proceso:</strong> <code>influx auth create</code> imprime el token en pantalla, y eso lo filtró tres veces a canales donde no debía estar. La forma segura es que el comando escriba directo a su destino sin mostrarlo: <code>T=$(influx auth create ... --json | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])") &amp;&amp; sed -i "s|^FENIX_INFLUX_TOKEN=.*|FENIX_INFLUX_TOKEN=$T|" .env &amp;&amp; unset T</code></p>
     </div>
 
-    <div class="item warn">
-      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">CORS sigue abierto a cualquier origen</h3></div>
+    <div class="item done">
+      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">CORS sigue abierto a cualquier origen</h3></div>
       <p><code>fenix_api.py</code> ya lee <code>FENIX_ALLOWED_ORIGINS</code>, pero como no está definida acepta peticiones de cualquier sitio web y lo avisa al arrancar. Cualquier página podría consultar la API de telemetría desde el navegador de quien la visite.</p>
       <p class="what">definir <code>FENIX_ALLOWED_ORIGINS</code> con el dominio real del dashboard.</p>
+      <p class="resolved">30 ago 2026. Definida la variable en el <code>.env</code> con el origen del dashboard. Al hacerlo apareció que el pendiente cubría solo la mitad: <code>meta_server.py</code> (puerto 8060) tenía <code>Access-Control-Allow-Origin: *</code> escrito a mano, y es el que sirve <code>session_summary</code>, <code>sessions_for_date</code> y <code>set_meta</code> — justo lo que más usa el Frontend. Ahora ambos servidores leen la misma lista desde <code>config.ALLOWED_ORIGINS</code>. Verificado con <code>curl</code>: el origen del dashboard recibe la cabecera, uno ajeno no la recibe. Se agregaron 4 pruebas automatizadas.</p>
     </div>
 
     <div class="item done">
