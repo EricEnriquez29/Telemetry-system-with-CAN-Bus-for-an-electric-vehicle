@@ -1,3 +1,11 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  Este archivo está versionado en el repositorio, en software/deploy/.
+#  Systemd lee la copia de /etc/systemd/system/, no esta.
+#
+#  Si lo modificas en el servidor, copia el cambio también al repo
+#  (ver software/deploy/README.md) o el respaldo quedará desactualizado.
+#  Tras cualquier cambio: systemctl daemon-reload && systemctl restart ...
+# ─────────────────────────────────────────────────────────────────────────
 [Unit]
 Description=Fenix Telemetry Frontend
 After=network.target
