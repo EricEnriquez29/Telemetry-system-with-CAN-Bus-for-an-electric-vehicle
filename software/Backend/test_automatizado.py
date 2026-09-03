@@ -17,6 +17,8 @@ Ver la sección "Pruebas automatizadas" en README.md para más contexto.
 
 import pytest
 
+from datetime import datetime, timedelta, timezone
+
 from backend_core import config, fisica, meta_server, vueltas
 from backend_core.estado import estado
 
@@ -197,3 +199,50 @@ class TestCorsMetaServer:
     def test_peticion_sin_origen_no_recibe_cabecera(self, monkeypatch):
         monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["http://23.94.237.163:8080"])
         assert self._Peticion()._cors_origin() is None
+
+
+# ─── config.py — coherencia de la zona horaria ──────────────────────────────
+
+class TestDesfaseHorario:
+    """El desfase de México se aplica en dos puntos opuestos del flujo:
+    mqtt_listener lo RESTA al guardar (hora local del ESP32 → UTC) e
+    historicos lo SUMA al consultar (fecha local → ventana UTC). Ambos leen
+    config.TZ_OFFSET_HOURS; si alguien desalineara los signos, las sesiones
+    guardadas dejarían de encontrarse sin que saltara ningún error."""
+
+    def _guardar(self, texto_del_esp32):
+        """Reproduce la conversión de mqtt_listener.py al escribir en InfluxDB."""
+        return datetime.strptime(texto_del_esp32, "%Y-%m-%d %H:%M:%S.%f").replace(
+            tzinfo=timezone(timedelta(hours=-config.TZ_OFFSET_HOURS))
+        ).astimezone(timezone.utc).replace(tzinfo=None)
+
+    def _ventana(self, fecha):
+        """Reproduce la ventana de día que arma historicos.py al consultar."""
+        inicio = datetime.strptime(fecha, "%Y-%m-%d") + timedelta(hours=config.TZ_OFFSET_HOURS)
+        return inicio, inicio + timedelta(days=1)
+
+    def test_dato_de_la_tarde_se_encuentra_en_su_dia_local(self):
+        # Caso real: snapshot de las 20:20 del 30 ago, guardado como 02:20 UTC
+        # del 31. Consultar el 30 tiene que encontrarlo pese al cambio de día.
+        guardado = self._guardar("2026-08-30 20:20:59.374")
+        assert guardado == datetime(2026, 8, 31, 2, 20, 59, 374000)
+        inicio, fin = self._ventana("2026-08-30")
+        assert inicio <= guardado < fin
+
+    def test_dato_de_la_manana_se_encuentra_en_su_dia_local(self):
+        guardado = self._guardar("2026-08-30 08:15:00.000")
+        inicio, fin = self._ventana("2026-08-30")
+        assert inicio <= guardado < fin
+
+    def test_dato_no_aparece_en_el_dia_anterior(self):
+        guardado = self._guardar("2026-08-30 20:20:59.374")
+        inicio, fin = self._ventana("2026-08-29")
+        assert not (inicio <= guardado < fin)
+
+    def test_medianoche_local_cae_en_su_dia_y_no_en_el_previo(self):
+        # El borde: 00:00:00.001 local del 30 pertenece al 30, no al 29.
+        guardado = self._guardar("2026-08-30 00:00:00.001")
+        inicio, fin = self._ventana("2026-08-30")
+        assert inicio <= guardado < fin
+        inicio_prev, fin_prev = self._ventana("2026-08-29")
+        assert not (inicio_prev <= guardado < fin_prev)

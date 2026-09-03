@@ -364,8 +364,13 @@ def on_snapshot_message(client, userdata, msg):
         derived["soh_c"] = round(estado.soh_c, 2) if estado.soh_c is not None else None
 
         # ── 7. Escribir en InfluxDB ───────────────────────────────────────────
+        # El ESP32 manda la hora como texto, sin zona horaria ("2026-08-30
+        # 20:20:59.374"), así que hay que decirle a Python en qué huso está
+        # medida. El desfase sale de config.TZ_OFFSET_HOURS, la misma
+        # constante que usa historicos.py al consultar — en negativo aquí
+        # porque este convierte de local a UTC y aquel de UTC a local.
         ts = datetime.strptime(data["times"], "%Y-%m-%d %H:%M:%S.%f").replace(
-            tzinfo=timezone(timedelta(hours=-6))
+            tzinfo=timezone(timedelta(hours=-config.TZ_OFFSET_HOURS))
         )
 
         point = (

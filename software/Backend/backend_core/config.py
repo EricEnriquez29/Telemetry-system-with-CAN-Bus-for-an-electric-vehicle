@@ -55,6 +55,28 @@ API_INTERNAL_URL = os.environ.get(
     "FENIX_API_INTERNAL_URL", "http://localhost:8050/internal/snapshot"
 )
 
+# ─── Zona horaria de los datos ───────────────────────────────────────────
+# Desfase del huso en que trabaja el equipo respecto a UTC. México Centro es
+# UTC−6 todo el año (el país eliminó el horario de verano en 2022).
+#
+# ÚNICA fuente de este dato: lo usan los dos extremos del flujo de fechas, y
+# tienen que coincidir siempre o las sesiones guardadas dejan de encontrarse.
+#
+#   • mqtt_listener.py, al guardar: interpreta la hora que manda el ESP32
+#     (que viene sin zona horaria) como hora local, restando este desfase
+#     para obtener el instante UTC real que se escribe en InfluxDB.
+#
+#   • historicos.py, al consultar: convierte la fecha local que pide el
+#     Frontend a la ventana UTC equivalente, sumando este desfase.
+#
+# Antes el valor estaba escrito dos veces —aquí y a mano en mqtt_listener—,
+# así que cambiar uno sin el otro habría desalineado escritura y lectura sin
+# dar ningún error: las sesiones simplemente no aparecerían.
+#
+# NO depende de la zona horaria del servidor: es una propiedad del reloj del
+# ESP32 y de cómo consulta el equipo, no de dónde esté alojada la máquina.
+TZ_OFFSET_HOURS = 6
+
 # ─── Constantes del motor y paquete ──────────────────────────────────────
 KT = 0.143
 E_NOM = 5210.0
@@ -68,7 +90,6 @@ DT = 0.1
 # ─── Constantes conteo de vueltas ────────────────────────────────────────
 LAP_DEBOUNCE = 10.0  # s mínimos entre dos cruces válidos
 LAP_T_MIN = 15.0     # s mínimos de duración de una vuelta — FIJO, no cambiar sin que Payo lo pida
-TZ_OFFSET_HOURS = 6  # México Centro (UTC-6). Medianoche local = 06:00 UTC.
 LAP_N_CAL = 5        # vueltas usadas para calibrar la distancia de referencia
 LAP_D_TOL = 0.15     # tolerancia ±15% sobre la distancia de referencia
 EARTH_R_KM = 6371.0
