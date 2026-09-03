@@ -100,6 +100,12 @@
     content: "Resuelto "; font-family: var(--mono); font-size: 0.68rem;
     letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.4rem;
   }
+  .area {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 0.2rem 0.45rem; flex-shrink: 0;
+  }
   .item-title { font-weight: 600; font-size: 1rem; margin: 0; }
   .item p { margin: 0; color: var(--muted); font-size: 0.92rem; }
   .item p.what { color: var(--text); padding-top: 0.15rem; }
@@ -133,9 +139,9 @@
   <header>
     <div class="eyebrow">Escudería Fénix · UPIITA-IPN</div>
     <h1>Pendientes y correcciones del sistema de telemetría</h1>
-    <p class="lede">Todo lo que quedó identificado pero sin aplicar durante la sesión de refactorización. Ordenado por severidad dentro de cada área.</p>
+    <p class="lede">Estado del sistema de telemetría: lo que falta arriba, lo ya cerrado abajo. Cada punto resuelto conserva la nota de cómo se cerró —o por qué se decidió no hacerlo— para no repetir el trabajo de investigarlo.</p>
     <div class="meta">
-      <span>Creado 25 jul 2026 · actualizado 30 ago 2026</span>
+      <span>Creado 25 jul 2026 · actualizado 2 sep 2026</span>
       <span>Servidor en America/Mexico_City</span>
       <span>Telemetría en vivo verificada 30 ago 2026</span>
     </div>
@@ -143,17 +149,78 @@
 
   <div class="tally">
     <div class="tally-cell"><span class="tally-num n-crit">0</span><span class="tally-label">Bloqueantes</span></div>
-    <div class="tally-cell"><span class="tally-num n-warn">1</span><span class="tally-label">Importantes</span></div>
-    <div class="tally-cell"><span class="tally-num n-info">5</span><span class="tally-label">Menores</span></div>
-    <div class="tally-cell"><span class="tally-num n-ok">32</span><span class="tally-label">Resueltos</span></div>
+    <div class="tally-cell"><span class="tally-num n-warn">2</span><span class="tally-label">Importantes</span></div>
+    <div class="tally-cell"><span class="tally-num n-info">6</span><span class="tally-label">Menores</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">34</span><span class="tally-label">Resueltos</span></div>
   </div>
 
+
   <section>
-    <h2>Sin verificar <span class="count">2 resueltos</span></h2>
-    <p class="section-note">Trabajo terminado en código, pero que nadie ha confirmado que funcione en el mundo real.</p>
+    <h2>Pendientes <span class="count">8</span></h2>
+    <p class="section-note">Lo que sigue sin hacer, ordenado por severidad. La etiqueta gris indica de qué parte del sistema es.</p>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><span class="area">Seguridad</span><h3 class="item-title">Todo el tráfico viaja sin cifrar</h3></div>
+      <p>El dashboard se conecta por <code>ws://</code> y <code>http://</code>. Cualquiera en la misma red (el wifi de un evento, por ejemplo) puede leer la telemetría e interceptar el código de acceso de la línea de meta cuando se envía.</p>
+      <p class="what">configurar TLS en el servidor (certificado, aunque sea autofirmado o por túnel) y cambiar las URLs a <code>wss://</code>/<code>https://</code> en <code>js/config.js</code>. El Frontend ya está listo para el cambio.</p>
+      <p class="deferred"><strong>Pospuesto a propósito (18 ago 2026).</strong> Lo único con riesgo real es el código de la línea de meta: quien lo capture puede marcar vueltas falsas. La telemetría en sí no es secreta. Para que el ataque ocurra hacen falta tres cosas simultáneas — alguien en la misma red, con capacidad técnica para esnifar tráfico, y con intención de sabotear a otra escudería — lo que en un Electratón universitario es poco probable. El riesgo además solo existe durante un evento, mientras que el de los servicios corriendo como <code>root</code> es continuo: por eso ese va primero.</p>
+      <p class="deferred"><strong>Ruta decidida:</strong> subdominio gratuito de DuckDNS (no hay dominio propio) + Caddy como proxy en el 443, que gestiona el certificado de Let's Encrypt solo. Verificado el 18 ago: los puertos 80 y 443 están libres en el servidor. Falta registrar el subdominio.</p>
+      <p class="deferred"><strong>Mitigaciones baratas mientras tanto:</strong> cambiar el código de la meta antes de cada competencia (una línea del <code>.env</code>, así una captura solo sirve ese día), o restringir <code>set_meta</code> a la red local. <strong>Alcance:</strong> esto cifra dashboard y API, no el MQTT del vehículo — el ESP32 seguiría transmitiendo en claro por el 1883.</p>
+    </div>
+
+    <div class="item warn">
+      <div class="item-head"><span class="chip warn">Importante</span><span class="area">Firmware</span><h3 class="item-title">El vehículo no guarda nada por su cuenta</h3></div>
+      <p>Si el WiFi falla, el broker no responde o el ESP32 pierde conexión a media vuelta, <strong>esos datos no existen en ninguna parte</strong>. Todo depende de que el enlace MQTT llegue al servidor en el momento. Una sesión perdida no se repite.</p>
+      <p>La carpeta <code>src/T5_MICROSD/</code> sugiere que la intención estuvo ahí, pero revisando <code>mSD.cpp</code> (30 ago 2026) resulta que <strong>no escribe en ninguna tarjeta</strong>: lo que hace es resincronizar NTP cada 30 minutos y llevar el contador de sesiones en NVS. No hay una sola llamada a la librería SD.</p>
+      <p>Atenúa el riesgo, pero no lo elimina, que el vehículo vaya a llevar <strong>router Steren propio junto al MGT</strong>: mejora la conectividad en pista, aunque sigue sin haber red de seguridad si el enlace se cae igualmente.</p>
+      <p class="what">escribir cada snapshot también en microSD, con el mismo <code>session_id</code> que ya lleva el firmware, para poder recuperar una sesión que no llegó al servidor. Decidir formato (CSV o JSON por líneas) y cada cuánto se vuelca.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Servidor</span><h3 class="item-title">112 paquetes del sistema sin actualizar</h3></div>
+      <p>Detectado el 30 ago 2026 al instalar <code>python3.13-venv</code>. No se tocaron a propósito: un <code>apt upgrade</code> en mitad de los cambios del servidor habría añadido una variable de más a la depuración.</p>
+      <p>Entre ellos habrá parches de seguridad. El propio Python 3.13 estaba dos versiones de parche por detrás y se actualizó de paso al instalar el venv, sin efectos.</p>
+      <p class="what">planificar un <code>apt upgrade</code> con calma, fuera de temporada de competencia, y reiniciar los servicios después. Revisar antes qué entra, sobre todo si toca Python o systemd.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Frontend</span><h3 class="item-title">Los estados de alerta se comunican solo por color</h3></div>
+      <p>Las temperaturas y los voltajes de celda fuera de rango cambian de verde a amarillo a rojo, sin ningún otro indicador. Alguien con daltonismo no distingue una celda en advertencia de una normal.</p>
+      <p class="what">agregar un ícono, borde o patrón además del color cuando el valor entra en rango de advertencia o crítico.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Frontend</span><h3 class="item-title">Telemetría que llega pero no se muestra</h3></div>
+      <p><code>gyro_x</code>, <code>gyro_y</code>, <code>gyro_z</code> y <code>tmp_min</code> viajan desde el vehículo, el backend los procesa y los guarda en InfluxDB, pero el dashboard no los usa en ningún lado.</p>
+      <p class="what">decidir si vale la pena mostrarlos (los giroscopios podrían servir en la vista de dinámica vehicular) o dejarlos solo como dato histórico a propósito.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Frontend</span><h3 class="item-title">La pestaña «Ploteo» sigue vacía</h3></div>
+      <p>Muestra el texto «en construcción». No es un error, es una función que nunca se terminó.</p>
+      <p class="what">definir qué debería graficar, o quitar la pestaña si ya no se planea.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Frontend</span><h3 class="item-title">Three.js llegó al final de su rama compatible</h3></div>
+      <p>Se actualizó de <code>r128</code> (2021) a <code>0.160.0</code>, que es la última versión que todavía publica el build clásico. Las versiones más nuevas obligan a reescribir el Frontend con módulos ES e <code>import</code>.</p>
+      <p class="what">nada por ahora. Cuando haya que actualizar más, será un cambio de arquitectura, no una línea.</p>
+    </div>
+
+    <div class="item info">
+      <div class="item-head"><span class="chip info">Menor</span><span class="area">Frontend</span><h3 class="item-title">No hay forma de sacar los datos para analizarlos fuera</h3></div>
+      <p>Hoy la telemetría solo se puede ver dentro del dashboard. Para analizar una sesión en Excel, Matlab o Python hay que consultar InfluxDB a mano escribiendo Flux, que nadie fuera del equipo de software va a hacer.</p>
+      <p>Probablemente sea el origen de la pestaña «Ploteo» vacía: la necesidad de analizar existe, y quedó a medias.</p>
+      <p class="what">un botón en el modal de históricos que descargue la sesión en CSV — el formato que abren Excel, Matlab y pandas sin configurar nada. Mínimo: la tabla de vueltas, que es el resumen que de verdad se compara entre sesiones. Idealmente también la serie completa de muestras.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Resueltos y descartados <span class="count">13</span></h2>
+    <p class="section-note">Se conservan con la nota de cómo se cerraron —o por qué se decidió no hacerlos— para no volver a investigar lo mismo.</p>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">El firmware renombrado no se ha compilado ni flasheado</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Verificación</span><h3 class="item-title">El firmware renombrado no se ha compilado ni flasheado</h3></div>
       <p>Se renombraron 17 variables internas en 6 archivos C++ (<code>globals.h/.cpp</code>, <code>processing.cpp</code>, <code>snap.cpp</code>, <code>mqtt.cpp</code>, <code>diag.cpp</code>). La revisión fue línea por línea y un <code>grep</code> confirmó que no quedaron nombres viejos, pero no hay PlatformIO disponible para compilar aquí.</p>
       <p><strong>No hay prisa ni riesgo de incompatibilidad:</strong> el JSON que sale por MQTT no cambió, así que el ESP32 puede seguir con el firmware viejo indefinidamente y el sistema funciona igual.</p>
       <p class="what">compilar con PlatformIO y probar en el ESP32 real antes de subirlo al vehículo.</p>
@@ -169,26 +236,13 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Los servicios del servidor quizá siguen con el código viejo</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Verificación</span><h3 class="item-title">Los servicios del servidor quizá siguen con el código viejo</h3></div>
       <p>El <code>git pull</code> en <code>/opt/fenix</code> trajo todo el código nuevo, pero systemd no recarga solo: hasta que se reinicien, <code>fenix_backend</code> y <code>fenix_api</code> siguen ejecutando la versión anterior en memoria.</p>
       <p class="resolved">18 ago 2026. Confirmado: los tres llevaban corriendo desde el 18 de julio, o sea una semana antes del <code>git pull</code> — el código nuevo estuvo un mes en disco sin ejecutarse. Se reiniciaron los tres; PIDs nuevos, ningún error de import, sin bucle de reinicio, y el par backend→API (<code>POST /internal/snapshot</code> 200 OK cada 5 s) verificado. Corriendo <code>24d2e94</code>. El prefijo de hora en los logs del backend confirma que el <code>logging</code> nuevo está activo. Pendiente solo la prueba con telemetría real cuando se encienda el ESP32.</p>
     </div>
-  </section>
-
-  <section>
-    <h2>Seguridad <span class="count">1 abierto · 3 resueltos</span></h2>
-
-    <div class="item warn">
-      <div class="item-head"><span class="chip warn">Importante</span><h3 class="item-title">Todo el tráfico viaja sin cifrar</h3></div>
-      <p>El dashboard se conecta por <code>ws://</code> y <code>http://</code>. Cualquiera en la misma red (el wifi de un evento, por ejemplo) puede leer la telemetría e interceptar el código de acceso de la línea de meta cuando se envía.</p>
-      <p class="what">configurar TLS en el servidor (certificado, aunque sea autofirmado o por túnel) y cambiar las URLs a <code>wss://</code>/<code>https://</code> en <code>js/config.js</code>. El Frontend ya está listo para el cambio.</p>
-      <p class="deferred"><strong>Pospuesto a propósito (18 ago 2026).</strong> Lo único con riesgo real es el código de la línea de meta: quien lo capture puede marcar vueltas falsas. La telemetría en sí no es secreta. Para que el ataque ocurra hacen falta tres cosas simultáneas — alguien en la misma red, con capacidad técnica para esnifar tráfico, y con intención de sabotear a otra escudería — lo que en un Electratón universitario es poco probable. El riesgo además solo existe durante un evento, mientras que el de los servicios corriendo como <code>root</code> es continuo: por eso ese va primero.</p>
-      <p class="deferred"><strong>Ruta decidida:</strong> subdominio gratuito de DuckDNS (no hay dominio propio) + Caddy como proxy en el 443, que gestiona el certificado de Let's Encrypt solo. Verificado el 18 ago: los puertos 80 y 443 están libres en el servidor. Falta registrar el subdominio.</p>
-      <p class="deferred"><strong>Mitigaciones baratas mientras tanto:</strong> cambiar el código de la meta antes de cada competencia (una línea del <code>.env</code>, así una captura solo sirve ese día), o restringir <code>set_meta</code> a la red local. <strong>Alcance:</strong> esto cifra dashboard y API, no el MQTT del vehículo — el ESP32 seguiría transmitiendo en claro por el 1883.</p>
-    </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Los secretos siguen usando los valores por defecto</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Seguridad</span><h3 class="item-title">Los secretos siguen usando los valores por defecto</h3></div>
       <p>Se preparó <code>.env.example</code> para que la contraseña de MQTT, el token de InfluxDB y el código de la línea de meta (<code>fenix25</code>) salgan de variables de entorno — pero mientras no exista un <code>.env</code> real en el servidor, se siguen usando los valores que están escritos en el código y visibles en GitHub.</p>
       <p class="what">crear el <code>.env</code> en el servidor con valores nuevos, y rotar el token de InfluxDB y la contraseña de MQTT, que ya estuvieron expuestos en el repositorio.</p>
       <p class="deferred"><strong>Avance del 18 ago 2026.</strong> El repositorio es <strong>público</strong>, y la revisión encontró una credencial más de las tres que listaba este reporte: el <strong>SSID y la contraseña del WiFi</strong> (<code>globals.cpp</code>), que es una red física real. También la IP del servidor en tres archivos — no es una credencial, pero le indica a cualquiera contra qué máquina usar las demás.</p>
@@ -203,26 +257,21 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">CORS sigue abierto a cualquier origen</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Seguridad</span><h3 class="item-title">CORS sigue abierto a cualquier origen</h3></div>
       <p><code>fenix_api.py</code> ya lee <code>FENIX_ALLOWED_ORIGINS</code>, pero como no está definida acepta peticiones de cualquier sitio web y lo avisa al arrancar. Cualquier página podría consultar la API de telemetría desde el navegador de quien la visite.</p>
       <p class="what">definir <code>FENIX_ALLOWED_ORIGINS</code> con el dominio real del dashboard.</p>
       <p class="resolved">30 ago 2026. Definida la variable en el <code>.env</code> con el origen del dashboard. Al hacerlo apareció que el pendiente cubría solo la mitad: <code>meta_server.py</code> (puerto 8060) tenía <code>Access-Control-Allow-Origin: *</code> escrito a mano, y es el que sirve <code>session_summary</code>, <code>sessions_for_date</code> y <code>set_meta</code> — justo lo que más usa el Frontend. Ahora ambos servidores leen la misma lista desde <code>config.ALLOWED_ORIGINS</code>. Verificado con <code>curl</code>: el origen del dashboard recibe la cabecera, uno ajeno no la recibe. Se agregaron 4 pruebas automatizadas.</p>
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">El repositorio no tiene <code>.gitignore</code></h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Seguridad</span><h3 class="item-title">El repositorio no tiene <code>.gitignore</code></h3></div>
       <p>Ya causó un problema concreto: un archivo <code>.pyc</code> versionado bloqueó el <code>git pull</code> en el servidor. El riesgo mayor es que, cuando se cree el <code>.env</code> con credenciales reales, nada impide que se suba a GitHub por accidente.</p>
       <p class="what">crear <code>.gitignore</code> con <code>__pycache__/</code>, <code>*.pyc</code>, <code>.env</code> y <code>venv/</code>.</p>
       <p class="resolved">18 ago 2026. Creado en la raiz del repo, cubriendo ademas <code>secrets.h</code> del firmware, <code>*.bak</code> y archivos de editor. Verificado con un <code>.env</code> de prueba: git lo marca como ignorado, no como archivo nuevo.</p>
     </div>
-  </section>
-
-  <section>
-    <h2>Servidor <span class="count">1 abierto · 6 resueltos</span></h2>
-    <p class="section-note">Los cuatro primeros son el plan de 3 pasos que quedó acordado: usuario y venv juntos, luego los servicios al repo, y al final la zona horaria.</p>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Zona horaria del servidor en Asia/Kolkata</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">Zona horaria del servidor en Asia/Kolkata</h3></div>
       <p>El servidor está configurado con hora de India, no de México. Afecta logs y timestamps del sistema.</p>
       <p>Antes de cambiarla hay que revisar <code>TZ_OFFSET_HOURS = 6</code> en <code>backend_core/config.py</code>, que compensa UTC−6 al consultar sesiones históricas: hay que confirmar si ese offset queda correcto o hay que ajustarlo, y verificar que las sesiones ya guardadas se sigan encontrando con el filtro por fecha.</p>
       <p class="what">investigar el flujo de fechas completo, ajustar el código si aplica, y solo entonces correr <code>timedatectl set-timezone America/Mexico_City</code>.</p>
@@ -232,7 +281,7 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Los servicios corren como <code>root</code></h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">Los servicios corren como <code>root</code></h3></div>
       <p>Si alguien lograra ejecutar código a través del backend, tendría control total del servidor: llaves SSH, base de datos, todo. InfluxDB y mosquitto ya usan usuarios propios y limitados; los servicios de Fénix no.</p>
       <p class="what">crear el usuario <code>fenix</code>, darle propiedad de <code>/opt/fenix</code>, y cambiar <code>User=root</code> por <code>User=fenix</code> en los tres servicios.</p>
       <p class="resolved">30 ago 2026. Usuario de sistema <code>fenix</code> (uid 997, <code>nologin</code>, sin home), propiedad de <code>/opt/fenix</code> traspasada, y <code>User=fenix</code> en los tres servicios. Solo <code>fenix_backend</code> tenía la línea <code>User=</code>; los otros dos corrían como root por omisión, así que hubo que añadirla. Verificado con <code>ps</code>: los tres procesos son del usuario <code>fenix</code>, y siguen conectando a MQTT, escribiendo en InfluxDB y sirviendo el WebSocket. Antes de tocar nada se comprobó que el backend no escribe archivos fuera de <code>/opt/fenix</code> y que sus tres puertos están por encima de 1024. Copias de respaldo de los <code>.service</code> en <code>.bak2</code>.</p>
@@ -240,7 +289,7 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Sin entorno virtual de Python</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">Sin entorno virtual de Python</h3></div>
       <p>Los servicios usan el Python del sistema, y por eso <code>pip install</code> falla con <code>externally-managed-environment</code>. Instalar librerías así puede romper herramientas del propio Debian.</p>
       <p class="what">crear el venv en <code>/opt/fenix/venv</code>, instalar ahí las dependencias, y apuntar el <code>ExecStart=</code> de los tres servicios a <code>/opt/fenix/venv/bin/python</code>. La instalación se documenta en el README, sin recrear <code>requirements.txt</code>.</p>
       <p class="resolved">30 ago 2026. Venv creado como usuario <code>fenix</code> (hizo falta <code>apt install python3.13-venv</code>, y antes un <code>apt update</code> porque el índice estaba desfasado). Instalados <code>fastapi</code>, <code>uvicorn[standard]</code>, <code>influxdb-client</code>, <code>paho-mqtt</code> y <code>requests</code> — el extra <code>[standard]</code> importa: trae <code>websockets</code>, sin el cual el dashboard en vivo no funcionaría. Los tres <code>ExecStart=</code> apuntan al intérprete del venv; copias de respaldo en <code>.bak3</code>. Verificado que los tres procesos corren desde el venv y que MQTT, InfluxDB y el histórico siguen respondiendo. Procedimiento documentado en el README del Backend.</p>
@@ -248,7 +297,7 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Los archivos <code>.service</code> solo existen en el servidor</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">Los archivos <code>.service</code> solo existen en el servidor</h3></div>
       <p>Los tres viven sueltos en <code>/etc/systemd/system/</code> y no están versionados. Si el servidor se pierde o se migra, hay que reescribirlos de memoria.</p>
       <p class="what">meterlos al repo (por ejemplo en <code>software/deploy/</code>) con su propio README, y mencionarlos en el README de <code>software/</code>.</p>
       <p class="resolved">30 ago 2026. Los tres versionados en <code>software/deploy/</code>, tal como quedaron tras los cambios de hoy (usuario <code>fenix</code>, <code>EnvironmentFile=</code> y el intérprete del venv). Su README documenta qué asume cada archivo, cómo montar un servidor desde cero — usuario, clone, venv, <code>.env</code>, servicios — y las dos trampas del despliegue: hacer el <code>git pull</code> como <code>fenix</code> y no como root, y que sin <code>systemctl restart</code> el pull no surte efecto. Mencionado en el README de <code>software/</code>. No contienen secretos: las credenciales viven en el <code>.env</code>, que no se versiona.</p>
@@ -256,62 +305,23 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">El repositorio de InfluxData no se puede usar por <code>apt</code></h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">El repositorio de InfluxData no se puede usar por <code>apt</code></h3></div>
       <p>Detectado el 30 ago 2026. <code>apt update</code> rechaza <code>https://repos.influxdata.com/debian</code>: falta la clave GPG <code>AC10D7449F343ADCEFDDC2B6DA61C26A0585BD3B</code> con la que firma sus paquetes, así que apt se niega a usarlo por seguridad.</p>
       <p>InfluxDB sigue corriendo con normalidad — esto solo impide instalar actualizaciones suyas desde apt. Tampoco bloquea al resto: los repositorios de Debian se actualizan bien, solo hay que ignorar el error de este.</p>
       <p class="what">volver a importar la clave pública de InfluxData a <code>/etc/apt/keyrings/</code>, o quitar el repositorio si se prefiere fijar la versión actual de InfluxDB y no actualizarla.</p>
       <p class="resolved">30 ago 2026. La causa: InfluxData rota sus subclaves de firma, y la que tenía el servidor <strong>caducó el 17 ene 2026</strong>. El repositorio ya firmaba con una subclave nueva (10 jul 2025) que el llavero local no conocía. Se descargó la clave actual y se verificó su huella antes de instalarla: la subclave de 2025 es <code>AC10D744…</code>, exactamente la que apt reclamaba. Instalada en <code>/etc/apt/keyrings/influxdata-archive.gpg</code>, con el <code>signed-by</code> del repositorio apuntando ahí y la clave caducada eliminada. <code>apt update</code> ya lo acepta sin avisos.</p>
     </div>
 
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">112 paquetes del sistema sin actualizar</h3></div>
-      <p>Detectado el 30 ago 2026 al instalar <code>python3.13-venv</code>. No se tocaron a propósito: un <code>apt upgrade</code> en mitad de los cambios del servidor habría añadido una variable de más a la depuración.</p>
-      <p>Entre ellos habrá parches de seguridad. El propio Python 3.13 estaba dos versiones de parche por detrás y se actualizó de paso al instalar el venv, sin efectos.</p>
-      <p class="what">planificar un <code>apt upgrade</code> con calma, fuera de temporada de competencia, y reiniciar los servicios después. Revisar antes qué entra, sobre todo si toca Python o systemd.</p>
-    </div>
-
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Resuelto</span><h3 class="item-title">Archivos sueltos por limpiar</h3></div>
+      <div class="item-head"><span class="chip ok">Resuelto</span><span class="area">Servidor</span><h3 class="item-title">Archivos sueltos por limpiar</h3></div>
       <p>En <code>/root</code> hay 66 MB de instaladores de InfluxDB ya usados y cuatro archivos vacíos creados por accidente (<code>Alias</code>, <code>Aplicaciones</code>, <code>python3</code>, <code>Configuración</code>). En <code>/opt/fenix</code> quedó un <code>software/Frontend/index.html.bak</code> sin versionar.</p>
       <p class="what">borrarlos cuando convenga. Ninguno estorba hoy.</p>
       <p class="resolved">30 ago 2026. Borrado el contenido de <code>/root</code>: los dos instaladores de InfluxDB (64 MB, recuperables desde el repositorio de InfluxData), los cuatro archivos vacíos y las sobras de descomprimir el cliente. Se conservan <code>exec_recipe.log</code> y <code>recipe_-391.log</code>, del aprovisionamiento del VPS: pesan menos de 2 KB y registran cómo se montó la máquina.</p>
       <p class="deferred"><strong>El <code>index.html.bak</code> se conserva a propósito.</strong> Se comparó su hash contra todas las versiones del archivo en el historial de git y no coincide con ninguna: es una edición hecha directamente en el servidor el 14 jun 2026 que nunca se commiteó, así que es la única copia que existe. Ocupa 27 KB. Borrarlo sería irreversible y no libera nada apreciable; si molesta, la salida es traerlo al repo como archivo histórico.</p>
     </div>
-  </section>
-
-  <section>
-    <h2>Frontend <span class="count">4</span></h2>
-
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Los estados de alerta se comunican solo por color</h3></div>
-      <p>Las temperaturas y los voltajes de celda fuera de rango cambian de verde a amarillo a rojo, sin ningún otro indicador. Alguien con daltonismo no distingue una celda en advertencia de una normal.</p>
-      <p class="what">agregar un ícono, borde o patrón además del color cuando el valor entra en rango de advertencia o crítico.</p>
-    </div>
-
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Telemetría que llega pero no se muestra</h3></div>
-      <p><code>gyro_x</code>, <code>gyro_y</code>, <code>gyro_z</code> y <code>tmp_min</code> viajan desde el vehículo, el backend los procesa y los guarda en InfluxDB, pero el dashboard no los usa en ningún lado.</p>
-      <p class="what">decidir si vale la pena mostrarlos (los giroscopios podrían servir en la vista de dinámica vehicular) o dejarlos solo como dato histórico a propósito.</p>
-    </div>
-
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">La pestaña «Ploteo» sigue vacía</h3></div>
-      <p>Muestra el texto «en construcción». No es un error, es una función que nunca se terminó.</p>
-      <p class="what">definir qué debería graficar, o quitar la pestaña si ya no se planea.</p>
-    </div>
-
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">Three.js llegó al final de su rama compatible</h3></div>
-      <p>Se actualizó de <code>r128</code> (2021) a <code>0.160.0</code>, que es la última versión que todavía publica el build clásico. Las versiones más nuevas obligan a reescribir el Frontend con módulos ES e <code>import</code>.</p>
-      <p class="what">nada por ahora. Cuando haya que actualizar más, será un cambio de arquitectura, no una línea.</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Backend <span class="count">2 descartados</span></h2>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Descartado</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
+      <div class="item-head"><span class="chip ok">Descartado</span><span class="area">Backend</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
       <p>Hoy uno se entera de que algo se cayó cuando el dashboard se queda congelado. No existe un endpoint que responda «estoy vivo, MQTT conectado, InfluxDB respondiendo».</p>
       <p class="what">agregar un <code>/health</code> que reporte el estado de las conexiones, útil sobre todo antes de una competencia.</p>
       <p class="resolved">30 ago 2026 — <strong>descartado por poco valor.</strong> El pendiente daba por hecho que el dashboard no informa del estado del sistema, y no es cierto: la barra superior ya tiene dos indicadores. El del WebSocket distingue «Servidor conectado» de «Servidor reconectando…», y el de MGT muestra si el vehículo transmite (vía LWT). Entre los dos ya se separa un fallo del servidor de un coche apagado, que es el caso cotidiano.</p>
@@ -321,7 +331,7 @@
     </div>
 
     <div class="item done">
-      <div class="item-head"><span class="chip ok">Descartado</span><h3 class="item-title">Dos módulos quedan fuera de las pruebas automatizadas</h3></div>
+      <div class="item-head"><span class="chip ok">Descartado</span><span class="area">Backend</span><h3 class="item-title">Dos módulos quedan fuera de las pruebas automatizadas</h3></div>
       <p><code>historicos.py</code> y el ciclo principal de <code>mqtt_listener.py</code> necesitan InfluxDB y un broker MQTT reales para probarse, así que no están cubiertos por <code>pytest</code>. Todo lo demás (física, conteo de vueltas, validación de entrada) sí lo está.</p>
       <p class="what">seguir verificándolos a mano, o montar un entorno de pruebas con servicios reales si el proyecto crece.</p>
       <p class="resolved">30 ago 2026 — <strong>descartado por ahora.</strong> En un proyecto de un solo desarrollador, que se verifica a mano antes de cada competencia, el retorno de cubrir estos dos módulos no compensa el trabajo: imitar las respuestas de InfluxDB es tedioso, y montar un entorno con servicios reales es infraestructura que hay que mantener.</p>
@@ -360,7 +370,6 @@
       </ul>
     </div>
   </section>
-
 </div>
 </body>
 </html>
