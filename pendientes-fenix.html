@@ -144,8 +144,8 @@
   <div class="tally">
     <div class="tally-cell"><span class="tally-num n-crit">0</span><span class="tally-label">Bloqueantes</span></div>
     <div class="tally-cell"><span class="tally-num n-warn">1</span><span class="tally-label">Importantes</span></div>
-    <div class="tally-cell"><span class="tally-num n-info">7</span><span class="tally-label">Menores</span></div>
-    <div class="tally-cell"><span class="tally-num n-ok">30</span><span class="tally-label">Resueltos</span></div>
+    <div class="tally-cell"><span class="tally-num n-info">6</span><span class="tally-label">Menores</span></div>
+    <div class="tally-cell"><span class="tally-num n-ok">31</span><span class="tally-label">Resueltos</span></div>
   </div>
 
   <section>
@@ -308,12 +308,16 @@
   </section>
 
   <section>
-    <h2>Backend <span class="count">2</span></h2>
+    <h2>Backend <span class="count">1 abierto · 1 descartado</span></h2>
 
-    <div class="item info">
-      <div class="item-head"><span class="chip info">Menor</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
+    <div class="item done">
+      <div class="item-head"><span class="chip ok">Descartado</span><h3 class="item-title">No hay forma de saber si el sistema está sano sin mirar el dashboard</h3></div>
       <p>Hoy uno se entera de que algo se cayó cuando el dashboard se queda congelado. No existe un endpoint que responda «estoy vivo, MQTT conectado, InfluxDB respondiendo».</p>
       <p class="what">agregar un <code>/health</code> que reporte el estado de las conexiones, útil sobre todo antes de una competencia.</p>
+      <p class="resolved">30 ago 2026 — <strong>descartado por poco valor.</strong> El pendiente daba por hecho que el dashboard no informa del estado del sistema, y no es cierto: la barra superior ya tiene dos indicadores. El del WebSocket distingue «Servidor conectado» de «Servidor reconectando…», y el de MGT muestra si el vehículo transmite (vía LWT). Entre los dos ya se separa un fallo del servidor de un coche apagado, que es el caso cotidiano.</p>
+      <p class="deferred"><strong>Lo que sigue siendo ciego:</strong> un InfluxDB caído. El refactor aisló ese fallo a propósito para que no tumbara la telemetría en vivo, así que el dashboard se vería perfectamente normal mientras no se guarda nada — se podría correr una sesión entera creyendo que queda registrada y no tener histórico al terminar. Ese caso, y solo ese, justificaría el endpoint.</p>
+      <p class="deferred"><strong>Cuándo retomarlo:</strong> el argumento fuerte no es mirar un JSON en el navegador —para eso ya está el dashboard— sino que devolver <code>503</code> permite que un monitor externo avise sin que nadie mire. Tiene sentido el día que se quiera montar ese aviso automático; antes, no compensa.</p>
+      <p class="deferred"><strong>Sin comprobar:</strong> qué pasa si se para solo <code>fenix_backend</code> con <code>fenix_api</code> vivo. Probablemente el WebSocket siga conectado y el dashboard quede congelado con el indicador en verde — un tercer fallo silencioso. Se verifica con <code>systemctl stop fenix_backend</code> y mirando el dashboard. Si se confirma, este pendiente merece reabrirse.</p>
     </div>
 
     <div class="item info">
