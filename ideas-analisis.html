@@ -262,8 +262,9 @@
     <div class="item">
       <div class="item-head"><h3 class="item-title">Análisis en vivo, en una sección propia</h3></div>
       <p>Debe poder graficarse mientras el vehículo corre. Se resuelve con una <strong>sección separada dentro de Ploteo</strong>, dedicada solo a datos en vivo, en lugar de mezclar la vuelta en curso con el análisis histórico.</p>
-      <p>La ventaja es que desaparece la transición más incómoda del diseño: qué hacer cuando la vuelta en curso se cierra. En una sección dedicada, la línea viva simplemente se reinicia con cada cruce de meta.</p>
-      <p>Para no perder la capacidad de comparar —que es donde está el valor de mirar datos mientras el coche rueda—, la sección admite <strong>vueltas de referencia como fondo fijo</strong>: una vuelta anterior, o de otra sesión, dibujada estática mientras la línea viva avanza sobre ella.</p>
+      <p>La ventaja es que desaparece la transición más incómoda del diseño: qué hacer cuando la vuelta en curso se cierra. En una sección dedicada no hay tal transición.</p>
+      <p><strong>Sin superposición.</strong> La sección en vivo funciona como las gráficas de la página principal: una ventana deslizante sobre los datos que van llegando, sin vueltas de referencia ni comparaciones. Lo único que la distingue del dashboard principal es que el usuario elige qué variables ver y cómo cruzarlas.</p>
+      <p>La consecuencia asumida es que no hay comparación en vivo: cualquier análisis contra otra vuelta o sesión —incluido el delta-time— ocurre en la sección histórica, una vez cerrada la vuelta.</p>
       <p>Las dos fuentes de datos quedan así separadas por sección: HTTP contra InfluxDB para el análisis histórico, WebSocket para la sección en vivo. Ambas comparten la misma conexión que ya alimenta la página principal, puesto que las tres pestañas viven en el mismo documento.</p>
     </div>
 
@@ -275,8 +276,9 @@
 
     <div class="item">
       <div class="item-head"><h3 class="item-title">Cadencia de redibujado</h3></div>
-      <p>Los snapshots llegan a 10~Hz, pero la sección en vivo no debe redibujarse a esa frecuencia. Dos medidas: añadir puntos al final de cada serie en lugar de reconstruir la gráfica (<code>extendTraces</code> de Plotly), y acumular los snapshots que llegan para dibujar dos o tres veces por segundo.</p>
-      <p>El resultado se percibe idéntico y el costo baja a menos de un tercio. La diferencia con la página principal —que sí redibuja a 10~Hz y funciona bien— es la cantidad de datos: allí cada serie está limitada a una ventana de 15 segundos, unos 150 puntos. Aquí, con vueltas de referencia cargadas y varios paneles, se manejan miles.</p>
+      <p>Al no haber superposición, la sección en vivo puede redibujarse a 10~Hz igual que la página principal, siempre que mantenga la misma disciplina: <strong>ventana deslizante y sin acumular</strong>. Allí cada serie está limitada a 15 segundos —unos 150 puntos— y se descarta lo viejo; por eso doce redibujados por segundo no pesan.</p>
+      <p>La precaución aplica si alguna vista acumula en lugar de descartar, como una nube de puntos que va sumando toda la vuelta. En ese caso conviene añadir puntos al final de la serie en vez de reconstruir la gráfica (<code>extendTraces</code> de Plotly) y bajar el redibujado a dos o tres veces por segundo.</p>
+      <p>En la sección histórica el problema no existe: los datos se cargan una vez y no cambian.</p>
     </div>
 
     <div class="item">
