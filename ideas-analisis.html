@@ -249,7 +249,7 @@
 
     <div class="item">
       <div class="item-head"><h3 class="item-title">Alcance de la selección</h3></div>
-      <p>Una vuelta concreta de una sesión de un día, un rango de vueltas, o la sesión completa. Comparable contra otra vuelta, otro rango o toda otra sesión, del mismo día o de otro.</p>
+      <p>Cada origen se elige en tres pasos: <strong>día → sesión → alcance</strong>, donde el alcance es la sesión completa o una vuelta concreta. Comparable contra otro origen del mismo día o de otro.</p>
     </div>
 
     <div class="item">
@@ -264,8 +264,8 @@
       <div class="item-head"><h3 class="item-title">Análisis en vivo, en una sección propia</h3></div>
       <p>Debe poder graficarse mientras el vehículo corre. Se resuelve con una <strong>sección separada dentro de Ploteo</strong>, dedicada solo a datos en vivo, en lugar de mezclar la vuelta en curso con el análisis histórico.</p>
       <p>La ventaja es que desaparece la transición más incómoda del diseño: qué hacer cuando la vuelta en curso se cierra. En una sección dedicada no hay tal transición.</p>
-      <p><strong>Sin superposición.</strong> La sección en vivo funciona como las gráficas de la página principal: una <strong>ventana deslizante de 15 segundos</strong> sobre los datos que van llegando, sin vueltas de referencia, sin comparaciones y sin mapa. Lo único que la distingue del dashboard principal es que el usuario elige qué variables ver y cómo cruzarlas.</p>
-      <p>Al ser ventana deslizante no hace falta seguimiento automático ni pausa: la vista siempre muestra los últimos 15 segundos y no hay nada que perseguir.</p>
+      <p><strong>Sin superposición.</strong> La sección en vivo funciona como las gráficas de la página principal: una <strong>ventana deslizante de 20 segundos</strong> sobre los datos que van llegando, sin vueltas de referencia, sin comparaciones y sin mapa. Lo único que la distingue del dashboard principal es que el usuario elige qué variables ver y cómo cruzarlas.</p>
+      <p>Al ser ventana deslizante no hace falta seguimiento automático ni pausa: la vista siempre muestra los últimos 20 segundos y no hay nada que perseguir. La gráfica tampoco admite zoom ni desplazamiento — solo grafica.</p>
       <p>La consecuencia asumida es que no hay comparación en vivo: cualquier análisis contra otra vuelta o sesión —incluido el delta-time— ocurre en la sección histórica, una vez cerrada la vuelta.</p>
       <p>Las dos fuentes de datos quedan así separadas por sección: HTTP contra InfluxDB para el análisis histórico, WebSocket para la sección en vivo. Ambas comparten la misma conexión que ya alimenta la página principal, puesto que las tres pestañas viven en el mismo documento.</p>
     </div>
@@ -278,15 +278,11 @@
 
     <div class="item">
       <div class="item-head"><h3 class="item-title">Cadencia de redibujado</h3></div>
-      <p>Al no haber superposición, la sección en vivo puede redibujarse a 10~Hz igual que la página principal, siempre que mantenga la misma disciplina: <strong>ventana deslizante de 15 segundos y sin acumular</strong>. Cada serie queda limitada a unos 150 puntos y lo viejo se descarta; por eso diez redibujados por segundo no pesan.</p>
+      <p>Al no haber superposición, la sección en vivo puede redibujarse a 10~Hz igual que la página principal, siempre que mantenga la misma disciplina: <strong>ventana deslizante de 20 segundos y sin acumular</strong>. Cada serie queda limitada a unos 200 puntos y lo viejo se descarta; por eso diez redibujados por segundo no pesan.</p>
       <p>La precaución aplica si alguna vista acumula en lugar de descartar, como una nube de puntos que va sumando toda la vuelta. En ese caso conviene añadir puntos al final de la serie en vez de reconstruir la gráfica (<code>extendTraces</code> de Plotly) y bajar el redibujado a dos o tres veces por segundo.</p>
       <p>En la sección histórica el problema no existe: los datos se cargan una vez y no cambian.</p>
     </div>
 
-    <div class="item">
-      <div class="item-head"><h3 class="item-title">Configuraciones guardadas</h3></div>
-      <p>Poder recuperar un conjunto de gráficas ya armado sin rehacerlo cada vez. Se resuelve en el navegador con <code>localStorage</code>, sin tocar el servidor.</p>
-    </div>
   </section>
 
 </div>

@@ -38,7 +38,6 @@
   button{cursor:pointer;}
   button:hover{border-color:var(--orange);color:var(--orange);}
 
-  /* ── Lista con casillas para elegir variables ── */
   .chk-list{background:#111;border:1px solid var(--border);border-radius:3px;padding:4px;max-height:132px;overflow-y:auto;min-width:190px;}
   .chk-item{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:2px;cursor:pointer;font-size:11px;}
   .chk-item:hover{background:#181818;}
@@ -48,11 +47,13 @@
   .chk-item.bloq{opacity:.35;cursor:not-allowed;}
   .chk-cuenta{font-size:9px;color:#666;padding:2px 6px 0;}
 
-  .origenes{display:flex;flex-direction:column;gap:6px;}
-  .origen-row{display:flex;gap:6px;align-items:center;}
-  .swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0;}
-  .origen-row select{font-size:10px;padding:3px 5px;}
-  .ref-tag{font-size:8px;letter-spacing:1px;color:var(--orange);border:1px solid var(--orange);border-radius:2px;padding:1px 4px;}
+  /* ── Orígenes: día → sesión → alcance ── */
+  .origenes{display:flex;flex-direction:column;gap:5px;}
+  .origen-cab{display:grid;grid-template-columns:16px 118px 96px 128px 30px;gap:6px;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:#666;padding-left:2px;}
+  .origen-row{display:grid;grid-template-columns:16px 118px 96px 128px 30px;gap:6px;align-items:center;}
+  .swatch{width:13px;height:13px;border-radius:2px;}
+  .origen-row select{font-size:10px;padding:3px 5px;width:100%;}
+  .ref-tag{font-size:8px;letter-spacing:1px;color:var(--orange);border:1px solid var(--orange);border-radius:2px;padding:1px 4px;text-align:center;}
 
   .grid-hist{display:grid;grid-template-columns:1fr 400px;gap:12px;}
   @media(max-width:1150px){.grid-hist{grid-template-columns:1fr;}}
@@ -62,11 +63,14 @@
   .card-title .hint{color:#666;text-transform:none;letter-spacing:0;font-size:9px;}
   .card-title .var-mapa{color:var(--orange);}
 
-  #mapa{height:290px;border-radius:3px;background:#111;}
+  #mapa{height:280px;border-radius:3px;background:#111;}
   .leyenda-mapa{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:9px;color:var(--muted);}
   #barra-color{flex:1;height:9px;border-radius:2px;border:1px solid #222;}
+  /* Controles del mapa: debajo del propio mapa */
+  .mapa-controles{display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid #1a1a1a;}
+  .mapa-controles .field{flex:1;}
+  .mapa-controles select{width:100%;}
 
-  /* ── Tabla de valores bajo el cursor: una columna por origen ── */
   table.cursor-tabla{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:2px;}
   table.cursor-tabla th,table.cursor-tabla td{padding:3px 5px;border-bottom:1px solid #161616;text-align:right;}
   table.cursor-tabla th:first-child,table.cursor-tabla td:first-child{text-align:left;color:var(--muted);font-weight:normal;}
@@ -99,8 +103,8 @@
 <!-- ─────────────── EN VIVO ─────────────── -->
 <div class="panel active" id="panel-vivo">
   <div class="aviso">
-    <b>Ventana deslizante de 15 segundos.</b> Se alimenta del WebSocket, descarta lo viejo y no acumula.
-    Sin superposición, sin comparación, sin mapa y <b>sin zoom ni desplazamiento</b>: solo grafica.
+    <b>Ventana deslizante de 20 segundos.</b> Se alimenta del WebSocket, descarta lo viejo y no acumula.
+    Sin superposición, sin comparación, sin mapa y sin zoom ni desplazamiento: solo grafica.
   </div>
 
   <div class="toolbar">
@@ -121,13 +125,6 @@
       <label>Estado</label>
       <div class="estado-vivo"><div class="dot" id="v-dot"></div><span id="v-estado">Recibiendo 10 Hz</span></div>
     </div>
-    <div class="field">
-      <label>Configuración</label>
-      <div style="display:flex;gap:4px;">
-        <button onclick="guardarConfig('vivo')">Guardar</button>
-        <button onclick="cargarConfig('vivo')">Cargar</button>
-      </div>
-    </div>
   </div>
 
   <div class="card">
@@ -145,8 +142,9 @@
   </div>
 
   <div class="toolbar">
-    <div class="field" style="min-width:300px;">
+    <div class="field" style="min-width:420px;">
       <label>Orígenes</label>
+      <div class="origen-cab"><span></span><span>Día</span><span>Sesión</span><span>Alcance</span><span></span></div>
       <div class="origenes" id="h-origenes"></div>
     </div>
     <div class="field">
@@ -157,18 +155,6 @@
       <label>Variables en Y</label>
       <div class="chk-list" id="h-y"></div>
       <div class="chk-cuenta" id="h-y-cuenta"></div>
-    </div>
-    <div class="field">
-      <label>Colorear mapa con</label>
-      <select id="h-mapvar"></select>
-      <div class="chk-cuenta">solo entre las variables elegidas</div>
-    </div>
-    <div class="field">
-      <label>Configuración</label>
-      <div style="display:flex;gap:4px;">
-        <button onclick="guardarConfig('hist')">Guardar</button>
-        <button onclick="cargarConfig('hist')">Cargar</button>
-      </div>
     </div>
   </div>
 
@@ -183,6 +169,16 @@
         <div class="card-title"><span>Trazado</span><span class="var-mapa" id="h-mapname">—</span></div>
         <div id="mapa"></div>
         <div class="leyenda-mapa"><span id="h-min">—</span><div id="barra-color"></div><span id="h-max">—</span></div>
+        <div class="mapa-controles">
+          <div class="field">
+            <label>Origen a mostrar</label>
+            <select id="h-maporigen"></select>
+          </div>
+          <div class="field">
+            <label>Colorear con</label>
+            <select id="h-mapvar"></select>
+          </div>
+        </div>
       </div>
       <div class="card" style="margin-top:12px;">
         <div class="card-title"><span>Bajo el cursor</span><span class="hint" id="h-cursor-pos"></span></div>
@@ -217,6 +213,7 @@ var CENTRO = {lat:19.5042, lon:-99.1467};
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
 var DASHES  = ['solid','dot','dash'];
 var MAX_Y = 3, MAX_ORIGENES = 3;
+var VENTANA_S = 20;
 
 function aleatorio(semilla){ var s=semilla; return function(){ s=(s*9301+49297)%233280; return s/233280; }; }
 function puntoPista(u){
@@ -230,7 +227,7 @@ function curvatura(u){
 }
 function generarVuelta(semilla, nVuelta){
   var rnd = aleatorio(semilla + nVuelta*137);
-  var ritmo = 0.92 + rnd()*0.16, dt = 0.1, n = Math.round(260*ritmo);
+  var ritmo = 0.92 + rnd()*0.16, dt = 0.1, n = Math.round(320*ritmo);
   var pts = [], E = 0, d = 0, vAnt = 0;
   for (var i=0;i<n;i++){
     var u = i/n, curv = curvatura(u);
@@ -262,20 +259,25 @@ function generarVuelta(semilla, nVuelta){
 var SESIONES = [
   {fecha:'2026-07-03', sesion:3, semilla:1001, vueltas:6},
   {fecha:'2026-07-03', sesion:4, semilla:2002, vueltas:5},
-  {fecha:'2026-08-19', sesion:1, semilla:3003, vueltas:7}
+  {fecha:'2026-08-19', sesion:1, semilla:3003, vueltas:7},
+  {fecha:'2026-08-19', sesion:2, semilla:4004, vueltas:4}
 ];
+function dias(){
+  var vistos = {}, res = [];
+  SESIONES.forEach(function(s){ if(!vistos[s.fecha]){ vistos[s.fecha]=1; res.push(s.fecha); } });
+  return res;
+}
+function sesionesDe(fecha){ return SESIONES.filter(function(s){return s.fecha===fecha;}); }
+function buscaSesion(fecha, sesion){ return SESIONES.find(function(s){return s.fecha===fecha && s.sesion===sesion;}); }
+
 var CACHE = {};
 function datosVuelta(fecha, sesion, vuelta){
   var k = fecha+'|'+sesion+'|'+vuelta;
-  if (!CACHE[k]){
-    var s = SESIONES.find(function(x){return x.fecha===fecha && x.sesion===sesion;});
-    CACHE[k] = generarVuelta(s.semilla, vuelta);
-  }
+  if (!CACHE[k]) CACHE[k] = generarVuelta(buscaSesion(fecha,sesion).semilla, vuelta);
   return CACHE[k];
 }
 function datosSesion(fecha, sesion){
-  var s = SESIONES.find(function(x){return x.fecha===fecha && x.sesion===sesion;});
-  var todo = [], desp = 0;
+  var s = buscaSesion(fecha,sesion), todo = [], desp = 0;
   for (var v=1; v<=s.vueltas; v++){
     var lv = datosVuelta(fecha,sesion,v);
     for (var i=0;i<lv.length;i++){
@@ -301,8 +303,11 @@ function llenarSelect(sel, lista, valor){
   });
   if (valor) sel.value = valor;
 }
+function opcion(sel, valor, texto){
+  var o = document.createElement('option'); o.value = valor; o.textContent = texto;
+  sel.appendChild(o); return o;
+}
 
-// ── Lista de casillas para elegir variables (máx. 3) ──
 function construirLista(cont, marcadas, alCambiar){
   cont.innerHTML = '';
   VARIABLES.forEach(function(v){
@@ -338,16 +343,15 @@ var LAYOUT_BASE = {
   paper_bgcolor:'#0d0d0d', plot_bgcolor:'#0d0d0d',
   font:{family:'Share Tech Mono, monospace', color:'#b0b0b0', size:10},
   margin:{l:56,r:56,t:10,b:42},
-  showlegend:true, legend:{orientation:'h', y:1.13, font:{size:9}}
+  showlegend:true, legend:{orientation:'h', y:1.13, font:{size:9}},
+  dragmode:false               // sin zoom por selección ni arrastre
 };
 function ejeY(k, etiqueta, color){
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
-           zerolinecolor:'#222', tickfont:{color:color}};
+           zerolinecolor:'#222', tickfont:{color:color}, fixedrange:true};
   if (k>0){ e.overlaying='y'; e.side = (k===1?'right':'left'); }
   return e;
 }
-
-// Verde → amarillo → rojo
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
   var c1=[59,167,118], c2=[194,168,56], c3=[204,64,85];
@@ -355,13 +359,15 @@ function escalaColor(f){
   return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  EN VIVO — ventana deslizante de 15 s, gráfica estática
-// ═══════════════════════════════════════════════════════════════════════
-var VENTANA_S = 15;
-// staticPlot: sin zoom, sin desplazamiento, sin barra de herramientas. Solo grafica.
+// En vivo: gráfica totalmente estática.
 var CONFIG_VIVO = {staticPlot:true, responsive:true};
-var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:false};
+// Histórico: sin zoom ni desplazamiento, pero conserva el cursor —
+// staticPlot lo desactivaría y con él la sincronización con el mapa.
+var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:false, doubleClick:false};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EN VIVO
+// ═══════════════════════════════════════════════════════════════════════
 var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null};
 
 function inicializarVivo(){
@@ -415,12 +421,10 @@ function redibujarVivo(){
                gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
   if (!dispersion){
     var ult = b[b.length-1][ejeX];
-    lay.xaxis.range = [ult - (ejeX==='t_vuelta' ? VENTANA_S : 0.25), ult];
+    lay.xaxis.range = [ult - (ejeX==='t_vuelta' ? VENTANA_S : 0.3), ult];
   }
   ys.forEach(function(y,k){
-    var e = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k]);
-    e.fixedrange = true;
-    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = e;
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k]);
   });
   Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
@@ -440,7 +444,8 @@ function inicializarHist(){
     redibujarHist();
   });
   document.getElementById('h-x').onchange = redibujarHist;
-  document.getElementById('h-mapvar').onchange = function(){ dibujarMapa(); };
+  document.getElementById('h-mapvar').onchange = dibujarMapa;
+  document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
   mapa = L.map('mapa', {zoomControl:true, attributionControl:false});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
@@ -456,73 +461,85 @@ function inicializarHist(){
   redibujarHist();
 }
 
-// El selector del mapa solo ofrece las variables ya elegidas en Y:
-// así el trazado siempre está relacionado con lo que se está graficando.
-function sincronizarSelectorMapa(){
-  var sel = document.getElementById('h-mapvar');
-  var ys = marcadasDe(document.getElementById('h-y'));
-  var previo = sel.value;
-  sel.innerHTML = '';
-  if (!ys.length){
-    var o = document.createElement('option'); o.value=''; o.textContent='— elige variables —';
-    sel.appendChild(o); return;
-  }
-  ys.forEach(function(id){
-    var m = meta(id), o = document.createElement('option');
-    o.value = id; o.textContent = m.nombre + ' ['+m.unidad+']';
-    sel.appendChild(o);
-  });
-  sel.value = (ys.indexOf(previo) >= 0) ? previo : ys[0];
-}
-
+// ── Un origen = día → sesión → alcance (sesión completa o vuelta N) ──
 function filaOrigen(i){
   var div = document.createElement('div');
   div.className = 'origen-row';
   div.innerHTML = '<div class="swatch" style="background:'+COLORES[i]+'"></div>' +
-                  '<select class="o-sesion"></select><select class="o-vuelta"></select>' +
-                  (i===0 ? '<span class="ref-tag">ref</span>' : '');
-  var selS = div.querySelector('.o-sesion');
-  var vacio = document.createElement('option'); vacio.value=''; vacio.textContent='— sin origen —';
-  selS.appendChild(vacio);
-  SESIONES.forEach(function(s){
-    var o = document.createElement('option');
-    o.value = s.fecha+'|'+s.sesion; o.textContent = s.fecha+' · S'+s.sesion;
-    selS.appendChild(o);
-  });
-  if (i<2) selS.selectedIndex = 1;
-  var selV = div.querySelector('.o-vuelta');
-  actualizarVueltas(selS, selV, i===0 ? 1 : 2);
-  selS.onchange = function(){ actualizarVueltas(selS, selV, 1); redibujarHist(); };
-  selV.onchange = redibujarHist;
+                  '<select class="o-dia"></select>' +
+                  '<select class="o-sesion"></select>' +
+                  '<select class="o-alcance"></select>' +
+                  (i===0 ? '<span class="ref-tag">ref</span>' : '<span></span>');
+
+  var selD = div.querySelector('.o-dia'),
+      selS = div.querySelector('.o-sesion'),
+      selA = div.querySelector('.o-alcance');
+
+  opcion(selD, '', '— ninguno —');
+  dias().forEach(function(f){ opcion(selD, f, f); });
+  if (i < 2) selD.value = dias()[0];
+
+  selD.onchange = function(){ llenarSesiones(selD, selS, selA); redibujarHist(); };
+  selS.onchange = function(){ llenarAlcance(selD, selS, selA, '1'); redibujarHist(); };
+  selA.onchange = redibujarHist;
+
+  llenarSesiones(selD, selS, selA, i===0 ? '1' : '2');
   return div;
 }
 
-function actualizarVueltas(selS, selV, preferida){
-  selV.innerHTML = '';
-  if (!selS.value){ selV.disabled = true; return; }
-  selV.disabled = false;
-  var partes = selS.value.split('|');
-  var s = SESIONES.find(function(x){return x.fecha===partes[0] && x.sesion===+partes[1];});
-  var oT = document.createElement('option'); oT.value='all'; oT.textContent='sesión completa';
-  selV.appendChild(oT);
-  for (var v=1; v<=s.vueltas; v++){
-    var o = document.createElement('option'); o.value=String(v); o.textContent='vuelta '+v;
-    selV.appendChild(o);
-  }
-  selV.value = String(preferida || 1);
+function llenarSesiones(selD, selS, selA, alcancePref){
+  selS.innerHTML = '';
+  if (!selD.value){ selS.disabled = selA.disabled = true; selA.innerHTML=''; return; }
+  selS.disabled = selA.disabled = false;
+  sesionesDe(selD.value).forEach(function(s){ opcion(selS, String(s.sesion), 'Sesión '+s.sesion); });
+  llenarAlcance(selD, selS, selA, alcancePref || '1');
+}
+
+function llenarAlcance(selD, selS, selA, preferido){
+  selA.innerHTML = '';
+  if (!selD.value || !selS.value) return;
+  var s = buscaSesion(selD.value, +selS.value);
+  opcion(selA, 'all', 'Sesión completa');
+  for (var v=1; v<=s.vueltas; v++) opcion(selA, String(v), 'Vuelta '+v);
+  selA.value = preferido;
+  if (!selA.value) selA.value = '1';
 }
 
 function origenesActivos(){
   var res = [];
   document.querySelectorAll('#h-origenes .origen-row').forEach(function(row, i){
-    var s = row.querySelector('.o-sesion').value, v = row.querySelector('.o-vuelta').value;
-    if (!s) return;
-    var partes = s.split('|');
-    res.push({idx:i, color:COLORES[i], fecha:partes[0], sesion:+partes[1], vuelta:v,
-      etiqueta: partes[0].slice(5)+' S'+partes[1]+' '+(v==='all'?'completa':'V'+v),
-      datos: v==='all' ? datosSesion(partes[0],+partes[1]) : datosVuelta(partes[0],+partes[1],+v)});
+    var d = row.querySelector('.o-dia').value,
+        s = row.querySelector('.o-sesion').value,
+        a = row.querySelector('.o-alcance').value;
+    if (!d || !s || !a) return;
+    res.push({idx:i, color:COLORES[i], fecha:d, sesion:+s, alcance:a,
+      etiqueta: d.slice(5)+' S'+s+' '+(a==='all'?'completa':'V'+a),
+      datos: a==='all' ? datosSesion(d,+s) : datosVuelta(d,+s,+a)});
   });
   return res;
+}
+
+// El selector del mapa solo ofrece las variables ya elegidas en Y
+function sincronizarSelectorMapa(){
+  var sel = document.getElementById('h-mapvar');
+  var ys = marcadasDe(document.getElementById('h-y'));
+  var previo = sel.value;
+  sel.innerHTML = '';
+  if (!ys.length){ opcion(sel, '', '— elige variables —'); return; }
+  ys.forEach(function(id){ var m = meta(id); opcion(sel, id, m.nombre+' ['+m.unidad+']'); });
+  sel.value = (ys.indexOf(previo) >= 0) ? previo : ys[0];
+}
+
+// El selector de origen del mapa solo ofrece los orígenes ya graficados
+function sincronizarOrigenMapa(){
+  var sel = document.getElementById('h-maporigen');
+  var orig = origenesActivos();
+  var previo = sel.value;
+  sel.innerHTML = '';
+  if (!orig.length){ opcion(sel, '', '— sin orígenes —'); return; }
+  orig.forEach(function(o){ opcion(sel, String(o.idx), o.etiqueta + (o.idx===0 ? '  (ref)' : '')); });
+  var existe = orig.some(function(o){ return String(o.idx) === previo; });
+  sel.value = existe ? previo : String(orig[0].idx);
 }
 
 function redibujarHist(){
@@ -548,21 +565,25 @@ function redibujarHist(){
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
-               gridcolor:'#1a1a1a', zerolinecolor:'#222'};
+               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
   ys.forEach(function(y,k){
     lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0');
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
+  sincronizarOrigenMapa();
   dibujarMapa();
 }
 
-// ── Mapa: trazado del origen de referencia, coloreado por la variable elegida ──
+// ── Mapa: el origen elegido, coloreado por la variable elegida ──
 function dibujarMapa(){
   capaTrazado.forEach(function(c){ mapa.removeLayer(c); });
   capaTrazado = [];
-  var o = origenesActivos()[0];
+
+  var orig = origenesActivos();
+  var idxSel = document.getElementById('h-maporigen').value;
+  var o = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
   var campo = document.getElementById('h-mapvar').value;
   var barra = document.getElementById('barra-color');
 
@@ -582,8 +603,6 @@ function dibujarMapa(){
   document.getElementById('h-min').textContent = min.toFixed(1)+' '+m.unidad;
   document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad;
 
-  // La barra se construye con la misma función de color que los segmentos,
-  // así la leyenda siempre corresponde a lo que se ve en el mapa.
   var paradas = [];
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
@@ -595,8 +614,7 @@ function dibujarMapa(){
       {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
   }
 
-  // Reencuadra solo al cambiar de origen, no al cambiar de variable
-  var clave = o.fecha+'|'+o.sesion+'|'+o.vuelta;
+  var clave = o.fecha+'|'+o.sesion+'|'+o.alcance;
   if (clave !== ultimoAjuste){
     // animate:false — con la animación por defecto el encuadre puede quedarse
     // a medias y el mapa se queda en el zoom anterior
@@ -613,90 +631,38 @@ function moverCursor(idx){
   var cont = document.getElementById('h-valores');
   if (!orig.length || !ys.length){ cont.innerHTML = '<div class="sin-cursor">Elige orígenes y variables.</div>'; return; }
 
-  var ref = orig[0], pRef = ref.datos[idx];
-  if (!pRef) return;
+  // El marcador se coloca sobre el origen que se está mostrando en el mapa
+  var idxSel = document.getElementById('h-maporigen').value;
+  var oMapa = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
+  var pMapa = oMapa.datos[idx];
 
-  if (marcadorCursor) mapa.removeLayer(marcadorCursor);
-  marcadorCursor = L.circleMarker([pRef.lat,pRef.lon],
-    {radius:7, color:'#fff', weight:2, fillColor:ref.color, fillOpacity:1}).addTo(mapa);
-
-  document.getElementById('h-cursor-pos').textContent =
-    pRef.d_vuelta.toFixed(3)+' km · '+pRef.t_vuelta.toFixed(1)+' s';
+  if (pMapa){
+    if (marcadorCursor) mapa.removeLayer(marcadorCursor);
+    marcadorCursor = L.circleMarker([pMapa.lat,pMapa.lon],
+      {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
+    document.getElementById('h-cursor-pos').textContent =
+      pMapa.d_vuelta.toFixed(3)+' km · '+pMapa.t_vuelta.toFixed(1)+' s';
+  }
 
   var campoMapa = document.getElementById('h-mapvar').value;
   var html = '<table class="cursor-tabla"><thead><tr><th></th>';
-  orig.forEach(function(o){
-    html += '<th style="color:'+o.color+'">'+o.etiqueta+'</th>';
-  });
+  orig.forEach(function(o){ html += '<th style="color:'+o.color+'">'+o.etiqueta+'</th>'; });
   html += '</tr></thead><tbody>';
 
-  // Fila de contexto: dónde está el cursor en cada origen
   ['t_vuelta','d_vuelta'].forEach(function(campo){
     var m = meta(campo);
     html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){
-      var p = o.datos[idx];
-      html += '<td>'+(p ? p[campo] : '—')+'</td>';
-    });
+    orig.forEach(function(o){ var p = o.datos[idx]; html += '<td>'+(p ? p[campo] : '—')+'</td>'; });
     html += '</tr>';
   });
-
-  // Una fila por variable seleccionada, una columna por origen
   ys.forEach(function(y){
-    var m = meta(y);
-    var clase = (y === campoMapa) ? ' class="destacada"' : '';
+    var m = meta(y), clase = (y === campoMapa) ? ' class="destacada"' : '';
     html += '<tr'+clase+'><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){
-      var p = o.datos[idx];
-      html += '<td>'+(p ? p[y] : '—')+'</td>';
-    });
+    orig.forEach(function(o){ var p = o.datos[idx]; html += '<td>'+(p ? p[y] : '—')+'</td>'; });
     html += '</tr>';
   });
   html += '</tbody></table>';
   cont.innerHTML = html;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Configuraciones guardadas
-// ═══════════════════════════════════════════════════════════════════════
-function guardarConfig(seccion){
-  var cfg;
-  if (seccion === 'vivo'){
-    cfg = {x:document.getElementById('v-x').value, y:marcadasDe(document.getElementById('v-y'))};
-  } else {
-    cfg = {x:document.getElementById('h-x').value, y:marcadasDe(document.getElementById('h-y')),
-           mapvar:document.getElementById('h-mapvar').value,
-           orig:Array.prototype.map.call(document.querySelectorAll('#h-origenes .origen-row'), function(r){
-             return {s:r.querySelector('.o-sesion').value, v:r.querySelector('.o-vuelta').value};
-           })};
-  }
-  try { localStorage.setItem('fenix-ploteo-'+seccion, JSON.stringify(cfg)); alert('Configuración guardada.'); }
-  catch(e){ alert('No se pudo guardar en este navegador.'); }
-}
-
-function cargarConfig(seccion){
-  var cfg;
-  try { cfg = JSON.parse(localStorage.getItem('fenix-ploteo-'+seccion) || 'null'); } catch(e){ cfg = null; }
-  if (!cfg){ alert('No hay configuración guardada para esta sección.'); return; }
-  if (seccion === 'vivo'){
-    document.getElementById('v-x').value = cfg.x;
-    construirLista(document.getElementById('v-y'), cfg.y, redibujarVivo);
-    redibujarVivo();
-  } else {
-    document.getElementById('h-x').value = cfg.x;
-    construirLista(document.getElementById('h-y'), cfg.y, function(){ sincronizarSelectorMapa(); redibujarHist(); });
-    document.querySelectorAll('#h-origenes .origen-row').forEach(function(r,i){
-      if (!cfg.orig[i]) return;
-      var selS = r.querySelector('.o-sesion'), selV = r.querySelector('.o-vuelta');
-      selS.value = cfg.orig[i].s;
-      actualizarVueltas(selS, selV, 1);
-      selV.value = cfg.orig[i].v;
-    });
-    sincronizarSelectorMapa();
-    if (cfg.mapvar) document.getElementById('h-mapvar').value = cfg.mapvar;
-    ultimoAjuste = '';
-    redibujarHist();
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -706,25 +672,20 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
     t.classList.add('active');
     document.getElementById('panel-'+t.dataset.panel).classList.add('active');
-    // Al mostrar el panel, Leaflet ya conoce el tamaño real del contenedor:
-    // hasta entonces el encuadre se calcula sobre un div oculto y sale mal.
+    // Hasta que el panel se muestra, Leaflet no conoce el tamaño real del
+    // contenedor y el encuadre sale mal
     if (t.dataset.panel === 'hist' && mapa) setTimeout(function(){
-      mapa.invalidateSize();
-      ultimoAjuste = '';
-      dibujarMapa();
+      mapa.invalidateSize(); ultimoAjuste = ''; dibujarMapa();
     }, 60);
   };
 });
 
-// Al cambiar el tamaño de la ventana, el mapa necesita recalcular y reencuadrar
 var temporizadorResize = null;
 window.addEventListener('resize', function(){
   clearTimeout(temporizadorResize);
   temporizadorResize = setTimeout(function(){
     if (!mapa) return;
-    mapa.invalidateSize();
-    ultimoAjuste = '';
-    dibujarMapa();
+    mapa.invalidateSize(); ultimoAjuste = ''; dibujarMapa();
   }, 150);
 });
 
