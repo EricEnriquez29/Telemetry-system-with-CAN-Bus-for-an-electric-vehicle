@@ -260,9 +260,23 @@
     </div>
 
     <div class="item">
-      <div class="item-head"><h3 class="item-title">Análisis en vivo, no solo posterior</h3></div>
-      <p>Debe poder graficarse mientras el vehículo corre, incluyendo la vuelta en curso. Esto obliga a alimentar los paneles de dos fuentes a la vez: el histórico desde InfluxDB para las vueltas cerradas, y el WebSocket para la que está ocurriendo.</p>
-      <p>Es un requisito de arquitectura, no una función que se añada después: condiciona cómo se estructura el estado de la pestaña desde el primer momento.</p>
+      <div class="item-head"><h3 class="item-title">Análisis en vivo, en una sección propia</h3></div>
+      <p>Debe poder graficarse mientras el vehículo corre. Se resuelve con una <strong>sección separada dentro de Ploteo</strong>, dedicada solo a datos en vivo, en lugar de mezclar la vuelta en curso con el análisis histórico.</p>
+      <p>La ventaja es que desaparece la transición más incómoda del diseño: qué hacer cuando la vuelta en curso se cierra. En una sección dedicada, la línea viva simplemente se reinicia con cada cruce de meta.</p>
+      <p>Para no perder la capacidad de comparar —que es donde está el valor de mirar datos mientras el coche rueda—, la sección admite <strong>vueltas de referencia como fondo fijo</strong>: una vuelta anterior, o de otra sesión, dibujada estática mientras la línea viva avanza sobre ella.</p>
+      <p>Las dos fuentes de datos quedan así separadas por sección: HTTP contra InfluxDB para el análisis histórico, WebSocket para la sección en vivo. Ambas comparten la misma conexión que ya alimenta la página principal, puesto que las tres pestañas viven en el mismo documento.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Seguimiento automático con pausa</h3></div>
+      <p>La vista avanza sola siguiendo el dato más reciente, hasta que el usuario interactúa: al hacer zoom o desplazar, el seguimiento se pausa por sí solo. Un control permite reanudarlo, recorriendo la vista de vuelta hasta el instante actual.</p>
+      <p>Sin esto, analizar mientras el coche rueda es inviable: cualquier intento de mirar un detalle se ve interrumpido por el avance de la gráfica.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Cadencia de redibujado</h3></div>
+      <p>Los snapshots llegan a 10~Hz, pero la sección en vivo no debe redibujarse a esa frecuencia. Dos medidas: añadir puntos al final de cada serie en lugar de reconstruir la gráfica (<code>extendTraces</code> de Plotly), y acumular los snapshots que llegan para dibujar dos o tres veces por segundo.</p>
+      <p>El resultado se percibe idéntico y el costo baja a menos de un tercio. La diferencia con la página principal —que sí redibuja a 10~Hz y funciona bien— es la cantidad de datos: allí cada serie está limitada a una ventana de 15 segundos, unos 150 puntos. Aquí, con vueltas de referencia cargadas y varios paneles, se manejan miles.</p>
     </div>
 
     <div class="item">
