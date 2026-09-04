@@ -296,9 +296,17 @@ def on_snapshot_message(client, userdata, msg):
         if lap_info["armado"]:
             derived["E_vuelta_actual"] = round(estado.E_HV - estado.E_HV_lap_inicio, 3)
             derived["E_regen_vuelta_actual"] = round(estado.E_regen - estado.E_regen_lap_inicio, 3)
+            # Eficiencia de la vuelta en curso [Wh/km]. Solo tiene sentido con
+            # distancia recorrida suficiente: por debajo de 10 m el cociente se
+            # dispara y no informa de nada.
+            derived["eta_vuelta_actual"] = (
+                round(derived["E_vuelta_actual"] / estado.d_vuelta, 2)
+                if estado.d_vuelta > 0.01 else None
+            )
         else:
             derived["E_vuelta_actual"] = None
             derived["E_regen_vuelta_actual"] = None
+            derived["eta_vuelta_actual"] = None
 
         # ── 4. Actualizar acumuladores HV ─────────────────────────────────────
         if curr_p < -config.I_MIN and derived["p_hv"] is not None:
@@ -434,6 +442,19 @@ def on_snapshot_message(client, userdata, msg):
         if derived["eta_total"] is not None: point = point.field("eta_total", derived["eta_total"])
         if derived["r_pack"] is not None: point = point.field("r_pack", derived["r_pack"])
         if derived["soh_c"] is not None: point = point.field("soh_c", derived["soh_c"])
+
+        # ── Métricas por vuelta y estimaciones de sesión ───────────────────────
+        # Antes solo viajaban al dashboard en vivo y no se persistían. Las tres
+        # primeras son reconstruibles desde E_HV/E_regen/d_vuelta, pero las
+        # cuatro estimaciones NO: dependen del promedio de sesión conocido en
+        # ese instante, así que recalcularlas después con la sesión completa da
+        # otro número. Guardarlas es lo que permite evaluar después qué tan
+        # bueno fue el estimador de autonomía frente a lo que realmente pasó.
+        for campo in ("E_vuelta_actual", "E_regen_vuelta_actual", "eta_vuelta_actual",
+                      "d_rest", "n_rest", "t_rest", "n_opt"):
+            valor = derived.get(campo)
+            if valor is not None:
+                point = point.field(campo, float(valor))
 
         for i, v in enumerate(cell_volts):
             point = point.field(f"cell_{i+1}", float(v))
