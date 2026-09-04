@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ideas para análisis — Telemetría Fénix</title>
+<style>
+  :root {
+    --bg: #0F1319; --surface: #161B23; --surface-2: #1C222C; --line: #262E3A;
+    --text: #E6E9EF; --muted: #8A94A6; --accent: #EF5E20;
+    --critical: #E5484D; --warning: #E8A33D; --ok: #3BA776; --info: #4A90B8;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #FBFAF9; --surface: #FFFFFF; --surface-2: #F4F5F7; --line: #E1E4E9;
+      --text: #1A1F27; --muted: #5C6675; --accent: #C9491A;
+      --critical: #C62A2F; --warning: #9A6512; --ok: #2A7A55; --info: #2E6B8C;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FBFAF9; --surface: #FFFFFF; --surface-2: #F4F5F7; --line: #E1E4E9;
+    --text: #1A1F27; --muted: #5C6675; --accent: #C9491A;
+    --critical: #C62A2F; --warning: #9A6512; --ok: #2A7A55; --info: #2E6B8C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    line-height: 1.6; margin: 0; padding: 0 1.25rem 5rem;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; display: flex; flex-direction: column; gap: 2.5rem; }
+  header {
+    padding-top: 3.5rem; display: flex; flex-direction: column; gap: 0.75rem;
+    border-bottom: 1px solid var(--line); padding-bottom: 2rem;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-size: clamp(1.75rem, 4vw, 2.4rem); line-height: 1.15; margin: 0;
+    text-wrap: balance; font-weight: 650; letter-spacing: -0.02em;
+  }
+  .lede { color: var(--muted); max-width: 40rem; margin: 0; }
+  .meta {
+    font-family: var(--mono); font-size: 0.75rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.5rem;
+  }
+  section { display: flex; flex-direction: column; gap: 1rem; }
+  h2 {
+    font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--text); margin: 0; padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--accent); display: flex;
+    justify-content: space-between; align-items: baseline; gap: 1rem;
+  }
+  h2 .count { color: var(--muted); font-weight: 400; letter-spacing: 0.06em; }
+  .section-note { color: var(--muted); font-size: 0.9rem; margin: 0; }
+  .item {
+    background: var(--surface); border: 1px solid var(--line); border-left-width: 3px;
+    border-left-color: var(--accent); border-radius: 5px;
+    padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .item-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 3px;
+    border: 1px solid currentColor; flex-shrink: 0; color: var(--info);
+  }
+  .chip.top { color: var(--accent); }
+  .origen {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 0.2rem 0.45rem; flex-shrink: 0;
+  }
+  .item-title { font-weight: 600; font-size: 1rem; margin: 0; }
+  .item p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .item p.sirve { color: var(--text); }
+  .sirve::before {
+    content: "Aquí sirve para "; font-family: var(--mono); font-size: 0.68rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-right: 0.4rem;
+  }
+  .item p.datos {
+    font-size: 0.86rem; border-left: 2px solid var(--line); padding-left: 0.8rem;
+  }
+  .datos strong { color: var(--ok); }
+  code {
+    font-family: var(--mono); font-size: 0.85em; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 3px; padding: 0.08em 0.35em; word-break: break-word;
+  }
+  .nota {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .nota h3 {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em;
+    text-transform: uppercase; margin: 0; color: var(--accent);
+  }
+  .nota p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  ol.fases {
+    margin: 0; padding-left: 1.3rem; color: var(--muted); font-size: 0.92rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  ol.fases strong { color: var(--text); }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.88rem;
+  }
+  th, td {
+    text-align: left; padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+  }
+  td { color: var(--muted); }
+  td:first-child { color: var(--text); }
+  .tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Escudería Fénix · UPIITA-IPN</div>
+    <h1>Ideas para la pestaña de análisis</h1>
+    <p class="lede">Herramientas de análisis de telemetría tomadas de F1, Fórmula E, WEC, NASCAR y FSAE, evaluadas para un vehículo de competencia por eficiencia. Cada una indica qué datos necesita y si ya están disponibles.</p>
+    <div class="meta">
+      <span>3 sep 2026</span>
+      <span>Pestaña «Ploteo» — sin implementar</span>
+      <span>Ninguna requiere datos nuevos</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>El punto de partida <span class="count">lo que ya existe</span></h2>
+    <p class="section-note">Ninguna de las ideas de este documento requiere instrumentación adicional en el vehículo. Todas se calculan con lo que la base ya guarda.</p>
+
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr><th>Recurso</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Distancia por vuelta (<code>d_vuelta</code>)</td><td>Se guarda por muestra y se reinicia en cada vuelta. Es el eje X que permite superponer vueltas de distinta duración</td></tr>
+          <tr><td>Número de vuelta (<code>lap_number</code>)</td><td>Es un tag de InfluxDB, así que filtrar por vuelta es una condición directa en la consulta</td></tr>
+          <tr><td>Posición GPS</td><td><code>gps_lat</code> y <code>gps_lon</code> a 10 Hz</td></tr>
+          <tr><td>Fuerzas G compensadas</td><td><code>Gx</code>, <code>Gy</code>, <code>Gz</code>, ya descontada la gravedad según la inclinación</td></tr>
+          <tr><td>Energía acumulada</td><td><code>E_HV</code> y <code>E_regen</code>, base de todo análisis de eficiencia</td></tr>
+          <tr><td>Pedales</td><td><code>throttle</code> y <code>brake</code> como porcentaje</td></tr>
+          <tr><td>Plotly</td><td>Ya cargado en el Frontend. Incluye <code>scattergl</code> (WebGL), capaz de dibujar cientos de miles de puntos</td></tr>
+          <tr><td>Mapa satelital</td><td>Esri World Imagery con etiquetas de Carto, ya integrado en la página principal</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Las ideas <span class="count">8</span></h2>
+    <p class="section-note">Ordenadas por lo que aportan a un vehículo cuya carrera se gana por eficiencia, no por velocidad punta.</p>
+
+    <div class="item">
+      <div class="item-head"><span class="chip top">Prioridad alta</span><span class="origen">F1 · MoTeC · WinTAX</span><h3 class="item-title">Delta-time contra una vuelta de referencia</h3></div>
+      <p>Una línea que muestra, en cada punto del trazado, cuántos segundos se llevan ganados o perdidos respecto a otra vuelta. Cuando la línea sube, se está perdiendo tiempo ahí; cuando baja, se gana. Es la herramienta más usada en ingeniería de pista, y la que convierte una comparación de gráficas en un diagnóstico.</p>
+      <p class="sirve">localizar el tramo exacto donde una vuelta fue peor, en vez de saber solo que el total fue peor.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> Para cada distancia, el tiempo acumulado de la vuelta A menos el de la B. Requiere interpolar ambas vueltas sobre una rejilla común de distancia.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip top">Prioridad alta</span><span class="origen">Fórmula E</span><h3 class="item-title">Delta de energía</h3></div>
+      <p>El mismo concepto que el delta-time, pero midiendo watts-hora en lugar de segundos: cuánta energía se lleva gastada de más o de menos respecto a una vuelta de referencia, punto a punto del circuito. En Fórmula E es la pantalla sobre la que se decide la estrategia de carrera.</p>
+      <p class="sirve">saber en qué curva concreta se va la energía, que en una competencia de eficiencia importa más que dónde se pierde tiempo.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> Diferencia de <code>E_HV</code> acumulada, alineada por <code>d_vuelta</code>. Misma mecánica que el delta-time.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad media</span><span class="origen">Todas las categorías</span><h3 class="item-title">Trazado coloreado por variable</h3></div>
+      <p>El circuito dibujado con las coordenadas GPS, con cada segmento coloreado según el valor de la variable elegida: verde donde el valor es bajo, rojo donde es alto. En F1 se usa coloreado por velocidad; en resistencia, por consumo.</p>
+      <p>No es un mapa de calor difuso —eso mide densidad de puntos—, sino segmentos de línea coloreados uno a uno sobre el mapa satelital que ya existe.</p>
+      <p class="sirve">ver de un vistazo dónde se gasta la energía, coloreando el trazado por Wh/km instantáneo.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> <code>gps_lat</code>, <code>gps_lon</code> y la variable a colorear. Se dibuja con polilíneas de Leaflet.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad media</span><span class="origen">F1 · WEC</span><h3 class="item-title">Micro-sectores y vuelta ideal</h3></div>
+      <p>Dividir la vuelta en 20 o 30 tramos por distancia y comparar cada tramo entre todas las vueltas de la sesión. El mejor tiempo de cada tramo se resalta, igual que los sectores morados de la televisión.</p>
+      <p>La suma de todos los mejores tramos es la <em>vuelta ideal</em>: el tiempo que ya se demostró ser capaz de hacer, solo que repartido entre vueltas distintas. La diferencia con la mejor vuelta real es el margen disponible sin cambiar nada del vehículo.</p>
+      <p class="sirve">cuantificar cuánto rendimiento hay sobre la mesa antes de tocar el coche, y dar al piloto objetivos por tramo.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> Se calcula solo a partir de <code>d_vuelta</code> y el tiempo, sin configuración manual de sectores.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad media</span><span class="origen">FSAE · coaching</span><h3 class="item-title">Histograma de pedales y tiempo en costa</h3></div>
+      <p>Qué porcentaje de la vuelta se pasa a fondo, a carga parcial, frenando, y —lo relevante aquí— <em>en costa</em>: sin acelerador ni freno, rodando por inercia.</p>
+      <p>Su complemento es la detección de <strong>solapamiento acelerador-freno</strong>: instantes en que ambos pedales están pisados a la vez. Es un clásico del análisis de pilotaje y delata pérdidas de energía puramente atribuibles a la conducción.</p>
+      <p class="sirve">medir la estrategia de rodar por inercia, que en una carrera de eficiencia es energía gratis, y detectar hábitos del piloto que la desperdician.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> <code>throttle</code> y <code>brake</code>. El tiempo en costa es la fracción de muestras con ambos por debajo de un umbral.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad media</span><span class="origen">NASCAR · resistencia</span><h3 class="item-title">Evolución del ritmo y degradación</h3></div>
+      <p>Tiempo de cada vuelta a lo largo de la sesión, con su desviación estándar. En NASCAR se usa para leer la degradación de los neumáticos a lo largo de un relevo.</p>
+      <p>Cruzado con <code>soc</code> y <code>soh_c</code>, se convierte en la curva de caída de rendimiento conforme la batería se vacía: cuánto ritmo se pierde por cada 10 % de carga consumida.</p>
+      <p class="sirve">separar lo que es cansancio o inconsistencia del piloto de lo que es caída física del paquete de baterías.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> Tiempos por vuelta del histórico, más <code>soc</code> y <code>soh_c</code>.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad baja</span><span class="origen">FSAE · SAE</span><h3 class="item-title">Diagrama g-g con círculo de fricción</h3></div>
+      <p>La nube de puntos de aceleración longitudinal contra lateral, con el círculo teórico del límite de agarre dibujado encima. Es el análisis estándar de dinámica vehicular en FSAE.</p>
+      <p>Lo que se lee es cuánto del potencial del neumático se está aprovechando: si la nube no llena el círculo, queda margen sin usar —típicamente en la transición entre frenar y girar—.</p>
+      <p class="sirve">evaluar el pilotaje en el límite y justificar decisiones de reparto de peso o presión de neumáticos.</p>
+      <p class="datos"><strong>Datos: disponibles.</strong> <code>Gx</code> y <code>Gy</code>, ya compensadas por gravedad. Se dibuja con <code>scattergl</code> de Plotly.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><span class="chip">Prioridad baja</span><span class="origen">F1 · karting</span><h3 class="item-title">Comparación de trazada sobre el mapa</h3></div>
+      <p>Dos vueltas dibujadas sobre el circuito, coloreadas según la separación lateral entre ambas: muestra que en una curva se entró más abierto que en la otra.</p>
+      <p>Es lo más complejo de esta lista —requiere proyectar una vuelta sobre la otra por distancia recorrida— y también lo más vistoso para una defensa de tesis.</p>
+      <p class="sirve">explicar visualmente por qué una vuelta fue mejor, cuando la diferencia está en la línea trazada y no en los pedales.</p>
+      <p class="datos"><strong>Datos: disponibles</strong>, con la salvedad de que la precisión depende de la calidad del GPS. Conviene validarla antes de invertir tiempo aquí.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Orden sugerido</h2>
+    <div class="nota">
+      <h3>Por fases</h3>
+      <ol class="fases">
+        <li><strong>Base:</strong> endpoint de series, panel de gráficas apiladas con cursor compartido, y el mapa. Sin esto no hay nada que construir encima.</li>
+        <li><strong>Superposición</strong> de vueltas alineadas por distancia. Es lo que convierte el visor en herramienta de comparación.</li>
+        <li><strong>Delta-time y delta de energía.</strong> El salto de calidad real: pasa de mostrar datos a señalar dónde está el problema.</li>
+        <li><strong>Dispersión XY</strong> y diagrama g-g.</li>
+        <li><strong>Micro-sectores</strong> y vuelta ideal.</li>
+      </ol>
+      <p>Las tres primeras dan una herramienta ya usable en pista. Las dos últimas son las que se defienden bien ante un jurado.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Requisitos acordados <span class="count">para el diseño</span></h2>
+    <p class="section-note">Decisiones tomadas el 3 sep 2026, que condicionan la arquitectura y conviene no perder.</p>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Ejes libres</h3></div>
+      <p>Cualquier variable en X contra cualquiera en Y. Incluye series contra tiempo, series contra distancia, y variable contra variable (nube de puntos, como <code>Gx</code> vs <code>Gy</code> o potencia mecánica vs corriente).</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Alcance de la selección</h3></div>
+      <p>Una vuelta concreta de una sesión de un día, un rango de vueltas, o la sesión completa. Comparable contra otra vuelta, otro rango o toda otra sesión, del mismo día o de otro.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Dos tipos de superposición</h3></div>
+      <p><strong>Entre vueltas o sesiones:</strong> las mismas variables de distintos orígenes, superpuestas en los mismos ejes. Se alinean por distancia, no por tiempo: así el metro 300 de una vuelta cae sobre el metro 300 de la otra aunque duren distinto.</p>
+      <p><strong>Entre variables:</strong> distintas magnitudes del mismo origen, para buscar correlaciones. Cuando las unidades no son comparables (velocidad frente a potencia) hacen falta ejes Y separados, o una de las dos queda aplastada contra el eje.</p>
+      <p>Convención tomada de MoTeC: el color identifica el <em>origen</em> (vuelta o sesión), no la variable, y la referencia se dibuja con trazo más grueso.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Análisis en vivo, no solo posterior</h3></div>
+      <p>Debe poder graficarse mientras el vehículo corre, incluyendo la vuelta en curso. Esto obliga a alimentar los paneles de dos fuentes a la vez: el histórico desde InfluxDB para las vueltas cerradas, y el WebSocket para la que está ocurriendo.</p>
+      <p>Es un requisito de arquitectura, no una función que se añada después: condiciona cómo se estructura el estado de la pestaña desde el primer momento.</p>
+    </div>
+
+    <div class="item">
+      <div class="item-head"><h3 class="item-title">Configuraciones guardadas</h3></div>
+      <p>Poder recuperar un conjunto de gráficas ya armado sin rehacerlo cada vez. Se resuelve en el navegador con <code>localStorage</code>, sin tocar el servidor.</p>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
