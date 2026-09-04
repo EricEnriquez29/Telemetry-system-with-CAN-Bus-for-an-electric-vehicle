@@ -22,7 +22,7 @@
   .title{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;color:var(--orange);text-transform:uppercase;}
   .subtitle{font-size:11px;color:var(--muted);margin-top:4px;}
 
-  .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--col1);}
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--col1);}
   .tab{padding:10px 22px;cursor:pointer;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent;}
   .tab:hover{color:var(--text);}
   .tab.active{color:var(--orange);border-bottom-color:var(--orange);background:#111;}
@@ -30,16 +30,23 @@
   .panel{display:none;padding:14px;}
   .panel.active{display:block;}
 
-  .toolbar{background:var(--col1);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
-  .field{display:flex;flex-direction:column;gap:4px;}
-  .field label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
-  select,button,input{font-family:'Share Tech Mono',monospace;background:#141414;color:var(--text);border:1px solid var(--border);border-radius:3px;padding:5px 8px;font-size:11px;}
+  .toolbar{background:var(--col1);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field > label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+  select,button{font-family:'Share Tech Mono',monospace;background:#141414;color:var(--text);border:1px solid var(--border);border-radius:3px;padding:5px 8px;font-size:11px;}
   select:focus,button:focus{outline:1px solid var(--orange);}
   button{cursor:pointer;}
   button:hover{border-color:var(--orange);color:var(--orange);}
-  button.primary{background:var(--orange);color:#000;border-color:var(--orange);font-weight:bold;}
-  button.primary:hover{background:#ff7a3d;color:#000;}
-  select[multiple]{min-height:88px;}
+
+  /* ── Lista con casillas para elegir variables ── */
+  .chk-list{background:#111;border:1px solid var(--border);border-radius:3px;padding:4px;max-height:132px;overflow-y:auto;min-width:190px;}
+  .chk-item{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:2px;cursor:pointer;font-size:11px;}
+  .chk-item:hover{background:#181818;}
+  .chk-item input{accent-color:var(--orange);cursor:pointer;margin:0;}
+  .chk-item.sel{background:#1a1a1a;}
+  .chk-item .u{color:#666;font-size:10px;}
+  .chk-item.bloq{opacity:.35;cursor:not-allowed;}
+  .chk-cuenta{font-size:9px;color:#666;padding:2px 6px 0;}
 
   .origenes{display:flex;flex-direction:column;gap:6px;}
   .origen-row{display:flex;gap:6px;align-items:center;}
@@ -47,21 +54,26 @@
   .origen-row select{font-size:10px;padding:3px 5px;}
   .ref-tag{font-size:8px;letter-spacing:1px;color:var(--orange);border:1px solid var(--orange);border-radius:2px;padding:1px 4px;}
 
-  .grid-hist{display:grid;grid-template-columns:1fr 380px;gap:12px;}
-  @media(max-width:1100px){.grid-hist{grid-template-columns:1fr;}}
+  .grid-hist{display:grid;grid-template-columns:1fr 400px;gap:12px;}
+  @media(max-width:1150px){.grid-hist{grid-template-columns:1fr;}}
 
   .card{background:var(--col1);border:1px solid var(--border);border-radius:4px;padding:10px;}
-  .card-title{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+  .card-title{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .card-title .hint{color:#666;text-transform:none;letter-spacing:0;font-size:9px;}
+  .card-title .var-mapa{color:var(--orange);}
 
-  #mapa{height:300px;border-radius:3px;background:#111;}
-  .leyenda-mapa{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9px;color:var(--muted);}
-  .barra-color{flex:1;height:8px;border-radius:2px;background:linear-gradient(to right,#3ba776,#c2a838,#cc4055);}
+  #mapa{height:290px;border-radius:3px;background:#111;}
+  .leyenda-mapa{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:9px;color:var(--muted);}
+  #barra-color{flex:1;height:9px;border-radius:2px;border:1px solid #222;}
 
-  .valores{margin-top:10px;display:flex;flex-direction:column;gap:3px;font-size:11px;}
-  .valor-row{display:flex;justify-content:space-between;border-bottom:1px solid #161616;padding:2px 0;}
-  .valor-row .k{color:var(--muted);}
-  .valor-row .v{font-weight:bold;}
+  /* ── Tabla de valores bajo el cursor: una columna por origen ── */
+  table.cursor-tabla{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:2px;}
+  table.cursor-tabla th,table.cursor-tabla td{padding:3px 5px;border-bottom:1px solid #161616;text-align:right;}
+  table.cursor-tabla th:first-child,table.cursor-tabla td:first-child{text-align:left;color:var(--muted);font-weight:normal;}
+  table.cursor-tabla thead th{font-size:9px;letter-spacing:.5px;border-bottom:1px solid #262626;}
+  table.cursor-tabla td{font-weight:bold;}
+  table.cursor-tabla tr.destacada td{color:var(--orange);}
+  .sin-cursor{font-size:10px;color:#666;padding:6px 2px;}
 
   .aviso{background:#141414;border-left:3px solid var(--orange);padding:8px 12px;font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
   .aviso b{color:var(--text);}
@@ -88,7 +100,7 @@
 <div class="panel active" id="panel-vivo">
   <div class="aviso">
     <b>Ventana deslizante de 15 segundos.</b> Se alimenta del WebSocket, descarta lo viejo y no acumula.
-    Sin superposición, sin comparación y sin mapa — para eso está la sección Histórico.
+    Sin superposición, sin comparación, sin mapa y <b>sin zoom ni desplazamiento</b>: solo grafica.
   </div>
 
   <div class="toolbar">
@@ -97,12 +109,13 @@
       <select id="v-x"></select>
     </div>
     <div class="field">
-      <label>Variables en Y (máx. 3)</label>
-      <select id="v-y" multiple size="5"></select>
+      <label>Variables en Y</label>
+      <div class="chk-list" id="v-y"></div>
+      <div class="chk-cuenta" id="v-y-cuenta"></div>
     </div>
     <div class="field">
       <label>Simulación</label>
-      <button id="v-toggle" class="primary">Pausar</button>
+      <button id="v-toggle">Pausar</button>
     </div>
     <div class="field">
       <label>Estado</label>
@@ -119,15 +132,16 @@
 
   <div class="card">
     <div class="card-title"><span>Gráfica en vivo</span><span class="hint" id="v-hint">vuelta 1 · 0.0 s</span></div>
-    <div id="g-vivo" style="height:420px;"></div>
+    <div id="g-vivo" style="height:430px;"></div>
   </div>
 </div>
 
 <!-- ─────────────── HISTÓRICO ─────────────── -->
 <div class="panel" id="panel-hist">
   <div class="aviso">
-    <b>Hasta 3 orígenes comparables.</b> El color identifica el origen (vuelta o sesión), no la variable.
-    El primero es la referencia y se dibuja con trazo más grueso. Al comparar vueltas, alinea por distancia.
+    <b>Hasta 3 orígenes comparables.</b> El color identifica el origen; el tipo de línea, la variable.
+    El primero es la referencia y va con trazo más grueso. El mapa se colorea con una de las variables ya elegidas,
+    y el cursor muestra los valores de <b>todos</b> los orígenes a la vez.
   </div>
 
   <div class="toolbar">
@@ -140,12 +154,14 @@
       <select id="h-x"></select>
     </div>
     <div class="field">
-      <label>Variables en Y (máx. 3)</label>
-      <select id="h-y" multiple size="5"></select>
+      <label>Variables en Y</label>
+      <div class="chk-list" id="h-y"></div>
+      <div class="chk-cuenta" id="h-y-cuenta"></div>
     </div>
     <div class="field">
-      <label>Colorear mapa por</label>
+      <label>Colorear mapa con</label>
       <select id="h-mapvar"></select>
+      <div class="chk-cuenta">solo entre las variables elegidas</div>
     </div>
     <div class="field">
       <label>Configuración</label>
@@ -159,18 +175,18 @@
   <div class="grid-hist">
     <div class="card">
       <div class="card-title"><span>Gráfica</span><span class="hint">pasa el cursor para sincronizar con el mapa</span></div>
-      <div id="g-hist" style="height:460px;"></div>
+      <div id="g-hist" style="height:470px;"></div>
     </div>
 
     <div>
       <div class="card">
-        <div class="card-title"><span>Trazado</span><span class="hint" id="h-mapname">velocidad</span></div>
+        <div class="card-title"><span>Trazado</span><span class="var-mapa" id="h-mapname">—</span></div>
         <div id="mapa"></div>
-        <div class="leyenda-mapa"><span id="h-min">—</span><div class="barra-color"></div><span id="h-max">—</span></div>
+        <div class="leyenda-mapa"><span id="h-min">—</span><div id="barra-color"></div><span id="h-max">—</span></div>
       </div>
       <div class="card" style="margin-top:12px;">
-        <div class="card-title"><span>Bajo el cursor</span></div>
-        <div class="valores" id="h-valores"><div class="valor-row"><span class="k">—</span><span class="v">—</span></div></div>
+        <div class="card-title"><span>Bajo el cursor</span><span class="hint" id="h-cursor-pos"></span></div>
+        <div id="h-valores"><div class="sin-cursor">Pasa el cursor sobre la gráfica.</div></div>
       </div>
     </div>
   </div>
@@ -178,8 +194,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════
-//  Generador de datos simulados
-//  Reemplazable por: GET /session_series (histórico) y WebSocket (vivo)
+//  Datos simulados — reemplazables por GET /session_series y WebSocket
 // ═══════════════════════════════════════════════════════════════════════
 var VARIABLES = [
   {id:'speed_v', nombre:'Velocidad',        unidad:'km/h'},
@@ -200,66 +215,50 @@ var EJES_X = [{id:'t_vuelta',nombre:'Tiempo de vuelta',unidad:'s'},
 
 var CENTRO = {lat:19.5042, lon:-99.1467};
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
+var DASHES  = ['solid','dot','dash'];
+var MAX_Y = 3, MAX_ORIGENES = 3;
 
 function aleatorio(semilla){ var s=semilla; return function(){ s=(s*9301+49297)%233280; return s/233280; }; }
-
-// Trazado cerrado: óvalo deformado, en grados
 function puntoPista(u){
   var a = u*2*Math.PI;
-  var rx = 0.0016*(1+0.18*Math.sin(3*a));
-  var ry = 0.0011*(1+0.12*Math.cos(2*a));
+  var rx = 0.0016*(1+0.18*Math.sin(3*a)), ry = 0.0011*(1+0.12*Math.cos(2*a));
   return {lat: CENTRO.lat + ry*Math.sin(a), lon: CENTRO.lon + rx*Math.cos(a)};
 }
-// Curvatura aproximada: donde el trazado gira, se baja la velocidad
 function curvatura(u){
   var a = u*2*Math.PI;
-  return Math.abs(Math.sin(2*a)) * 0.6 + Math.abs(Math.cos(3*a)) * 0.4;
+  return Math.abs(Math.sin(2*a))*0.6 + Math.abs(Math.cos(3*a))*0.4;
 }
-
 function generarVuelta(semilla, nVuelta){
   var rnd = aleatorio(semilla + nVuelta*137);
-  var ritmo = 0.92 + rnd()*0.16;              // variación de ritmo entre vueltas
-  var dt = 0.1, n = Math.round(260*ritmo);
+  var ritmo = 0.92 + rnd()*0.16, dt = 0.1, n = Math.round(260*ritmo);
   var pts = [], E = 0, d = 0, vAnt = 0;
-
   for (var i=0;i<n;i++){
-    var u = i/n;
-    var curv = curvatura(u);
-    var vObj = (62 - curv*30) * (1/ritmo) + (rnd()-0.5)*1.2;
+    var u = i/n, curv = curvatura(u);
+    var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
     var v = vAnt + (vObj - vAnt)*0.12;
-    var acc = (v - vAnt)/dt/3.6;                       // m/s²
+    var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
-
-    d += v*dt/3600;                                     // km
+    d += v*dt/3600;
     var pos = puntoPista(u);
     var thr = Math.max(0, Math.min(100, 50 + acc*22 + (rnd()-0.5)*6));
     var brk = acc < -0.6 ? Math.min(100, -acc*40) : 0;
     var pmec = Math.max(0, v*68 + acc*260);
-    var phv  = pmec > 0 ? pmec/ (0.78 + 0.1*(1-curv)) : 0;
+    var phv  = pmec > 0 ? pmec/(0.78 + 0.1*(1-curv)) : 0;
     E += phv*dt/3600;
-
     pts.push({
-      t_vuelta: +(i*dt).toFixed(1),
-      d_vuelta: +d.toFixed(4),
-      speed_v : +v.toFixed(1),
-      rpm     : Math.round(v*25.4),
-      p_hv    : Math.round(phv),
-      p_mec   : Math.round(pmec),
-      curr_p  : +(-phv/52.1).toFixed(1),
-      throttle: Math.round(thr),
-      brake   : Math.round(brk),
-      Gx      : +(acc/9.81).toFixed(3),
-      Gy      : +(curv*1.15*(Math.sin(u*12)>0?1:-1)).toFixed(3),
-      E_HV    : +E.toFixed(2),
-      eta     : +(78 + (1-curv)*11).toFixed(1),
-      soc     : +(77 - (nVuelta-1)*3.2 - E/52).toFixed(1),
-      lat: pos.lat, lon: pos.lon
+      t_vuelta:+(i*dt).toFixed(1), d_vuelta:+d.toFixed(4),
+      speed_v:+v.toFixed(1), rpm:Math.round(v*25.4),
+      p_hv:Math.round(phv), p_mec:Math.round(pmec),
+      curr_p:+(-phv/52.1).toFixed(1),
+      throttle:Math.round(thr), brake:Math.round(brk),
+      Gx:+(acc/9.81).toFixed(3), Gy:+(curv*1.15*(Math.sin(u*12)>0?1:-1)).toFixed(3),
+      E_HV:+E.toFixed(2), eta:+(78+(1-curv)*11).toFixed(1),
+      soc:+(77-(nVuelta-1)*3.2-E/52).toFixed(1),
+      lat:pos.lat, lon:pos.lon
     });
   }
   return pts;
 }
-
-// Catálogo de sesiones simuladas
 var SESIONES = [
   {fecha:'2026-07-03', sesion:3, semilla:1001, vueltas:6},
   {fecha:'2026-07-03', sesion:4, semilla:2002, vueltas:5},
@@ -268,7 +267,7 @@ var SESIONES = [
 var CACHE = {};
 function datosVuelta(fecha, sesion, vuelta){
   var k = fecha+'|'+sesion+'|'+vuelta;
-  if (!CACHE[k]) {
+  if (!CACHE[k]){
     var s = SESIONES.find(function(x){return x.fecha===fecha && x.sesion===sesion;});
     CACHE[k] = generarVuelta(s.semilla, vuelta);
   }
@@ -276,15 +275,15 @@ function datosVuelta(fecha, sesion, vuelta){
 }
 function datosSesion(fecha, sesion){
   var s = SESIONES.find(function(x){return x.fecha===fecha && x.sesion===sesion;});
-  var todo = [], desplazamiento = 0;
+  var todo = [], desp = 0;
   for (var v=1; v<=s.vueltas; v++){
     var lv = datosVuelta(fecha,sesion,v);
     for (var i=0;i<lv.length;i++){
       var p = Object.assign({}, lv[i]);
-      p.t_vuelta = +(p.t_vuelta + desplazamiento).toFixed(1);
+      p.t_vuelta = +(p.t_vuelta + desp).toFixed(1);
       todo.push(p);
     }
-    desplazamiento += lv[lv.length-1].t_vuelta;
+    desp += lv[lv.length-1].t_vuelta;
   }
   return todo;
 }
@@ -293,39 +292,82 @@ function datosSesion(fecha, sesion){
 //  Utilidades
 // ═══════════════════════════════════════════════════════════════════════
 function meta(id){ return EJES_X.concat(VARIABLES).find(function(v){return v.id===id;}) || {nombre:id,unidad:''}; }
-function llenarSelect(sel, lista, valores){
+function llenarSelect(sel, lista, valor){
   sel.innerHTML = '';
   lista.forEach(function(v){
     var o = document.createElement('option');
     o.value = v.id; o.textContent = v.nombre + (v.unidad ? ' ['+v.unidad+']' : '');
-    if (valores && valores.indexOf(v.id) >= 0) o.selected = true;
     sel.appendChild(o);
   });
+  if (valor) sel.value = valor;
 }
-function seleccionados(sel, max){
-  var v = Array.prototype.slice.call(sel.selectedOptions).map(function(o){return o.value;});
-  return max ? v.slice(0,max) : v;
+
+// ── Lista de casillas para elegir variables (máx. 3) ──
+function construirLista(cont, marcadas, alCambiar){
+  cont.innerHTML = '';
+  VARIABLES.forEach(function(v){
+    var lab = document.createElement('label');
+    lab.className = 'chk-item';
+    lab.innerHTML = '<input type="checkbox" value="'+v.id+'"><span>'+v.nombre+'</span><span class="u">'+v.unidad+'</span>';
+    var chk = lab.querySelector('input');
+    chk.checked = marcadas.indexOf(v.id) >= 0;
+    chk.onchange = function(){
+      if (chk.checked && marcadasDe(cont).length > MAX_Y){ chk.checked = false; return; }
+      pintarLista(cont); alCambiar();
+    };
+    cont.appendChild(lab);
+  });
+  pintarLista(cont);
 }
+function marcadasDe(cont){
+  return Array.prototype.slice.call(cont.querySelectorAll('input:checked')).map(function(c){return c.value;});
+}
+function pintarLista(cont){
+  var n = marcadasDe(cont).length, tope = n >= MAX_Y;
+  cont.querySelectorAll('.chk-item').forEach(function(it){
+    var c = it.querySelector('input');
+    it.classList.toggle('sel', c.checked);
+    it.classList.toggle('bloq', tope && !c.checked);
+    c.disabled = tope && !c.checked;
+  });
+  var cuenta = document.getElementById(cont.id + '-cuenta');
+  if (cuenta) cuenta.textContent = n + ' de ' + MAX_Y + ' seleccionadas';
+}
+
 var LAYOUT_BASE = {
   paper_bgcolor:'#0d0d0d', plot_bgcolor:'#0d0d0d',
   font:{family:'Share Tech Mono, monospace', color:'#b0b0b0', size:10},
-  margin:{l:52,r:52,t:10,b:40},
-  showlegend:true, legend:{orientation:'h', y:1.12, font:{size:9}},
-  hovermode:'x unified'
+  margin:{l:56,r:56,t:10,b:42},
+  showlegend:true, legend:{orientation:'h', y:1.13, font:{size:9}}
 };
-var CONFIG_PLOT = {displayModeBar:false, responsive:true};
+function ejeY(k, etiqueta, color){
+  var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
+           zerolinecolor:'#222', tickfont:{color:color}};
+  if (k>0){ e.overlaying='y'; e.side = (k===1?'right':'left'); }
+  return e;
+}
+
+// Verde → amarillo → rojo
+function escalaColor(f){
+  f = Math.max(0, Math.min(1, f));
+  var c1=[59,167,118], c2=[194,168,56], c3=[204,64,85];
+  var a = f<0.5?c1:c2, b = f<0.5?c2:c3, u = f<0.5?f*2:(f-0.5)*2;
+  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
+}
 
 // ═══════════════════════════════════════════════════════════════════════
-//  SECCIÓN EN VIVO — ventana deslizante de 15 s, sin acumular
+//  EN VIVO — ventana deslizante de 15 s, gráfica estática
 // ═══════════════════════════════════════════════════════════════════════
 var VENTANA_S = 15;
-var vivo = { buffer:[], vuelta:1, i:0, corriendo:true, datos:null };
+// staticPlot: sin zoom, sin desplazamiento, sin barra de herramientas. Solo grafica.
+var CONFIG_VIVO = {staticPlot:true, responsive:true};
+var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:false};
+var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null};
 
 function inicializarVivo(){
-  llenarSelect(document.getElementById('v-x'), EJES_X, ['t_vuelta']);
-  llenarSelect(document.getElementById('v-y'), VARIABLES, ['speed_v','p_hv','throttle']);
+  llenarSelect(document.getElementById('v-x'), EJES_X, 't_vuelta');
+  construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], redibujarVivo);
   document.getElementById('v-x').onchange = redibujarVivo;
-  document.getElementById('v-y').onchange = redibujarVivo;
   document.getElementById('v-toggle').onclick = function(){
     vivo.corriendo = !vivo.corriendo;
     this.textContent = vivo.corriendo ? 'Pausar' : 'Reanudar';
@@ -333,109 +375,118 @@ function inicializarVivo(){
     document.getElementById('v-estado').textContent = vivo.corriendo ? 'Recibiendo 10 Hz' : 'Simulación pausada';
   };
   vivo.datos = datosVuelta('2026-08-19',1,1);
-  Plotly.newPlot('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_PLOT);
-  setInterval(tickVivo, 100);   // 10 Hz, como el WebSocket real
+  Plotly.newPlot('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_VIVO);
+  setInterval(tickVivo, 100);
 }
 
 function tickVivo(){
   if (!vivo.corriendo) return;
   var p = vivo.datos[vivo.i];
   vivo.buffer.push(p);
-  // Ventana deslizante: descartar todo lo anterior a 15 s
   var limite = p.t_vuelta - VENTANA_S;
   while (vivo.buffer.length && vivo.buffer[0].t_vuelta < limite) vivo.buffer.shift();
-
   vivo.i++;
-  if (vivo.i >= vivo.datos.length){        // cruce de meta: reinicia
+  if (vivo.i >= vivo.datos.length){
     vivo.vuelta++;
     vivo.datos = datosVuelta('2026-08-19',1,((vivo.vuelta-1)%7)+1);
     vivo.i = 0; vivo.buffer = [];
   }
-  document.getElementById('v-hint').textContent =
-    'vuelta ' + vivo.vuelta + ' · ' + p.t_vuelta.toFixed(1) + ' s';
+  document.getElementById('v-hint').textContent = 'vuelta '+vivo.vuelta+' · '+p.t_vuelta.toFixed(1)+' s';
   redibujarVivo();
 }
 
 function redibujarVivo(){
   var ejeX = document.getElementById('v-x').value;
-  var ys   = seleccionados(document.getElementById('v-y'), 3);
+  var ys = marcadasDe(document.getElementById('v-y'));
   var b = vivo.buffer;
-  if (!b.length) return;
+  if (!b.length || !ys.length){ Plotly.react('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_VIVO); return; }
 
-  var esDispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
-  var trazas = ys.map(function(y, k){
-    return {
-      x: b.map(function(p){return p[ejeX];}),
-      y: b.map(function(p){return p[y];}),
-      name: meta(y).nombre,
-      type:'scattergl',
-      mode: esDispersion ? 'markers' : 'lines',
-      marker:{size:4, color:COLORES[k]},
-      line:{width:1.6, color:COLORES[k]},
-      yaxis: k===0 ? 'y' : 'y'+(k+1)
-    };
+  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
+  var trazas = ys.map(function(y,k){
+    return {x:b.map(function(p){return p[ejeX];}), y:b.map(function(p){return p[y];}),
+            name:meta(y).nombre, type:'scattergl',
+            mode: dispersion ? 'markers' : 'lines',
+            marker:{size:4, color:COLORES[k]}, line:{width:1.7, color:COLORES[k]},
+            yaxis: k===0 ? 'y' : 'y'+(k+1)};
   });
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
-               gridcolor:'#1a1a1a', zerolinecolor:'#222'};
-  if (!esDispersion){
+               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
+  if (!dispersion){
     var ult = b[b.length-1][ejeX];
     lay.xaxis.range = [ult - (ejeX==='t_vuelta' ? VENTANA_S : 0.25), ult];
   }
   ys.forEach(function(y,k){
-    var eje = k===0 ? 'yaxis' : 'yaxis'+(k+1);
-    lay[eje] = {title:{text:meta(y).unidad,font:{size:9}}, gridcolor:'#1a1a1a',
-                zerolinecolor:'#222', titlefont:{color:COLORES[k]}, tickfont:{color:COLORES[k]}};
-    if (k>0){ lay[eje].overlaying='y'; lay[eje].side = k===1?'right':'left'; lay[eje].anchor = k===2?'free':'x'; if(k===2) lay[eje].position=0; }
+    var e = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k]);
+    e.fixedrange = true;
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = e;
   });
-  Plotly.react('g-vivo', trazas, lay, CONFIG_PLOT);
+  Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  SECCIÓN HISTÓRICO — hasta 3 orígenes, superposición y mapa
+//  HISTÓRICO
 // ═══════════════════════════════════════════════════════════════════════
-var MAX_ORIGENES = 3;
-var mapa, capaTrazado = [], marcadorCursor = null;
+var mapa, capaTrazado = [], marcadorCursor = null, ultimoAjuste = '';
 
 function inicializarHist(){
   var cont = document.getElementById('h-origenes');
   for (var i=0;i<MAX_ORIGENES;i++) cont.appendChild(filaOrigen(i));
 
-  llenarSelect(document.getElementById('h-x'), EJES_X, ['d_vuelta']);
-  llenarSelect(document.getElementById('h-y'), VARIABLES, ['speed_v','p_hv']);
-  llenarSelect(document.getElementById('h-mapvar'), VARIABLES, ['speed_v']);
+  llenarSelect(document.getElementById('h-x'), EJES_X, 'd_vuelta');
+  construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
+    sincronizarSelectorMapa();
+    redibujarHist();
+  });
   document.getElementById('h-x').onchange = redibujarHist;
-  document.getElementById('h-y').onchange = redibujarHist;
-  document.getElementById('h-mapvar').onchange = redibujarHist;
+  document.getElementById('h-mapvar').onchange = function(){ dibujarMapa(); };
 
   mapa = L.map('mapa', {zoomControl:true, attributionControl:false});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.65}).addTo(mapa);
   mapa.setView([CENTRO.lat, CENTRO.lon], 16);
 
-  Plotly.newPlot('g-hist', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_PLOT);
+  Plotly.newPlot('g-hist', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_HIST);
   document.getElementById('g-hist').on('plotly_hover', function(ev){
-    moverCursor(ev.points[0].pointIndex, ev.points[0].curveNumber);
+    moverCursor(ev.points[0].pointIndex);
   });
+
+  sincronizarSelectorMapa();
   redibujarHist();
+}
+
+// El selector del mapa solo ofrece las variables ya elegidas en Y:
+// así el trazado siempre está relacionado con lo que se está graficando.
+function sincronizarSelectorMapa(){
+  var sel = document.getElementById('h-mapvar');
+  var ys = marcadasDe(document.getElementById('h-y'));
+  var previo = sel.value;
+  sel.innerHTML = '';
+  if (!ys.length){
+    var o = document.createElement('option'); o.value=''; o.textContent='— elige variables —';
+    sel.appendChild(o); return;
+  }
+  ys.forEach(function(id){
+    var m = meta(id), o = document.createElement('option');
+    o.value = id; o.textContent = m.nombre + ' ['+m.unidad+']';
+    sel.appendChild(o);
+  });
+  sel.value = (ys.indexOf(previo) >= 0) ? previo : ys[0];
 }
 
 function filaOrigen(i){
   var div = document.createElement('div');
   div.className = 'origen-row';
-  div.innerHTML =
-    '<div class="swatch" style="background:'+COLORES[i]+'"></div>' +
-    '<select class="o-sesion" data-i="'+i+'"></select>' +
-    '<select class="o-vuelta" data-i="'+i+'"></select>' +
-    (i===0 ? '<span class="ref-tag">ref</span>' : '');
+  div.innerHTML = '<div class="swatch" style="background:'+COLORES[i]+'"></div>' +
+                  '<select class="o-sesion"></select><select class="o-vuelta"></select>' +
+                  (i===0 ? '<span class="ref-tag">ref</span>' : '');
   var selS = div.querySelector('.o-sesion');
   var vacio = document.createElement('option'); vacio.value=''; vacio.textContent='— sin origen —';
   selS.appendChild(vacio);
   SESIONES.forEach(function(s){
     var o = document.createElement('option');
-    o.value = s.fecha+'|'+s.sesion;
-    o.textContent = s.fecha+' · S'+s.sesion;
+    o.value = s.fecha+'|'+s.sesion; o.textContent = s.fecha+' · S'+s.sesion;
     selS.appendChild(o);
   });
   if (i<2) selS.selectedIndex = 1;
@@ -452,8 +503,8 @@ function actualizarVueltas(selS, selV, preferida){
   selV.disabled = false;
   var partes = selS.value.split('|');
   var s = SESIONES.find(function(x){return x.fecha===partes[0] && x.sesion===+partes[1];});
-  var oTodas = document.createElement('option'); oTodas.value='all'; oTodas.textContent='sesión completa';
-  selV.appendChild(oTodas);
+  var oT = document.createElement('option'); oT.value='all'; oT.textContent='sesión completa';
+  selV.appendChild(oT);
   for (var v=1; v<=s.vueltas; v++){
     var o = document.createElement('option'); o.value=String(v); o.textContent='vuelta '+v;
     selV.appendChild(o);
@@ -464,40 +515,33 @@ function actualizarVueltas(selS, selV, preferida){
 function origenesActivos(){
   var res = [];
   document.querySelectorAll('#h-origenes .origen-row').forEach(function(row, i){
-    var s = row.querySelector('.o-sesion').value;
-    var v = row.querySelector('.o-vuelta').value;
+    var s = row.querySelector('.o-sesion').value, v = row.querySelector('.o-vuelta').value;
     if (!s) return;
     var partes = s.split('|');
-    res.push({
-      i: i, color: COLORES[i], fecha: partes[0], sesion:+partes[1], vuelta: v,
-      etiqueta: partes[0].slice(5)+' S'+partes[1]+' '+(v==='all' ? 'completa' : 'V'+v),
-      datos: v==='all' ? datosSesion(partes[0], +partes[1]) : datosVuelta(partes[0], +partes[1], +v)
-    });
+    res.push({idx:i, color:COLORES[i], fecha:partes[0], sesion:+partes[1], vuelta:v,
+      etiqueta: partes[0].slice(5)+' S'+partes[1]+' '+(v==='all'?'completa':'V'+v),
+      datos: v==='all' ? datosSesion(partes[0],+partes[1]) : datosVuelta(partes[0],+partes[1],+v)});
   });
   return res;
 }
 
 function redibujarHist(){
   var ejeX = document.getElementById('h-x').value;
-  var ys   = seleccionados(document.getElementById('h-y'), 3);
+  var ys = marcadasDe(document.getElementById('h-y'));
   var orig = origenesActivos();
-  var esDispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
+  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
 
   var trazas = [];
   orig.forEach(function(o){
-    ys.forEach(function(y, k){
+    ys.forEach(function(y,k){
       trazas.push({
-        x: o.datos.map(function(p){return p[ejeX];}),
-        y: o.datos.map(function(p){return p[y];}),
-        name: o.etiqueta + ' · ' + meta(y).nombre,
-        type:'scattergl',
-        mode: esDispersion ? 'markers' : 'lines',
-        // El color identifica el ORIGEN; el guion distingue la variable
-        marker:{size: o.i===0 ? 4 : 3, color:o.color, opacity: o.i===0?0.9:0.55},
-        line:{width: o.i===0 ? 2.4 : 1.3, color:o.color,
-              dash: k===0 ? 'solid' : (k===1 ? 'dot' : 'dash')},
-        yaxis: k===0 ? 'y' : 'y'+(k+1),
-        meta_origen: o.i
+        x:o.datos.map(function(p){return p[ejeX];}),
+        y:o.datos.map(function(p){return p[y];}),
+        name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
+        mode: dispersion ? 'markers' : 'lines',
+        marker:{size:o.idx===0?4:3, color:o.color, opacity:o.idx===0?0.9:0.55},
+        line:{width:o.idx===0?2.4:1.3, color:o.color, dash:DASHES[k]},
+        yaxis: k===0 ? 'y' : 'y'+(k+1)
       });
     });
   });
@@ -505,83 +549,124 @@ function redibujarHist(){
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
                gridcolor:'#1a1a1a', zerolinecolor:'#222'};
-  lay.hovermode = esDispersion ? 'closest' : 'x unified';
+  lay.hovermode = dispersion ? 'closest' : 'x unified';
   ys.forEach(function(y,k){
-    var eje = k===0 ? 'yaxis' : 'yaxis'+(k+1);
-    lay[eje] = {title:{text:meta(y).nombre+' ['+meta(y).unidad+']',font:{size:9}},
-                gridcolor:'#1a1a1a', zerolinecolor:'#222'};
-    if (k>0){ lay[eje].overlaying='y'; lay[eje].side = k===1?'right':'left'; }
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0');
   });
-  Plotly.react('g-hist', trazas, lay, CONFIG_PLOT);
+  Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
-  dibujarMapa(orig[0]);
+  dibujarMapa();
 }
 
-// ── Mapa: trazado del origen de referencia, coloreado por variable ──
-function dibujarMapa(o){
+// ── Mapa: trazado del origen de referencia, coloreado por la variable elegida ──
+function dibujarMapa(){
   capaTrazado.forEach(function(c){ mapa.removeLayer(c); });
   capaTrazado = [];
-  if (!o) { document.getElementById('h-min').textContent='—'; document.getElementById('h-max').textContent='—'; return; }
-
+  var o = origenesActivos()[0];
   var campo = document.getElementById('h-mapvar').value;
+  var barra = document.getElementById('barra-color');
+
+  if (!o || !campo){
+    document.getElementById('h-mapname').textContent = '—';
+    document.getElementById('h-min').textContent = '—';
+    document.getElementById('h-max').textContent = '—';
+    barra.style.background = '#222';
+    return;
+  }
+
   var m = meta(campo);
-  document.getElementById('h-mapname').textContent = m.nombre;
+  document.getElementById('h-mapname').textContent = o.etiqueta + ' · ' + m.nombre;
 
   var vals = o.datos.map(function(p){return p[campo];});
   var min = Math.min.apply(null,vals), max = Math.max.apply(null,vals);
   document.getElementById('h-min').textContent = min.toFixed(1)+' '+m.unidad;
   document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad;
 
+  // La barra se construye con la misma función de color que los segmentos,
+  // así la leyenda siempre corresponde a lo que se ve en el mapa.
+  var paradas = [];
+  for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
+  barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
+
   for (var i=1;i<o.datos.length;i++){
     var a = o.datos[i-1], b = o.datos[i];
-    var f = max>min ? (b[campo]-min)/(max-min) : 0.5;
+    var f2 = max>min ? (b[campo]-min)/(max-min) : 0.5;
     capaTrazado.push(L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
-      {color: escalaColor(f), weight:5, opacity:0.95}).addTo(mapa));
+      {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
   }
-  mapa.fitBounds(L.latLngBounds(o.datos.map(function(p){return [p.lat,p.lon];})), {padding:[18,18]});
+
+  // Reencuadra solo al cambiar de origen, no al cambiar de variable
+  var clave = o.fecha+'|'+o.sesion+'|'+o.vuelta;
+  if (clave !== ultimoAjuste){
+    // animate:false — con la animación por defecto el encuadre puede quedarse
+    // a medias y el mapa se queda en el zoom anterior
+    mapa.fitBounds(L.latLngBounds(o.datos.map(function(p){return [p.lat,p.lon];})),
+                   {padding:[18,18], animate:false});
+    ultimoAjuste = clave;
+  }
 }
 
-// Verde → amarillo → rojo
-function escalaColor(f){
-  f = Math.max(0, Math.min(1, f));
-  var c1=[59,167,118], c2=[194,168,56], c3=[204,64,85];
-  var a = f<0.5 ? c1 : c2, b = f<0.5 ? c2 : c3, u = f<0.5 ? f*2 : (f-0.5)*2;
-  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
-}
-
-// ── Cursor sincronizado: gráfica → mapa + panel de valores ──
-function moverCursor(idx, curva){
+// ── Cursor: marcador en el mapa + valores de TODOS los orígenes ──
+function moverCursor(idx){
   var orig = origenesActivos();
-  if (!orig.length) return;
-  var ys = seleccionados(document.getElementById('h-y'), 3);
-  var o = orig[Math.floor(curva / Math.max(1,ys.length))] || orig[0];
-  var p = o.datos[idx];
-  if (!p) return;
+  var ys = marcadasDe(document.getElementById('h-y'));
+  var cont = document.getElementById('h-valores');
+  if (!orig.length || !ys.length){ cont.innerHTML = '<div class="sin-cursor">Elige orígenes y variables.</div>'; return; }
+
+  var ref = orig[0], pRef = ref.datos[idx];
+  if (!pRef) return;
 
   if (marcadorCursor) mapa.removeLayer(marcadorCursor);
-  marcadorCursor = L.circleMarker([p.lat,p.lon],
-    {radius:7, color:'#fff', weight:2, fillColor:o.color, fillOpacity:1}).addTo(mapa);
+  marcadorCursor = L.circleMarker([pRef.lat,pRef.lon],
+    {radius:7, color:'#fff', weight:2, fillColor:ref.color, fillOpacity:1}).addTo(mapa);
 
-  var html = '<div class="valor-row"><span class="k">origen</span><span class="v" style="color:'+o.color+'">'+o.etiqueta+'</span></div>';
-  html += '<div class="valor-row"><span class="k">distancia</span><span class="v">'+p.d_vuelta.toFixed(3)+' km</span></div>';
-  html += '<div class="valor-row"><span class="k">tiempo</span><span class="v">'+p.t_vuelta.toFixed(1)+' s</span></div>';
-  VARIABLES.forEach(function(v){
-    html += '<div class="valor-row"><span class="k">'+v.nombre+'</span><span class="v">'+p[v.id]+' '+v.unidad+'</span></div>';
+  document.getElementById('h-cursor-pos').textContent =
+    pRef.d_vuelta.toFixed(3)+' km · '+pRef.t_vuelta.toFixed(1)+' s';
+
+  var campoMapa = document.getElementById('h-mapvar').value;
+  var html = '<table class="cursor-tabla"><thead><tr><th></th>';
+  orig.forEach(function(o){
+    html += '<th style="color:'+o.color+'">'+o.etiqueta+'</th>';
   });
-  document.getElementById('h-valores').innerHTML = html;
+  html += '</tr></thead><tbody>';
+
+  // Fila de contexto: dónde está el cursor en cada origen
+  ['t_vuelta','d_vuelta'].forEach(function(campo){
+    var m = meta(campo);
+    html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
+    orig.forEach(function(o){
+      var p = o.datos[idx];
+      html += '<td>'+(p ? p[campo] : '—')+'</td>';
+    });
+    html += '</tr>';
+  });
+
+  // Una fila por variable seleccionada, una columna por origen
+  ys.forEach(function(y){
+    var m = meta(y);
+    var clase = (y === campoMapa) ? ' class="destacada"' : '';
+    html += '<tr'+clase+'><td>'+m.nombre+' ['+m.unidad+']</td>';
+    orig.forEach(function(o){
+      var p = o.datos[idx];
+      html += '<td>'+(p ? p[y] : '—')+'</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  cont.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Configuraciones guardadas (localStorage)
+//  Configuraciones guardadas
 // ═══════════════════════════════════════════════════════════════════════
 function guardarConfig(seccion){
   var cfg;
   if (seccion === 'vivo'){
-    cfg = {x: document.getElementById('v-x').value, y: seleccionados(document.getElementById('v-y'),3)};
+    cfg = {x:document.getElementById('v-x').value, y:marcadasDe(document.getElementById('v-y'))};
   } else {
-    cfg = {x: document.getElementById('h-x').value, y: seleccionados(document.getElementById('h-y'),3),
-           mapvar: document.getElementById('h-mapvar').value,
-           orig: Array.prototype.map.call(document.querySelectorAll('#h-origenes .origen-row'), function(r){
+    cfg = {x:document.getElementById('h-x').value, y:marcadasDe(document.getElementById('h-y')),
+           mapvar:document.getElementById('h-mapvar').value,
+           orig:Array.prototype.map.call(document.querySelectorAll('#h-origenes .origen-row'), function(r){
              return {s:r.querySelector('.o-sesion').value, v:r.querySelector('.o-vuelta').value};
            })};
   }
@@ -592,15 +677,14 @@ function guardarConfig(seccion){
 function cargarConfig(seccion){
   var cfg;
   try { cfg = JSON.parse(localStorage.getItem('fenix-ploteo-'+seccion) || 'null'); } catch(e){ cfg = null; }
-  if (!cfg) { alert('No hay configuración guardada para esta sección.'); return; }
+  if (!cfg){ alert('No hay configuración guardada para esta sección.'); return; }
   if (seccion === 'vivo'){
     document.getElementById('v-x').value = cfg.x;
-    llenarSelect(document.getElementById('v-y'), VARIABLES, cfg.y);
+    construirLista(document.getElementById('v-y'), cfg.y, redibujarVivo);
     redibujarVivo();
   } else {
     document.getElementById('h-x').value = cfg.x;
-    llenarSelect(document.getElementById('h-y'), VARIABLES, cfg.y);
-    document.getElementById('h-mapvar').value = cfg.mapvar;
+    construirLista(document.getElementById('h-y'), cfg.y, function(){ sincronizarSelectorMapa(); redibujarHist(); });
     document.querySelectorAll('#h-origenes .origen-row').forEach(function(r,i){
       if (!cfg.orig[i]) return;
       var selS = r.querySelector('.o-sesion'), selV = r.querySelector('.o-vuelta');
@@ -608,6 +692,9 @@ function cargarConfig(seccion){
       actualizarVueltas(selS, selV, 1);
       selV.value = cfg.orig[i].v;
     });
+    sincronizarSelectorMapa();
+    if (cfg.mapvar) document.getElementById('h-mapvar').value = cfg.mapvar;
+    ultimoAjuste = '';
     redibujarHist();
   }
 }
@@ -619,8 +706,26 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
     t.classList.add('active');
     document.getElementById('panel-'+t.dataset.panel).classList.add('active');
-    if (t.dataset.panel === 'hist' && mapa) setTimeout(function(){ mapa.invalidateSize(); }, 60);
+    // Al mostrar el panel, Leaflet ya conoce el tamaño real del contenedor:
+    // hasta entonces el encuadre se calcula sobre un div oculto y sale mal.
+    if (t.dataset.panel === 'hist' && mapa) setTimeout(function(){
+      mapa.invalidateSize();
+      ultimoAjuste = '';
+      dibujarMapa();
+    }, 60);
   };
+});
+
+// Al cambiar el tamaño de la ventana, el mapa necesita recalcular y reencuadrar
+var temporizadorResize = null;
+window.addEventListener('resize', function(){
+  clearTimeout(temporizadorResize);
+  temporizadorResize = setTimeout(function(){
+    if (!mapa) return;
+    mapa.invalidateSize();
+    ultimoAjuste = '';
+    dibujarMapa();
+  }, 150);
 });
 
 inicializarVivo();
