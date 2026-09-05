@@ -276,16 +276,25 @@ function datosVuelta(fecha, sesion, vuelta){
   if (!CACHE[k]) CACHE[k] = generarVuelta(buscaSesion(fecha,sesion).semilla, vuelta);
   return CACHE[k];
 }
+// En una sesión completa, tiempo y distancia se ACUMULAN a lo largo de todas
+// las vueltas. En la base ambos se reinician en cada cruce de meta —eso es lo
+// que permite superponer vueltas— pero al graficar la sesión entera hay que
+// encadenarlos, o las vueltas se dibujan unas sobre otras en el mismo rango y
+// aparecen rectas espurias al saltar del final de una vuelta al inicio de la
+// siguiente.
 function datosSesion(fecha, sesion){
-  var s = buscaSesion(fecha,sesion), todo = [], desp = 0;
+  var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0;
   for (var v=1; v<=s.vueltas; v++){
     var lv = datosVuelta(fecha,sesion,v);
     for (var i=0;i<lv.length;i++){
       var p = Object.assign({}, lv[i]);
-      p.t_vuelta = +(p.t_vuelta + desp).toFixed(1);
+      p.t_vuelta = +(p.t_vuelta + despT).toFixed(1);
+      p.d_vuelta = +(p.d_vuelta + despD).toFixed(4);
+      p.n_vuelta = v;
       todo.push(p);
     }
-    desp += lv[lv.length-1].t_vuelta;
+    despT += lv[lv.length-1].t_vuelta;
+    despD += lv[lv.length-1].d_vuelta;
   }
   return todo;
 }
