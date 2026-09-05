@@ -369,11 +369,24 @@ function ejeY(k, etiqueta, color){
 // El cursor NO puede alinearse por posición en el arreglo: dos vueltas tienen
 // distinto número de muestras, así que el punto 200 de una está en un metro
 // distinto que el 200 de la otra, y la comparación dejaría de tener sentido.
+// Devuelve null si el valor cae fuera del recorrido de ese origen. Sin esa
+// comprobación, al comparar una vuelta de 0.37 km con una sesión de 2.2 km y
+// poner el cursor en el km 1.5, la vuelta devolvía su último punto —a 1.1 km
+// de distancia— como si fuera un valor comparable.
 function indiceMasCercano(datos, campoX, valorX){
-  var mejor = 0, mejorDif = Infinity;
+  var min = Infinity, max = -Infinity;
   for (var i=0;i<datos.length;i++){
-    var dif = Math.abs(datos[i][campoX] - valorX);
-    if (dif < mejorDif){ mejorDif = dif; mejor = i; }
+    var v = datos[i][campoX];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  var margen = (max - min) * 0.01;
+  if (valorX < min - margen || valorX > max + margen) return null;
+
+  var mejor = 0, mejorDif = Infinity;
+  for (var j=0;j<datos.length;j++){
+    var dif = Math.abs(datos[j][campoX] - valorX);
+    if (dif < mejorDif){ mejorDif = dif; mejor = j; }
   }
   return mejor;
 }
@@ -423,7 +436,9 @@ function tickVivo(){
     vivo.i = 0; vivo.buffer = [];
   }
   document.getElementById('v-hint').textContent = 'vuelta '+vivo.vuelta+' · '+p.t_vuelta.toFixed(1)+' s';
-  redibujarVivo();
+  // El buffer se sigue llenando aunque no se vea, pero no tiene sentido
+  // redibujar diez veces por segundo una gráfica que está en la pestaña oculta
+  if (document.getElementById('panel-vivo').classList.contains('active')) redibujarVivo();
 }
 
 function redibujarVivo(){
@@ -444,9 +459,17 @@ function redibujarVivo(){
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
                gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
-  if (!dispersion){
-    var ult = b[b.length-1][ejeX];
-    lay.xaxis.range = [ult - (ejeX==='t_vuelta' ? VENTANA_S : 0.3), ult];
+  if (ejeX === 't_vuelta'){
+    // Ventana fija de 20 s: se mantiene estable aunque al inicio de la vuelta
+    // todavía no haya datos suficientes para llenarla
+    var ult = b[b.length-1].t_vuelta;
+    lay.xaxis.range = [ult - VENTANA_S, ult];
+  } else if (ejeX === 'd_vuelta'){
+    // En distancia, la ventana la marca lo que realmente hay en el buffer: los
+    // mismos 20 s cubren más o menos metros según la velocidad, así que un
+    // ancho fijo dejaría hueco vacío o recortaría datos
+    var d0 = b[0].d_vuelta, d1 = b[b.length-1].d_vuelta;
+    lay.xaxis.range = (d1 > d0) ? [d0, d1] : [d0, d0 + 0.01];
   }
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
@@ -701,7 +724,10 @@ function moverCursor(valorX, nTraza, idxPunto){
   } else {
     // Series contra tiempo o distancia: cada origen busca su punto más cercano
     // al mismo valor de X, para que la comparación sea del mismo punto de pista
-    orig.forEach(function(o){ o.punto = o.datos[indiceMasCercano(o.datos, ejeX, valorX)]; });
+    orig.forEach(function(o){
+      var i = indiceMasCercano(o.datos, ejeX, valorX);
+      o.punto = (i === null) ? null : o.datos[i];
+    });
   }
 
   // El marcador se coloca sobre el origen que se está mostrando en el mapa
@@ -750,6 +776,9 @@ document.querySelectorAll('.tab').forEach(function(t){
     // tamaño mientras esta pestaña no se veía, la gráfica conserva el ancho
     // viejo hasta que se le pide recalcular
     Plotly.Plots.resize(t.dataset.panel === 'vivo' ? 'g-vivo' : 'g-hist');
+    // Al volver a la sección en vivo, ponerla al día con lo que llegó mientras
+    // estaba oculta
+    if (t.dataset.panel === 'vivo') redibujarVivo();
     // Leaflet tiene el mismo problema con el tamaño del contenedor
     if (t.dataset.panel === 'hist' && mapa) setTimeout(function(){
       mapa.invalidateSize(); ultimoAjuste = ''; dibujarMapa();
