@@ -483,8 +483,9 @@ function inicializarHist(){
   Plotly.newPlot('g-hist', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_HIST);
   document.getElementById('g-hist').on('plotly_hover', function(ev){
     // Se pasa el VALOR del eje X, no el índice: cada origen busca después su
-    // propio punto más cercano a esa misma distancia o instante
-    moverCursor(ev.points[0].x);
+    // propio punto más cercano a esa misma distancia o instante.
+    // También el número de traza, para saber sobre qué origen está el cursor.
+    moverCursor(ev.points[0].x, ev.points[0].curveNumber, ev.points[0].pointIndex);
   });
 
   sincronizarSelectorMapa();
@@ -604,8 +605,19 @@ function redibujarHist(){
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
+  // La tabla del cursor corresponde a la selección anterior: si no se limpia,
+  // sigue mostrando variables ya desmarcadas o columnas de orígenes quitados
+  limpiarCursor();
+
   sincronizarOrigenMapa();
   dibujarMapa();
+}
+
+function limpiarCursor(){
+  document.getElementById('h-valores').innerHTML =
+    '<div class="sin-cursor">Pasa el cursor sobre la gráfica.</div>';
+  document.getElementById('h-cursor-pos').textContent = '';
+  if (marcadorCursor){ mapa.removeLayer(marcadorCursor); marcadorCursor = null; }
 }
 
 // ── Mapa: el origen elegido, coloreado por la variable elegida ──
@@ -667,7 +679,7 @@ function dibujarMapa(){
 // Recibe el VALOR del eje X. Cada origen localiza su punto más cercano a ese
 // valor, de modo que la comparación es siempre en la misma distancia (o el
 // mismo instante), no en la misma posición del arreglo.
-function moverCursor(valorX){
+function moverCursor(valorX, nTraza, idxPunto){
   var orig = origenesActivos();
   var ys = marcadasDe(document.getElementById('h-y'));
   var cont = document.getElementById('h-valores');
@@ -677,12 +689,26 @@ function moverCursor(valorX){
   }
 
   var ejeX = document.getElementById('h-x').value;
-  // Punto de cada origen más cercano al valor X del cursor
-  orig.forEach(function(o){ o.punto = o.datos[indiceMasCercano(o.datos, ejeX, valorX)]; });
+  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
+
+  if (dispersion){
+    // Nube de puntos: el eje X es una variable cualquiera, no una posición en
+    // la vuelta. Buscar "el mismo X" en los demás orígenes daría puntos de
+    // lugares opuestos del circuito que solo coinciden en ese valor, así que
+    // se muestra únicamente el origen sobre el que está el cursor.
+    var oCursor = orig[Math.floor((nTraza||0) / ys.length)] || orig[0];
+    orig.forEach(function(o){ o.punto = (o === oCursor) ? o.datos[idxPunto] : null; });
+  } else {
+    // Series contra tiempo o distancia: cada origen busca su punto más cercano
+    // al mismo valor de X, para que la comparación sea del mismo punto de pista
+    orig.forEach(function(o){ o.punto = o.datos[indiceMasCercano(o.datos, ejeX, valorX)]; });
+  }
 
   // El marcador se coloca sobre el origen que se está mostrando en el mapa
   var idxSel = document.getElementById('h-maporigen').value;
   var oMapa = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
+  // En dispersión solo un origen tiene punto; si no es el del mapa, se marca ese
+  if (!oMapa.punto){ oMapa = orig.find(function(x){ return !!x.punto; }) || oMapa; }
 
   if (oMapa.punto){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
@@ -720,8 +746,11 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
     t.classList.add('active');
     document.getElementById('panel-'+t.dataset.panel).classList.add('active');
-    // Hasta que el panel se muestra, Leaflet no conoce el tamaño real del
-    // contenedor y el encuadre sale mal
+    // Plotly no puede medir un contenedor oculto: si la ventana cambió de
+    // tamaño mientras esta pestaña no se veía, la gráfica conserva el ancho
+    // viejo hasta que se le pide recalcular
+    Plotly.Plots.resize(t.dataset.panel === 'vivo' ? 'g-vivo' : 'g-hist');
+    // Leaflet tiene el mismo problema con el tamaño del contenedor
     if (t.dataset.panel === 'hist' && mapa) setTimeout(function(){
       mapa.invalidateSize(); ultimoAjuste = ''; dibujarMapa();
     }, 60);
