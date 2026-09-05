@@ -355,11 +355,27 @@ var LAYOUT_BASE = {
   showlegend:true, legend:{orientation:'h', y:1.13, font:{size:9}},
   dragmode:false               // sin zoom por selección ni arrastre
 };
+// Con tres variables, el tercer eje tiene que apartarse: si se deja en 'left'
+// sin desplazar, se dibuja justo encima del primero y los dos rótulos se pisan.
 function ejeY(k, etiqueta, color){
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
            zerolinecolor:'#222', tickfont:{color:color}, fixedrange:true};
-  if (k>0){ e.overlaying='y'; e.side = (k===1?'right':'left'); }
+  if (k===1){ e.overlaying='y'; e.side='right'; }
+  if (k===2){ e.overlaying='y'; e.side='left'; e.anchor='free'; e.position=0; }
   return e;
+}
+
+// Índice del punto cuyo eje X está más cerca del valor buscado.
+// El cursor NO puede alinearse por posición en el arreglo: dos vueltas tienen
+// distinto número de muestras, así que el punto 200 de una está en un metro
+// distinto que el 200 de la otra, y la comparación dejaría de tener sentido.
+function indiceMasCercano(datos, campoX, valorX){
+  var mejor = 0, mejorDif = Infinity;
+  for (var i=0;i<datos.length;i++){
+    var dif = Math.abs(datos[i][campoX] - valorX);
+    if (dif < mejorDif){ mejorDif = dif; mejor = i; }
+  }
+  return mejor;
 }
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
@@ -432,6 +448,7 @@ function redibujarVivo(){
     var ult = b[b.length-1][ejeX];
     lay.xaxis.range = [ult - (ejeX==='t_vuelta' ? VENTANA_S : 0.3), ult];
   }
+  if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
     lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k]);
   });
@@ -456,14 +473,18 @@ function inicializarHist(){
   document.getElementById('h-mapvar').onchange = dibujarMapa;
   document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
-  mapa = L.map('mapa', {zoomControl:true, attributionControl:false});
+  // renderer canvas: una sesión completa son ~2000 segmentos, y con el
+  // renderizador SVG por defecto eso son 2000 nodos en el DOM
+  mapa = L.map('mapa', {zoomControl:true, attributionControl:false, renderer:L.canvas()});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.65}).addTo(mapa);
   mapa.setView([CENTRO.lat, CENTRO.lon], 16);
 
   Plotly.newPlot('g-hist', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_HIST);
   document.getElementById('g-hist').on('plotly_hover', function(ev){
-    moverCursor(ev.points[0].pointIndex);
+    // Se pasa el VALOR del eje X, no el índice: cada origen busca después su
+    // propio punto más cercano a esa misma distancia o instante
+    moverCursor(ev.points[0].x);
   });
 
   sincronizarSelectorMapa();
@@ -576,6 +597,8 @@ function redibujarHist(){
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
                gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
+  // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
+  if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
     lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0');
   });
@@ -600,12 +623,19 @@ function dibujarMapa(){
     document.getElementById('h-mapname').textContent = '—';
     document.getElementById('h-min').textContent = '—';
     document.getElementById('h-max').textContent = '—';
+    document.getElementById('h-cursor-pos').textContent = '';
     barra.style.background = '#222';
+    // Sin origen no hay trazado: el marcador del cursor tampoco debe quedarse
+    if (marcadorCursor){ mapa.removeLayer(marcadorCursor); marcadorCursor = null; }
     return;
   }
 
   var m = meta(campo);
-  document.getElementById('h-mapname').textContent = o.etiqueta + ' · ' + m.nombre;
+  // Una sesión completa recorre el mismo circuito varias veces, así que los
+  // trazados de todas las vueltas quedan encimados y solo se ve el último
+  var nVueltas = o.alcance === 'all' ? buscaSesion(o.fecha, o.sesion).vueltas : 1;
+  document.getElementById('h-mapname').textContent =
+    o.etiqueta + ' · ' + m.nombre + (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas)' : '');
 
   var vals = o.datos.map(function(p){return p[campo];});
   var min = Math.min.apply(null,vals), max = Math.max.apply(null,vals);
@@ -634,23 +664,32 @@ function dibujarMapa(){
 }
 
 // ── Cursor: marcador en el mapa + valores de TODOS los orígenes ──
-function moverCursor(idx){
+// Recibe el VALOR del eje X. Cada origen localiza su punto más cercano a ese
+// valor, de modo que la comparación es siempre en la misma distancia (o el
+// mismo instante), no en la misma posición del arreglo.
+function moverCursor(valorX){
   var orig = origenesActivos();
   var ys = marcadasDe(document.getElementById('h-y'));
   var cont = document.getElementById('h-valores');
-  if (!orig.length || !ys.length){ cont.innerHTML = '<div class="sin-cursor">Elige orígenes y variables.</div>'; return; }
+  if (!orig.length || !ys.length){
+    cont.innerHTML = '<div class="sin-cursor">Elige orígenes y variables.</div>';
+    return;
+  }
+
+  var ejeX = document.getElementById('h-x').value;
+  // Punto de cada origen más cercano al valor X del cursor
+  orig.forEach(function(o){ o.punto = o.datos[indiceMasCercano(o.datos, ejeX, valorX)]; });
 
   // El marcador se coloca sobre el origen que se está mostrando en el mapa
   var idxSel = document.getElementById('h-maporigen').value;
   var oMapa = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
-  var pMapa = oMapa.datos[idx];
 
-  if (pMapa){
+  if (oMapa.punto){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
-    marcadorCursor = L.circleMarker([pMapa.lat,pMapa.lon],
+    marcadorCursor = L.circleMarker([oMapa.punto.lat, oMapa.punto.lon],
       {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
     document.getElementById('h-cursor-pos').textContent =
-      pMapa.d_vuelta.toFixed(3)+' km · '+pMapa.t_vuelta.toFixed(1)+' s';
+      oMapa.punto.d_vuelta.toFixed(3)+' km · '+oMapa.punto.t_vuelta.toFixed(1)+' s';
   }
 
   var campoMapa = document.getElementById('h-mapvar').value;
@@ -661,13 +700,13 @@ function moverCursor(idx){
   ['t_vuelta','d_vuelta'].forEach(function(campo){
     var m = meta(campo);
     html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){ var p = o.datos[idx]; html += '<td>'+(p ? p[campo] : '—')+'</td>'; });
+    orig.forEach(function(o){ html += '<td>'+(o.punto ? o.punto[campo] : '—')+'</td>'; });
     html += '</tr>';
   });
   ys.forEach(function(y){
     var m = meta(y), clase = (y === campoMapa) ? ' class="destacada"' : '';
     html += '<tr'+clase+'><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){ var p = o.datos[idx]; html += '<td>'+(p ? p[y] : '—')+'</td>'; });
+    orig.forEach(function(o){ html += '<td>'+(o.punto ? o.punto[y] : '—')+'</td>'; });
     html += '</tr>';
   });
   html += '</tbody></table>';
