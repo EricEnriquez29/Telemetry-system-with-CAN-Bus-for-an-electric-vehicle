@@ -78,6 +78,9 @@
   table.cursor-tabla td{font-weight:bold;}
   table.cursor-tabla tr.destacada td{color:var(--orange);}
   .sin-cursor{font-size:10px;color:#666;padding:6px 2px;}
+  .aviso-comparacion{background:#1a1207;border-left:3px solid var(--yellow);color:#d8c9a0;
+    font-size:10px;padding:6px 10px;margin-bottom:8px;border-radius:2px;line-height:1.5;}
+  .aviso-comparacion b{color:var(--yellow);}
 
   .aviso{background:#141414;border-left:3px solid var(--orange);padding:8px 12px;font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
   .aviso b{color:var(--text);}
@@ -161,6 +164,7 @@
   <div class="grid-hist">
     <div class="card">
       <div class="card-title"><span>Gráfica</span><span class="hint">pasa el cursor para sincronizar con el mapa</span></div>
+      <div id="h-aviso"></div>
       <div id="g-hist" style="height:470px;"></div>
     </div>
 
@@ -206,12 +210,18 @@ var VARIABLES = [
   {id:'eta',     nombre:'Eficiencia motor', unidad:'%'},
   {id:'soc',     nombre:'SOC',              unidad:'%'}
 ];
-var EJES_X = [{id:'t_vuelta',nombre:'Tiempo de vuelta',unidad:'s'},
-              {id:'d_vuelta',nombre:'Distancia',unidad:'km'}].concat(VARIABLES);
+// Nombres neutros a propósito: en una vuelta suelta son tiempo y distancia DE
+// LA VUELTA, pero en una sesión completa están acumulados sobre todas las
+// vueltas. Llamarlos "de vuelta" haría leer 193 s como si fuera una vuelta.
+var EJES_X = [{id:'t_vuelta',nombre:'Tiempo transcurrido',unidad:'s'},
+              {id:'d_vuelta',nombre:'Distancia recorrida',unidad:'km'}].concat(VARIABLES);
 
 var CENTRO = {lat:19.5042, lon:-99.1467};
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
 var DASHES  = ['solid','dot','dash'];
+// En nube de puntos no se dibujan líneas, así que el tipo de trazo no
+// distingue nada: la variable se identifica por la forma del marcador
+var SIMBOLOS = ['circle','square','triangle-up'];
 var MAX_Y = 3, MAX_ORIGENES = 3;
 var VENTANA_S = 20;
 
@@ -383,12 +393,16 @@ function indiceMasCercano(datos, campoX, valorX){
   var margen = (max - min) * 0.01;
   if (valorX < min - margen || valorX > max + margen) return null;
 
-  var mejor = 0, mejorDif = Infinity;
-  for (var j=0;j<datos.length;j++){
-    var dif = Math.abs(datos[j][campoX] - valorX);
-    if (dif < mejorDif){ mejorDif = dif; mejor = j; }
+  // Tiempo y distancia siempre crecen dentro de un origen, así que se puede
+  // buscar por bisección: con tres sesiones completas cargadas, recorrer los
+  // arreglos enteros en cada movimiento del ratón son ~17 000 comparaciones,
+  // frente a ~13 por bisección.
+  var izq = 0, der = datos.length - 1;
+  while (der - izq > 1){
+    var medio = (izq + der) >> 1;
+    if (datos[medio][campoX] <= valorX) izq = medio; else der = medio;
   }
-  return mejor;
+  return (Math.abs(datos[izq][campoX] - valorX) <= Math.abs(datos[der][campoX] - valorX)) ? izq : der;
 }
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
@@ -452,7 +466,8 @@ function redibujarVivo(){
     return {x:b.map(function(p){return p[ejeX];}), y:b.map(function(p){return p[y];}),
             name:meta(y).nombre, type:'scattergl',
             mode: dispersion ? 'markers' : 'lines',
-            marker:{size:4, color:COLORES[k]}, line:{width:1.7, color:COLORES[k]},
+            marker:{size:4, color:COLORES[k], symbol:SIMBOLOS[k]},
+            line:{width:1.7, color:COLORES[k]},
             yaxis: k===0 ? 'y' : 'y'+(k+1)};
   });
 
@@ -610,7 +625,8 @@ function redibujarHist(){
         y:o.datos.map(function(p){return p[y];}),
         name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
-        marker:{size:o.idx===0?4:3, color:o.color, opacity:o.idx===0?0.9:0.55},
+        marker:{size:o.idx===0?5:4, color:o.color, opacity:o.idx===0?0.9:0.55,
+                symbol:SIMBOLOS[k]},
         line:{width:o.idx===0?2.4:1.3, color:o.color, dash:DASHES[k]},
         yaxis: k===0 ? 'y' : 'y'+(k+1)
       });
@@ -628,12 +644,43 @@ function redibujarHist(){
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
+  avisarComparacionDudosa(orig, ejeX);
+
   // La tabla del cursor corresponde a la selección anterior: si no se limpia,
   // sigue mostrando variables ya desmarcadas o columnas de orígenes quitados
   limpiarCursor();
 
   sincronizarOrigenMapa();
   dibujarMapa();
+}
+
+// Una herramienta de análisis no debe dejar comparar en silencio cosas que no
+// son equivalentes: superponer una vuelta con una sesión entera sobre el eje
+// de distancia enfrenta metros de vuelta contra metros de sesión.
+function avisarComparacionDudosa(orig, ejeX){
+  var cont = document.getElementById('h-aviso');
+  var avisos = [];
+
+  if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 't_vuelta')){
+    var completas = orig.filter(function(o){ return o.alcance === 'all'; }).length;
+    if (completas > 0 && completas < orig.length){
+      avisos.push('<b>Alcances mezclados.</b> Se están comparando vueltas sueltas con sesiones completas: ' +
+                  'en una vuelta el eje cuenta desde su cruce de meta, y en una sesión se acumula sobre todas las vueltas. ' +
+                  'Los valores no son equivalentes.');
+    }
+  }
+
+  var vistos = {}, duplicados = [];
+  orig.forEach(function(o){
+    var k = o.fecha+'|'+o.sesion+'|'+o.alcance;
+    if (vistos[k]) duplicados.push(o.etiqueta); else vistos[k] = true;
+  });
+  if (duplicados.length){
+    avisos.push('<b>Orígenes repetidos.</b> ' + duplicados[0] + ' está seleccionado más de una vez; ' +
+                'las trazas se dibujan encimadas y la tabla muestra columnas idénticas.');
+  }
+
+  cont.innerHTML = avisos.map(function(a){ return '<div class="aviso-comparacion">'+a+'</div>'; }).join('');
 }
 
 function limpiarCursor(){
