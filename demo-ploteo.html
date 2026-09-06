@@ -114,9 +114,6 @@
     <div class="field">
       <label>Eje X</label>
       <select id="v-x"></select>
-      <label class="chk-item" style="padding-left:0;margin-top:4px;">
-        <input type="checkbox" id="v-norm"><span>Normalizar Y (0–100 %)</span>
-      </label>
     </div>
     <div class="field">
       <label>Variables en Y</label>
@@ -156,9 +153,6 @@
     <div class="field">
       <label>Eje X</label>
       <select id="h-x"></select>
-      <label class="chk-item" style="padding-left:0;margin-top:4px;">
-        <input type="checkbox" id="h-norm"><span>Normalizar Y (0–100 %)</span>
-      </label>
     </div>
     <div class="field">
       <label>Variables en Y</label>
@@ -242,17 +236,15 @@ var EJES_X = [
   // consumo por metro, para medir el largo de una trazada y para saber
   // cuánto rodó. NO sirve para comparar vueltas: el error de cada curva se
   // acumula hasta la meta, así que a mitad de vuelta enfrenta puntos de
-  // pista distintos. El porcentaje tampoco lo arregla, solo reparte el error
-  // en vez de dejarlo crecer.
-  {id:'d_vuelta', nombre:'Distancia recorrida',  unidad:'m', dec:0},
-  {id:'pct',      nombre:'Porcentaje del recorrido', unidad:'%', dec:1}
+  // pista distintos.
+  {id:'d_vuelta', nombre:'Distancia recorrida',  unidad:'m', dec:0}
 ].concat(VARIABLES);
 
 // Ejes que representan el avance por la vuelta. Contra ellos las muestras
 // forman una serie ordenada y se dibujan como línea; contra cualquier otra
 // variable son una nube de puntos.
 function esEjeDeRecorrido(id){
-  return id === 's_pista' || id === 't_vuelta' || id === 'd_vuelta' || id === 'pct';
+  return id === 's_pista' || id === 't_vuelta' || id === 'd_vuelta';
 }
 
 var CENTRO = {lat:19.5042, lon:-99.1467};
@@ -348,9 +340,6 @@ function generarVuelta(semilla, nVuelta){
     });
     i++;
   }
-  // Porcentaje del recorrido de ESTA vuelta
-  var total = pts[pts.length-1].d_vuelta || 1;
-  pts.forEach(function(q){ q.pct = +(q.d_vuelta/total*100).toFixed(2); });
   return pts;
 }
 // ═══════════════════════════════════════════════════════════════════════
@@ -490,9 +479,6 @@ function datosSesion(fecha, sesion){
     despD += lv[lv.length-1].d_vuelta;
     despS += referencia().largo;
   }
-  // En una sesión completa el porcentaje es sobre todo el recorrido
-  var totalS = todo.length ? todo[todo.length-1].d_vuelta : 1;
-  todo.forEach(function(q){ q.pct = +(q.d_vuelta/(totalS||1)*100).toFixed(2); });
   CACHE_SESION[clave] = todo;
   return todo;
 }
@@ -611,30 +597,6 @@ function valorValido(v){ return v !== null && v !== undefined && isFinite(v); }
 
 // Devuelve el valor, o null si no es medible: nulo, no numérico, o por debajo
 // del mínimo físico de esa variable (el -1 que el MGT usa como "sin dato").
-// Rango de cada variable sobre TODOS los orígenes, para que al normalizar los
-// orígenes sigan siendo comparables entre sí. Normalizar cada uno con su
-// propio rango los haría coincidir siempre, ocultando justo la diferencia.
-function rangosDe(origenes, campos){
-  var r = {};
-  campos.forEach(function(c){
-    var mn = Infinity, mx = -Infinity;
-    origenes.forEach(function(o){
-      o.datos.forEach(function(p){
-        var v = sano(p, c);
-        if (v === null) return;
-        if (v < mn) mn = v;
-        if (v > mx) mx = v;
-      });
-    });
-    r[c] = (mn === Infinity) ? null : {min:mn, max:mx};
-  });
-  return r;
-}
-function normalizar(v, rango){
-  if (v === null || !rango || rango.max === rango.min) return null;
-  return +(((v - rango.min) / (rango.max - rango.min)) * 100).toFixed(2);
-}
-
 function formatear(v, campo){
   if (v === null || v === undefined || !isFinite(v)) return '—';
   var m = meta(campo);
@@ -672,7 +634,6 @@ function inicializarVivo(){
   llenarSelect(document.getElementById('v-x'), EJES_X, 't_vuelta');
   construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], redibujarVivo);
   document.getElementById('v-x').onchange = redibujarVivo;
-  document.getElementById('v-norm').onchange = redibujarVivo;
   document.getElementById('v-toggle').onclick = function(){
     vivo.corriendo = !vivo.corriendo;
     this.textContent = vivo.corriendo ? 'Pausar' : 'Reanudar';
@@ -714,16 +675,14 @@ function redibujarVivo(){
   if (!b.length || !ys.length){ Plotly.react('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_VIVO); return; }
 
   var dispersion = !esEjeDeRecorrido(ejeX);
-  var norm = document.getElementById('v-norm').checked;
-  var rangos = norm ? rangosDe([{datos:b}], ys) : null;
   var trazas = ys.map(function(y,k){
     return {x:b.map(function(p){return sano(p, ejeX);}),
-            y:b.map(function(p){ var v = sano(p, y); return norm ? normalizar(v, rangos[y]) : v; }),
+            y:b.map(function(p){ return sano(p, y); }),
             name:meta(y).nombre, type:'scattergl',
             mode: dispersion ? 'markers' : 'lines',
             marker:{size:4, color:COLORES[k], symbol:SIMBOLOS[k]},
             line:{width:1.7, color:COLORES[k]},
-            yaxis: norm ? 'y' : (k===0 ? 'y' : 'y'+(k+1))};
+            yaxis: k===0 ? 'y' : 'y'+(k+1)};
   });
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
@@ -743,16 +702,10 @@ function redibujarVivo(){
     var d0 = sano(b[0], ejeX), d1 = sano(b[b.length-1], ejeX);
     if (d0 !== null && d1 !== null) lay.xaxis.range = (d1 > d0) ? [d0, d1] : [d0, d0 + 10];
   }
-  if (norm){
-    lay.yaxis = {title:{text:'% del rango de cada variable',font:{size:9}},
-                 gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true,
-                 range:[-2,102], hoverformat:'.1f'};
-  } else {
-    if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
-    ys.forEach(function(y,k){
-      lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y);
-    });
-  }
+  if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
+  ys.forEach(function(y,k){
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y);
+  });
   Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
 
@@ -771,7 +724,6 @@ function inicializarHist(){
     redibujarHist();
   });
   document.getElementById('h-x').onchange = redibujarHist;
-  document.getElementById('h-norm').onchange = redibujarHist;
   document.getElementById('h-mapvar').onchange = dibujarMapa;
   document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
@@ -892,24 +844,18 @@ function redibujarHist(){
   var orig = origenesActivos();
   var dispersion = !esEjeDeRecorrido(ejeX);
 
-  var norm = document.getElementById('h-norm').checked;
-  var rangos = norm ? rangosDe(orig, ys) : null;
-
   var trazas = [];
   orig.forEach(function(o){
     ys.forEach(function(y,k){
       trazas.push({
         x:o.datos.map(function(p){return sano(p, ejeX);}),
-        y:o.datos.map(function(p){
-          var v = sano(p, y);
-          return norm ? normalizar(v, rangos[y]) : v;
-        }),
+        y:o.datos.map(function(p){ return sano(p, y); }),
         name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
         marker:{size:o.esRef?5:4, color:o.color, opacity:o.esRef?0.9:0.55,
                 symbol:SIMBOLOS[k]},
         line:{width:o.esRef?2.4:1.3, color:o.color, dash:DASHES[k]},
-        yaxis: norm ? 'y' : (k===0 ? 'y' : 'y'+(k+1))
+        yaxis: k===0 ? 'y' : 'y'+(k+1)
       });
     });
   });
@@ -920,17 +866,10 @@ function redibujarHist(){
                hoverformat: '.'+(meta(ejeX).dec !== undefined ? meta(ejeX).dec : 2)+'f'};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
   // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
-  if (norm){
-    // Un solo eje compartido: es lo que hace comparables las formas
-    lay.yaxis = {title:{text:'% del rango de cada variable',font:{size:9}},
-                 gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true,
-                 range:[-2,102], hoverformat:'.1f'};
-  } else {
-    if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
-    ys.forEach(function(y,k){
-      lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y);
-    });
-  }
+  if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
+  ys.forEach(function(y,k){
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y);
+  });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
   avisarComparacionDudosa(orig, ejeX);
@@ -953,12 +892,11 @@ function avisarComparacionDudosa(orig, ejeX){
   // Comparar dos vueltas por odómetro es el error clásico: se ve una gráfica
   // perfectamente razonable en la que, a mitad de vuelta, cada traza está en
   // un punto distinto del circuito.
-  if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 'pct')){
-    avisos.push('<b>Eje no apto para comparar.</b> ' +
-                (ejeX === 'd_vuelta'
-                  ? 'La distancia recorrida es la trayectoria de cada vuelta: abrirse en una curva suma metros que se arrastran hasta la meta, así que el mismo valor de X cae en puntos distintos del circuito.'
-                  : 'El porcentaje reparte esa misma deriva a lo largo de la vuelta en vez de eliminarla, y estira o encoge cada vuelta según lo que midió.') +
-                ' Para comparar, usa <b>Posición en la pista</b>.');
+  if (orig.length > 1 && ejeX === 'd_vuelta'){
+    avisos.push('<b>Eje no apto para comparar.</b> La distancia recorrida es la ' +
+                'trayectoria de cada vuelta: abrirse en una curva suma metros que se ' +
+                'arrastran hasta la meta, así que el mismo valor de X cae en puntos ' +
+                'distintos del circuito. Para comparar, usa <b>Posición en la pista</b>.');
   }
 
   if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 't_vuelta')){
