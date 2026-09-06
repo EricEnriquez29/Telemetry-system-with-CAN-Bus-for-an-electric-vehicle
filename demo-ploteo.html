@@ -127,10 +127,6 @@
       <div class="chk-cuenta" id="v-y-cuenta"></div>
     </div>
     <div class="field">
-      <label>Escala de cada eje Y</label>
-      <div id="v-rangos"></div>
-    </div>
-    <div class="field">
       <label>Simulación</label>
       <button id="v-toggle">Pausar</button>
     </div>
@@ -210,13 +206,6 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  Datos simulados — reemplazables por GET /session_series y WebSocket
 // ═══════════════════════════════════════════════════════════════════════
-// `esc` es la escala de trabajo de cada variable: el rango en el que se espera
-// verla durante una carrera. En vivo el eje se fija ahí y no se mueve nunca.
-// Con autoescalado, el eje se recalcula diez veces por segundo sobre lo que hay
-// en los últimos veinte segundos, así que la misma señal cambia de altura al
-// entrar o salir un pico de la ventana y no se puede leer nada de un vistazo:
-// dos frenadas iguales se dibujan distintas según lo que hubiera alrededor.
-//
 // El campo `min` es el mínimo FÍSICAMENTE posible. El MGT usa -1 como marca de
 // "sin dato" en las variables que vienen del bus CAN, y sin esta declaración
 // esos -1 se dibujan como mediciones: una velocidad de -1 km/h estira el eje,
@@ -227,18 +216,18 @@
 // base devuelve flotantes crudos —42.199999999999996 km/h— y mostrarlos tal
 // cual llena la tabla de dígitos que no significan nada.
 var VARIABLES = [
-  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h', min:0, dec:1, esc:[0,80]},
-  {id:'rpm',     nombre:'RPM',              unidad:'rpm',  min:0, dec:0, esc:[0,2000]},
-  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W',    min:0, dec:0, esc:[0,8000]},
-  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W',    min:0, dec:0, esc:[0,6000]},
-  {id:'curr_p',  nombre:'Corriente pack',   unidad:'A',           dec:1, esc:[-160,40]},
-  {id:'throttle',nombre:'Acelerador',       unidad:'%',    min:0, dec:0, esc:[0,100]},
-  {id:'brake',   nombre:'Freno',            unidad:'%',    min:0, dec:0, esc:[0,100]},
-  {id:'Gx',      nombre:'G longitudinal',   unidad:'G',           dec:2, esc:[-2,2]},
-  {id:'Gy',      nombre:'G lateral',        unidad:'G',           dec:2, esc:[-2,2]},
-  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh',   min:0, dec:2, esc:[0,120]},
-  {id:'eta',     nombre:'Eficiencia motor', unidad:'%',    min:0, dec:1, esc:[60,100]},
-  {id:'soc',     nombre:'SOC',              unidad:'%',    min:0, dec:1, esc:[0,100]}
+  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h', min:0, dec:1},
+  {id:'rpm',     nombre:'RPM',              unidad:'rpm',  min:0, dec:0},
+  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W',    min:0, dec:0},
+  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W',    min:0, dec:0},
+  {id:'curr_p',  nombre:'Corriente pack',   unidad:'A',           dec:1},
+  {id:'throttle',nombre:'Acelerador',       unidad:'%',    min:0, dec:0},
+  {id:'brake',   nombre:'Freno',            unidad:'%',    min:0, dec:0},
+  {id:'Gx',      nombre:'G longitudinal',   unidad:'G',           dec:2},
+  {id:'Gy',      nombre:'G lateral',        unidad:'G',           dec:2},
+  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh',   min:0, dec:2},
+  {id:'eta',     nombre:'Eficiencia motor', unidad:'%',    min:0, dec:1},
+  {id:'soc',     nombre:'SOC',              unidad:'%',    min:0, dec:1}
 ];
 // Nombres neutros a propósito: en una vuelta suelta son tiempo y distancia DE
 // LA VUELTA, pero en una sesión completa están acumulados sobre todas las
@@ -768,7 +757,9 @@ function escalaColor(f){
 }
 
 // En vivo: gráfica totalmente estática.
-var CONFIG_VIVO = {staticPlot:true, responsive:true};
+// Mismo trato que el histórico: rueda para acercar, arrastrar para moverse,
+// doble clic para volver. staticPlot lo desactivaría todo.
+var CONFIG_VIVO = {displayModeBar:false, responsive:true, scrollZoom:true, doubleClick:'reset'};
 // Histórico: con zoom, y conservando el cursor. staticPlot desactivaría ambos
 // y con ellos la sincronización con el mapa, así que se configura a mano.
 // Rueda para acercar, arrastrar para moverse, doble clic para volver a la
@@ -778,15 +769,16 @@ var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:true, doubl
 // ═══════════════════════════════════════════════════════════════════════
 //  EN VIVO
 // ═══════════════════════════════════════════════════════════════════════
-var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null};
+// `zoom` guarda la vista que puso el usuario. Sin esto el zoom en vivo sería
+// inútil: la gráfica se redibuja diez veces por segundo y cada redibujo
+// devolvería el eje a la ventana deslizante antes de que diera tiempo a mirar.
+// Mientras hay zoom, la vista se queda quieta y los datos siguen entrando;
+// el doble clic la suelta y vuelve a seguir al coche.
+var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null, zoom:null};
 
 function inicializarVivo(){
   llenarSelect(document.getElementById('v-x'), EJES_X, 't_vuelta');
-  construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], function(){
-    pintarRangosY('vivo');
-    redibujarVivo();
-  });
-  pintarRangosY('vivo');
+  construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], redibujarVivo);
   document.getElementById('v-x').onchange = redibujarVivo;
   document.getElementById('v-toggle').onclick = function(){
     vivo.corriendo = !vivo.corriendo;
@@ -796,6 +788,18 @@ function inicializarVivo(){
   };
   vivo.datos = datosVuelta('2026-08-19',1,1);
   Plotly.newPlot('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_VIVO);
+  document.getElementById('g-vivo').on('plotly_relayout', function(ev){
+    // El doble clic manda autorange:true en todos los ejes — eso suelta la vista
+    var suelta = Object.keys(ev).some(function(k){ return /autorange$/.test(k) && ev[k] === true; });
+    if (suelta || ev.dragmode){ vivo.zoom = null; return; }
+    var g = document.getElementById('g-vivo'), z = {};
+    var hay = false;
+    Object.keys(g.layout).forEach(function(k){
+      if (!/^[xy]axis/.test(k) || !g.layout[k].range) return;
+      z[k] = g.layout[k].range.slice(); hay = true;
+    });
+    if (hay) vivo.zoom = z;
+  });
   setInterval(tickVivo, 100);
 }
 
@@ -816,7 +820,8 @@ function tickVivo(){
   var limite = p.t_vuelta - VENTANA_S;
   while (vivo.buffer.length && vivo.buffer[0].t_vuelta < limite) vivo.buffer.shift();
   vivo.i++;
-  document.getElementById('v-hint').textContent = 'vuelta '+vivo.vuelta+' · '+p.t_vuelta.toFixed(1)+' s';
+  document.getElementById('v-hint').textContent = 'vuelta '+vivo.vuelta+' · '+p.t_vuelta.toFixed(1)+' s' +
+    (vivo.zoom ? ' · vista fija, doble clic para soltar' : '');
   // El buffer se sigue llenando aunque no se vea, pero no tiene sentido
   // redibujar diez veces por segundo una gráfica que está en la pestaña oculta
   if (document.getElementById('panel-vivo').classList.contains('active')) redibujarVivo();
@@ -840,8 +845,9 @@ function redibujarVivo(){
   });
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
+  lay.dragmode = 'pan';
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
-               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
+               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:false};
   if (ejeX === 't_vuelta'){
     // Ventana fija de 20 s. Anclada en cero durante los primeros 20 s de cada
     // vuelta: sin esa sujeción el eje arrancaba en −20 s, y un tiempo de vuelta
@@ -858,8 +864,17 @@ function redibujarVivo(){
   }
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y, true, escalaViva(y));
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y, false);
   });
+  // La vista que puso el usuario manda sobre la ventana deslizante y sobre el
+  // autoescalado, hasta que la suelte con doble clic
+  if (vivo.zoom){
+    Object.keys(vivo.zoom).forEach(function(k){
+      if (!lay[k]) return;
+      lay[k].range = vivo.zoom[k].slice();
+      lay[k].autorange = false;
+    });
+  }
   Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
 
@@ -972,16 +987,6 @@ function marcarFilaReferencia(idxRef){
 }
 
 // El selector del mapa solo ofrece las variables ya elegidas en Y
-// Escala del eje en la sección en vivo: la de trabajo de la variable, salvo que
-// se haya editado a mano. Nunca es automática.
-var ESCALA_VIVA = {};
-function escalaViva(id){
-  var r = ESCALA_VIVA[id];
-  if (r && r.min !== null && r.max !== null && r.min < r.max) return [r.min, r.max];
-  var m = meta(id);
-  return m.esc ? m.esc.slice() : null;
-}
-
 // Rango fijado a mano para cada variable. Vacío = automático.
 // Un pico aislado —200 A durante dos décimas— estira el eje hasta 200 y deja
 // los 50 A en que de verdad se mueve la señal aplastados contra el cero. Poner
@@ -989,18 +994,14 @@ function escalaViva(id){
 // gráfica, que es exactamente lo que se quiere en ese caso.
 var RANGO_Y = {};
 
-function pintarRangosY(cual){
-  var vivo = (cual === 'vivo');
-  var cont = document.getElementById(vivo ? 'v-rangos' : 'h-rangos');
-  var ys = marcadasDe(document.getElementById(vivo ? 'v-y' : 'h-y'));
-  var almacen = vivo ? ESCALA_VIVA : RANGO_Y;
+function pintarRangosY(){
+  var cont = document.getElementById('h-rangos');
+  var ys = marcadasDe(document.getElementById('h-y'));
+  var almacen = RANGO_Y;
   if (!ys.length){ cont.innerHTML = '<div class="rango-nota">Elige variables.</div>'; return; }
   cont.innerHTML = '';
   ys.forEach(function(id){
     var m = meta(id), r = almacen[id] || {};
-    // En vivo la casilla arranca con la escala de trabajo a la vista, no vacía:
-    // el eje ya está fijo ahí y dejarla en blanco haría pensar que es automático
-    if (vivo && r.min === undefined && m.esc){ r = {min:m.esc[0], max:m.esc[1]}; }
     var fila = document.createElement('div');
     fila.className = 'rango-fila';
     fila.innerHTML = '<span title="'+m.nombre+'">'+m.nombre+'</span>' +
@@ -1010,16 +1011,15 @@ function pintarRangosY(cual){
                      (r.max !== undefined && r.max !== null ? ' value="'+r.max+'"' : '') + '>';
     cont.appendChild(fila);
   });
-  cont.insertAdjacentHTML('beforeend', '<div class="rango-nota">' +
-    (vivo ? 'Nunca es automática: si se borra, vuelve a la escala de trabajo.'
-          : 'Vacío = automático. Se aplican los dos o ninguno.') + '</div>');
+  cont.insertAdjacentHTML('beforeend',
+    '<div class="rango-nota">Vacío = automático. Se aplican los dos o ninguno.</div>');
   cont.querySelectorAll('input').forEach(function(inp){
     inp.onchange = function(){
       var id = inp.dataset.id;
       if (!almacen[id]) almacen[id] = {};
       var v = inp.value.trim();
       almacen[id][inp.dataset.cual] = (v === '' || !isFinite(+v)) ? null : +v;
-      if (vivo) redibujarVivo(); else redibujarHist();
+      redibujarHist();
     };
   });
 }
