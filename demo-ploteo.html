@@ -228,16 +228,41 @@ var VARIABLES = [
 // Nombres neutros a propósito: en una vuelta suelta son tiempo y distancia DE
 // LA VUELTA, pero en una sesión completa están acumulados sobre todas las
 // vueltas. Llamarlos "de vuelta" haría leer 193 s como si fuera una vuelta.
-var EJES_X = [{id:'t_vuelta',nombre:'Tiempo transcurrido',unidad:'s',dec:1},
-              {id:'d_vuelta',nombre:'Distancia recorrida',unidad:'m',dec:0},
-              // Alinear por porcentaje elimina la deriva: dos vueltas de
-              // distinta longitud —una trazada más abierta recorre más metros—
-              // dejan de compararse metro contra metro, que hacia el final de
-              // la vuelta enfrenta puntos separados varios metros de pista.
-              {id:'pct',nombre:'Porcentaje del recorrido',unidad:'%',dec:1}]
-             .concat(VARIABLES);
+var EJES_X = [
+  // El eje correcto para comparar vueltas y para correlacionar una medición
+  // con un punto del circuito. No mide lo que recorrió el coche, sino DÓNDE
+  // está: cada muestra se proyecta sobre una trazada de referencia y hereda
+  // la distancia de esa referencia. Abrirse en una curva deja de sumar
+  // metros al eje, así que el metro 234 es el mismo asfalto en todas las
+  // vueltas. Es la misma fuente que usa el mapa —el GPS—, de modo que
+  // gráfica y mapa quedan en el mismo sistema de coordenadas.
+  {id:'s_pista',  nombre:'Posición en la pista', unidad:'m', dec:0},
+  {id:'t_vuelta', nombre:'Tiempo transcurrido',  unidad:'s', dec:1},
+  // Integral de la velocidad: el recorrido REAL del coche. Sirve para
+  // consumo por metro, para medir el largo de una trazada y para saber
+  // cuánto rodó. NO sirve para comparar vueltas: el error de cada curva se
+  // acumula hasta la meta, así que a mitad de vuelta enfrenta puntos de
+  // pista distintos. El porcentaje tampoco lo arregla, solo reparte el error
+  // en vez de dejarlo crecer.
+  {id:'d_vuelta', nombre:'Distancia recorrida',  unidad:'m', dec:0},
+  {id:'pct',      nombre:'Porcentaje del recorrido', unidad:'%', dec:1}
+].concat(VARIABLES);
+
+// Ejes que representan el avance por la vuelta. Contra ellos las muestras
+// forman una serie ordenada y se dibujan como línea; contra cualquier otra
+// variable son una nube de puntos.
+function esEjeDeRecorrido(id){
+  return id === 's_pista' || id === 't_vuelta' || id === 'd_vuelta' || id === 'pct';
+}
 
 var CENTRO = {lat:19.5042, lon:-99.1467};
+// Conversión grados→metros en el entorno de la pista. A escala de un
+// circuito la Tierra es plana y esta aproximación yerra centímetros, una
+// décima del error del propio GPS.
+var M_LAT = 111320, M_LON = 111320*Math.cos(CENTRO.lat*Math.PI/180);
+function aMetros(p){
+  return {x:(p.lon - CENTRO.lon)*M_LON, y:(p.lat - CENTRO.lat)*M_LAT};
+}
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
 var DASHES  = ['solid','dot','dash'];
 // En nube de puntos no se dibujan líneas, así que el tipo de trazo no
@@ -247,27 +272,64 @@ var MAX_Y = 3, MAX_ORIGENES = 3;
 var VENTANA_S = 20;
 
 function aleatorio(semilla){ var s=semilla; return function(){ s=(s*9301+49297)%233280; return s/233280; }; }
-function puntoPista(u){
+// `desv` desplaza el punto esos metros perpendicular a la trazada, hacia un
+// lado u otro. Sin él todas las vueltas simuladas seguían la MISMA línea y
+// medían exactamente lo mismo, así que el problema que resuelve el eje de
+// posición en pista no se podía ver en el demo.
+function puntoPista(u, desv){
   var a = u*2*Math.PI;
-  var rx = 0.0016*(1+0.18*Math.sin(3*a)), ry = 0.0011*(1+0.12*Math.cos(2*a));
-  return {lat: CENTRO.lat + ry*Math.sin(a), lon: CENTRO.lon + rx*Math.cos(a)};
+  var rx = 0.00064*(1+0.18*Math.sin(3*a)), ry = 0.00044*(1+0.12*Math.cos(2*a));
+  var p = {lat: CENTRO.lat + ry*Math.sin(a), lon: CENTRO.lon + rx*Math.cos(a)};
+  if (!desv) return p;
+  var e = 1e-4, a1 = (u-e)*2*Math.PI, a2 = (u+e)*2*Math.PI;
+  var rx1 = 0.00064*(1+0.18*Math.sin(3*a1)), ry1 = 0.00044*(1+0.12*Math.cos(2*a1));
+  var rx2 = 0.00064*(1+0.18*Math.sin(3*a2)), ry2 = 0.00044*(1+0.12*Math.cos(2*a2));
+  var dx = (rx2*Math.cos(a2) - rx1*Math.cos(a1))*M_LON;
+  var dy = (ry2*Math.sin(a2) - ry1*Math.sin(a1))*M_LAT;
+  var L = Math.sqrt(dx*dx + dy*dy) || 1;
+  return {lat: p.lat + (dx/L)*desv/M_LAT, lon: p.lon - (dy/L)*desv/M_LON};
 }
 function curvatura(u){
   var a = u*2*Math.PI;
   return Math.abs(Math.sin(2*a))*0.6 + Math.abs(Math.cos(3*a))*0.4;
 }
+// Metros que mide una trazada concreta. Se necesita antes de simular la
+// vuelta, porque es lo que convierte la velocidad en avance por el circuito.
+function desvioDe(amp, fase){
+  return function(u){ return amp*Math.sin(3*u*2*Math.PI + fase); };
+}
+// Metros de pista por unidad de u. El parámetro u NO avanza a ritmo constante
+// —la trazada tiene tramos más largos que otros para el mismo salto de u—, así
+// que repartir la velocidad a partes iguales de u haría que el coche recorriera
+// más o menos metros de los que marca su propio odómetro.
+function tasaArco(desvio, u){
+  var e = 1e-4, u1 = Math.max(0, u-e), u2 = Math.min(1, u+e);
+  var a = aMetros(puntoPista(u1, desvio(u1)));
+  var b = aMetros(puntoPista(u2, desvio(u2)));
+  return Math.sqrt((b.x-a.x)*(b.x-a.x) + (b.y-a.y)*(b.y-a.y)) / (u2 - u1);
+}
+
 function generarVuelta(semilla, nVuelta){
   var rnd = aleatorio(semilla + nVuelta*137);
-  var ritmo = 0.92 + rnd()*0.16, dt = 0.1, n = Math.round(320*ritmo);
-  var pts = [], E = 0, d = 0, vAnt = 0;
-  for (var i=0;i<n;i++){
-    var u = i/n, curv = curvatura(u);
+  var ritmo = 0.92 + rnd()*0.16, dt = 0.1;
+  // Trazada propia: cada vuelta se abre y se cierra distinto, como en pista
+  var ampLinea = 0.8 + rnd()*2.4, faseLinea = rnd()*2*Math.PI;
+  var desvio = desvioDe(ampLinea, faseLinea);
+  // Antes la posición avanzaba a pasos iguales sin mirar la velocidad, así que
+  // el odómetro y el GPS describían recorridos distintos y abrirse en una curva
+  // no costaba ni un metro ni una décima. Ahora la velocidad empuja al coche
+  // por su propia línea: una trazada más abierta mide más y se tarda más en
+  // recorrerla, que es justo la deriva que el eje de posición en pista elimina.
+  var pts = [], E = 0, d = 0, vAnt = 0, u = 0, i = 0;
+  while (u < 1 && i < 20000){
+    var curv = curvatura(u);
     var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
     var v = vAnt + (vObj - vAnt)*0.12;
     var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
     d += v*dt/3600;
-    var pos = puntoPista(u);
+    var pos = puntoPista(u, desvio(u));
+    u += (v*dt/3.6)/tasaArco(desvio, u);
     var thr = Math.max(0, Math.min(100, 50 + acc*22 + (rnd()-0.5)*6));
     var brk = acc < -0.6 ? Math.min(100, -acc*40) : 0;
     var pmec = Math.max(0, v*68 + acc*260);
@@ -284,12 +346,99 @@ function generarVuelta(semilla, nVuelta){
       soc:+(77-(nVuelta-1)*3.2-E/52).toFixed(1),
       lat:pos.lat, lon:pos.lon
     });
+    i++;
   }
   // Porcentaje del recorrido de ESTA vuelta
   var total = pts[pts.length-1].d_vuelta || 1;
   pts.forEach(function(q){ q.pct = +(q.d_vuelta/total*100).toFixed(2); });
   return pts;
 }
+// ═══════════════════════════════════════════════════════════════════════
+//  POSICIÓN EN LA PISTA
+//
+//  El odómetro (d_vuelta) integra la velocidad, así que mide la trayectoria
+//  que hizo ESE coche en ESA vuelta. Abrirse cuatro metros en una curva los
+//  suma al total, y esos cuatro metros se arrastran hasta la meta: a partir
+//  de ahí, el metro 500 de una vuelta y el metro 500 de la otra son puntos
+//  distintos del circuito. Comparar ahí no compara nada.
+//
+//  La solución es dejar de medir sobre la trayectoria propia y medir sobre
+//  UNA sola línea, la misma para todas las vueltas. Se toma una vuelta como
+//  referencia, se remuestrea su GPS cada metro, y a cada muestra de
+//  cualquier vuelta se le asigna la distancia del punto de la referencia que
+//  le queda más cerca. Abrirse deja de sumar metros al eje.
+//
+//  El resultado sigue estando en metros reales y sigue siendo un lugar
+//  concreto del asfalto, que es justo lo que hace falta para leer "en el
+//  metro 234 el motor iba a tanto" y para que la gráfica y el mapa de calor
+//  hablen del mismo punto: ambos salen del GPS.
+// ═══════════════════════════════════════════════════════════════════════
+var PASO_REF = 1.0;   // metros entre muestras de la referencia
+
+// Remuestrea una polilínea a paso constante. Sin esto la referencia heredaría
+// el espaciado irregular del GPS —más denso donde el coche va lento— y la
+// resolución del eje cambiaría según la zona del circuito.
+function remuestrear(crudo, paso){
+  var x = [crudo[0].x], y = [crudo[0].y], s = [0];
+  var recorrido = 0, resto = paso;
+  for (var i=1; i<crudo.length; i++){
+    var dx = crudo[i].x - crudo[i-1].x, dy = crudo[i].y - crudo[i-1].y;
+    var L = Math.sqrt(dx*dx + dy*dy);
+    if (L < 1e-9) continue;
+    var pos = 0;
+    while (pos + resto <= L){
+      pos += resto;
+      x.push(crudo[i-1].x + dx*pos/L);
+      y.push(crudo[i-1].y + dy*pos/L);
+      s.push(recorrido + pos);
+      resto = paso;
+    }
+    resto -= (L - pos);
+    recorrido += L;
+  }
+  return {x:x, y:y, s:s, largo:recorrido};
+}
+
+var REFERENCIA = null;
+function referencia(){
+  if (REFERENCIA) return REFERENCIA;
+  // Se construye de una vuelta real, no de la fórmula que dibuja la pista:
+  // en el sistema de verdad la única fuente disponible es el GPS del coche.
+  var s0 = SESIONES[0];
+  var crudo = generarVuelta(s0.semilla, 1).filter(coordValida).map(aMetros);
+  // Se cierra el circuito para que el último tramo antes de meta exista
+  if (crudo.length > 2) crudo.push({x:crudo[0].x, y:crudo[0].y});
+  REFERENCIA = remuestrear(crudo, PASO_REF);
+  return REFERENCIA;
+}
+
+// Asigna p.s_pista a cada muestra. La búsqueda avanza solo hacia adelante
+// desde la última posición asignada: si buscara en todo el circuito, en una
+// horquilla o un cruce —donde la trazada pasa dos veces cerca del mismo
+// punto— el más cercano saltaría al tramo equivocado. Avanzar también
+// garantiza que el eje sea creciente, que es lo que espera la búsqueda por
+// bisección del cursor.
+function asignarPosicion(datos){
+  var R = referencia(), N = R.x.length, j = 0;
+  for (var i=0; i<datos.length; i++){
+    var p = datos[i];
+    if (!coordValida(p)){ p.s_pista = null; continue; }
+    var m = aMetros(p);
+    // 30 m de ventana. A 10 Hz eso cubre hasta 1080 km/h, y mantenerla corta
+    // evita que en un circuito que se dobla sobre sí mismo el punto más
+    // cercano salte a un tramo que pasa cerca pero está mucho más adelante.
+    var hasta = Math.min(N-1, j + Math.round(30/PASO_REF));
+    var mejor = j, dMin = Infinity;
+    for (var k=j; k<=hasta; k++){
+      var dx = R.x[k] - m.x, dy = R.y[k] - m.y, d2 = dx*dx + dy*dy;
+      if (d2 < dMin){ dMin = d2; mejor = k; }
+    }
+    j = mejor;
+    p.s_pista = +R.s[mejor].toFixed(1);
+  }
+  return datos;
+}
+
 var SESIONES = [
   {fecha:'2026-07-03', sesion:3, semilla:1001, vueltas:6},
   {fecha:'2026-07-03', sesion:4, semilla:2002, vueltas:5},
@@ -307,7 +456,7 @@ function buscaSesion(fecha, sesion){ return SESIONES.find(function(s){return s.f
 var CACHE = {};
 function datosVuelta(fecha, sesion, vuelta){
   var k = fecha+'|'+sesion+'|'+vuelta;
-  if (!CACHE[k]) CACHE[k] = generarVuelta(buscaSesion(fecha,sesion).semilla, vuelta);
+  if (!CACHE[k]) CACHE[k] = asignarPosicion(generarVuelta(buscaSesion(fecha,sesion).semilla, vuelta));
   return CACHE[k];
 }
 // En una sesión completa, tiempo y distancia se ACUMULAN a lo largo de todas
@@ -323,18 +472,23 @@ var CACHE_SESION = {};
 function datosSesion(fecha, sesion){
   var clave = fecha+'|'+sesion;
   if (CACHE_SESION[clave]) return CACHE_SESION[clave];
-  var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0;
+  var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0, despS = 0;
   for (var v=1; v<=s.vueltas; v++){
     var lv = datosVuelta(fecha,sesion,v);
     for (var i=0;i<lv.length;i++){
       var p = Object.assign({}, lv[i]);
       p.t_vuelta = +(p.t_vuelta + despT).toFixed(1);
       p.d_vuelta = +(p.d_vuelta + despD).toFixed(1);
+      // La posición en pista se encadena por el largo de la REFERENCIA, no
+      // por lo que recorrió cada vuelta: así cada vuelta ocupa exactamente
+      // una longitud de circuito y el eje sigue siendo comparable.
+      if (p.s_pista !== null && p.s_pista !== undefined) p.s_pista = +(p.s_pista + despS).toFixed(1);
       p.n_vuelta = v;
       todo.push(p);
     }
     despT += lv[lv.length-1].t_vuelta;
     despD += lv[lv.length-1].d_vuelta;
+    despS += referencia().largo;
   }
   // En una sesión completa el porcentaje es sobre todo el recorrido
   var totalS = todo.length ? todo[todo.length-1].d_vuelta : 1;
@@ -559,7 +713,7 @@ function redibujarVivo(){
   var b = vivo.buffer;
   if (!b.length || !ys.length){ Plotly.react('g-vivo', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_VIVO); return; }
 
-  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta' && ejeX !== 'pct');
+  var dispersion = !esEjeDeRecorrido(ejeX);
   var norm = document.getElementById('v-norm').checked;
   var rangos = norm ? rangosDe([{datos:b}], ys) : null;
   var trazas = ys.map(function(y,k){
@@ -582,12 +736,12 @@ function redibujarVivo(){
     var ult = b[b.length-1].t_vuelta;
     var ini = Math.max(0, ult - VENTANA_S);
     lay.xaxis.range = [ini, ini + VENTANA_S];
-  } else if (ejeX === 'd_vuelta'){
-    // En distancia, la ventana la marca lo que realmente hay en el buffer: los
-    // mismos 20 s cubren más o menos metros según la velocidad, así que un
-    // ancho fijo dejaría hueco vacío o recortaría datos
-    var d0 = b[0].d_vuelta, d1 = b[b.length-1].d_vuelta;
-    lay.xaxis.range = (d1 > d0) ? [d0, d1] : [d0, d0 + 10];
+  } else if (esEjeDeRecorrido(ejeX)){
+    // En distancia o posición, la ventana la marca lo que realmente hay en el
+    // buffer: los mismos 20 s cubren más o menos metros según la velocidad,
+    // así que un ancho fijo dejaría hueco vacío o recortaría datos
+    var d0 = sano(b[0], ejeX), d1 = sano(b[b.length-1], ejeX);
+    if (d0 !== null && d1 !== null) lay.xaxis.range = (d1 > d0) ? [d0, d1] : [d0, d0 + 10];
   }
   if (norm){
     lay.yaxis = {title:{text:'% del rango de cada variable',font:{size:9}},
@@ -611,7 +765,7 @@ function inicializarHist(){
   var cont = document.getElementById('h-origenes');
   for (var i=0;i<MAX_ORIGENES;i++) cont.appendChild(filaOrigen(i));
 
-  llenarSelect(document.getElementById('h-x'), EJES_X, 'd_vuelta');
+  llenarSelect(document.getElementById('h-x'), EJES_X, 's_pista');
   construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
     sincronizarSelectorMapa();
     redibujarHist();
@@ -736,7 +890,7 @@ function redibujarHist(){
   var ejeX = document.getElementById('h-x').value;
   var ys = marcadasDe(document.getElementById('h-y'));
   var orig = origenesActivos();
-  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta' && ejeX !== 'pct');
+  var dispersion = !esEjeDeRecorrido(ejeX);
 
   var norm = document.getElementById('h-norm').checked;
   var rangos = norm ? rangosDe(orig, ys) : null;
@@ -795,6 +949,17 @@ function redibujarHist(){
 function avisarComparacionDudosa(orig, ejeX){
   var cont = document.getElementById('h-aviso');
   var avisos = [];
+
+  // Comparar dos vueltas por odómetro es el error clásico: se ve una gráfica
+  // perfectamente razonable en la que, a mitad de vuelta, cada traza está en
+  // un punto distinto del circuito.
+  if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 'pct')){
+    avisos.push('<b>Eje no apto para comparar.</b> ' +
+                (ejeX === 'd_vuelta'
+                  ? 'La distancia recorrida es la trayectoria de cada vuelta: abrirse en una curva suma metros que se arrastran hasta la meta, así que el mismo valor de X cae en puntos distintos del circuito.'
+                  : 'El porcentaje reparte esa misma deriva a lo largo de la vuelta en vez de eliminarla, y estira o encoge cada vuelta según lo que midió.') +
+                ' Para comparar, usa <b>Posición en la pista</b>.');
+  }
 
   if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 't_vuelta')){
     var completas = orig.filter(function(o){ return o.alcance === 'all'; }).length;
@@ -938,7 +1103,7 @@ function moverCursor(valorX, nTraza, idxPunto){
   }
 
   var ejeX = document.getElementById('h-x').value;
-  var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta' && ejeX !== 'pct');
+  var dispersion = !esEjeDeRecorrido(ejeX);
 
   if (dispersion){
     // Nube de puntos: el eje X es una variable cualquiera, no una posición en
@@ -966,9 +1131,11 @@ function moverCursor(valorX, nTraza, idxPunto){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
     marcadorCursor = L.circleMarker([oMapa.punto.lat, oMapa.punto.lon],
       {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
+    var sP = oMapa.punto.s_pista;
     document.getElementById('h-cursor-pos').textContent =
-      oMapa.punto.d_vuelta.toFixed(0)+' m · '+oMapa.punto.t_vuelta.toFixed(1)+' s · '+
-      oMapa.punto.pct.toFixed(1)+' %';
+      (sP === null || sP === undefined ? '—' : sP.toFixed(0)+' m de pista') +
+      ' · recorridos '+oMapa.punto.d_vuelta.toFixed(0)+' m · '+
+      oMapa.punto.t_vuelta.toFixed(1)+' s';
   }
 
   var campoMapa = document.getElementById('h-mapvar').value;
@@ -984,7 +1151,7 @@ function moverCursor(valorX, nTraza, idxPunto){
     return '<td>' + (v !== null ? formatear(v, campo) : '<span style="color:#555">sin dato</span>') + '</td>';
   }
 
-  ['t_vuelta','d_vuelta'].forEach(function(campo){
+  ['s_pista','t_vuelta','d_vuelta'].forEach(function(campo){
     var m = meta(campo);
     html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
     orig.forEach(function(o){ html += celda(o, campo); });
