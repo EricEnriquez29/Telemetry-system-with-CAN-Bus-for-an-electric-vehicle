@@ -163,7 +163,7 @@
 
   <div class="grid-hist">
     <div class="card">
-      <div class="card-title"><span>Gráfica</span><span class="hint">pasa el cursor para sincronizar con el mapa</span></div>
+      <div class="card-title"><span>Gráfica</span><span class="hint">arrastra para ampliar · rueda para acercar · doble clic para volver</span></div>
       <div id="h-aviso"></div>
       <div id="g-hist" style="height:470px;"></div>
     </div>
@@ -541,10 +541,14 @@ var LAYOUT_BASE = {
 };
 // Con tres variables, el tercer eje tiene que apartarse: si se deja en 'left'
 // sin desplazar, se dibuja justo encima del primero y los dos rótulos se pisan.
-function ejeY(k, etiqueta, color, campo){
+// `fijo` bloquea el eje. En vivo tiene que estar bloqueado —la gráfica se
+// redibuja diez veces por segundo y cualquier zoom se perderia en el acto—,
+// pero en el histórico los datos no se mueven y ampliar una curva concreta es
+// justo lo que hace falta para analizar.
+function ejeY(k, etiqueta, color, campo, fijo){
   var m = campo ? meta(campo) : {};
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
-           zerolinecolor:'#222', tickfont:{color:color}, fixedrange:true,
+           zerolinecolor:'#222', tickfont:{color:color}, fixedrange:(fijo !== false),
            hoverformat: '.'+(m.dec !== undefined ? m.dec : 2)+'f'};
   if (k===1){ e.overlaying='y'; e.side='right'; }
   if (k===2){ e.overlaying='y'; e.side='left'; e.anchor='free'; e.position=0; }
@@ -621,9 +625,11 @@ function escalaColor(f){
 
 // En vivo: gráfica totalmente estática.
 var CONFIG_VIVO = {staticPlot:true, responsive:true};
-// Histórico: sin zoom ni desplazamiento, pero conserva el cursor —
-// staticPlot lo desactivaría y con él la sincronización con el mapa.
-var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:false, doubleClick:false};
+// Histórico: con zoom, y conservando el cursor. staticPlot desactivaría ambos
+// y con ellos la sincronización con el mapa, así que se configura a mano.
+// Doble clic devuelve la vista completa; no hay barra de herramientas porque
+// arrastrar, rueda y doble clic cubren todo lo que hace falta.
+var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:true, doubleClick:'reset'};
 
 // ═══════════════════════════════════════════════════════════════════════
 //  EN VIVO
@@ -704,7 +710,7 @@ function redibujarVivo(){
   }
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y);
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y, true);
   });
   Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
@@ -862,13 +868,18 @@ function redibujarHist(){
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
-               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true,
+               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:false,
                hoverformat: '.'+(meta(ejeX).dec !== undefined ? meta(ejeX).dec : 2)+'f'};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
+  // Arrastrar amplía; el resto de la interacción la fija CONFIG_HIST
+  lay.dragmode = 'zoom';
+  // Al cambiar de variables o de orígenes se vuelve a la vista completa, que es
+  // lo correcto: el zoom anterior estaba puesto sobre otros datos. Pero mover el
+  // cursor NO redibuja, así que la ampliación aguanta mientras se lee la tabla.
   // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y);
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y, false);
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
