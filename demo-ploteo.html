@@ -196,19 +196,25 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  Datos simulados — reemplazables por GET /session_series y WebSocket
 // ═══════════════════════════════════════════════════════════════════════
+// El campo `min` es el mínimo FÍSICAMENTE posible. El MGT usa -1 como marca de
+// "sin dato" en las variables que vienen del bus CAN, y sin esta declaración
+// esos -1 se dibujan como mediciones: una velocidad de -1 km/h estira el eje,
+// falsea los promedios y colorea el mapa con un valor que nunca ocurrió.
+// Solo se declara donde el mínimo es indiscutible: la corriente del paquete y
+// las fuerzas G sí pueden ser negativas, así que se dejan sin filtro.
 var VARIABLES = [
-  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h'},
-  {id:'rpm',     nombre:'RPM',              unidad:'rpm'},
-  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W'},
-  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W'},
+  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h', min:0},
+  {id:'rpm',     nombre:'RPM',              unidad:'rpm',  min:0},
+  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W',    min:0},
+  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W',    min:0},
   {id:'curr_p',  nombre:'Corriente pack',   unidad:'A'},
-  {id:'throttle',nombre:'Acelerador',       unidad:'%'},
-  {id:'brake',   nombre:'Freno',            unidad:'%'},
+  {id:'throttle',nombre:'Acelerador',       unidad:'%',    min:0},
+  {id:'brake',   nombre:'Freno',            unidad:'%',    min:0},
   {id:'Gx',      nombre:'G longitudinal',   unidad:'G'},
   {id:'Gy',      nombre:'G lateral',        unidad:'G'},
-  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh'},
-  {id:'eta',     nombre:'Eficiencia motor', unidad:'%'},
-  {id:'soc',     nombre:'SOC',              unidad:'%'}
+  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh',   min:0},
+  {id:'eta',     nombre:'Eficiencia motor', unidad:'%',    min:0},
+  {id:'soc',     nombre:'SOC',              unidad:'%',    min:0}
 ];
 // Nombres neutros a propósito: en una vuelta suelta son tiempo y distancia DE
 // LA VUELTA, pero en una sesión completa están acumulados sobre todas las
@@ -404,6 +410,27 @@ function indiceMasCercano(datos, campoX, valorX){
   }
   return (Math.abs(datos[izq][campoX] - valorX) <= Math.abs(datos[der][campoX] - valorX)) ? izq : der;
 }
+// Los datos reales traen huecos: campos condicionales que llegan nulos, cortes
+// de GPS, y muestras perdidas por una reconexión. Nada de eso debe romper la
+// herramienta ni, peor, dibujarse como si fuera un valor medido.
+function coordValida(p){
+  return p && typeof p.lat === 'number' && typeof p.lon === 'number' &&
+         isFinite(p.lat) && isFinite(p.lon) &&
+         !(p.lat === 0 && p.lon === 0);   // 0,0 es el clásico "sin fijación GPS"
+}
+function valorValido(v){ return v !== null && v !== undefined && isFinite(v); }
+
+// Devuelve el valor, o null si no es medible: nulo, no numérico, o por debajo
+// del mínimo físico de esa variable (el -1 que el MGT usa como "sin dato").
+function sano(punto, campo){
+  if (!punto) return null;
+  var v = punto[campo];
+  if (!valorValido(v)) return null;
+  var m = meta(campo);
+  if (m.min !== undefined && v < m.min) return null;
+  return v;
+}
+
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
   var c1=[59,167,118], c2=[194,168,56], c3=[204,64,85];
@@ -468,7 +495,7 @@ function redibujarVivo(){
 
   var dispersion = (ejeX !== 't_vuelta' && ejeX !== 'd_vuelta');
   var trazas = ys.map(function(y,k){
-    return {x:b.map(function(p){return p[ejeX];}), y:b.map(function(p){return p[y];}),
+    return {x:b.map(function(p){return sano(p, ejeX);}), y:b.map(function(p){return sano(p, y);}),
             name:meta(y).nombre, type:'scattergl',
             mode: dispersion ? 'markers' : 'lines',
             marker:{size:4, color:COLORES[k], symbol:SIMBOLOS[k]},
@@ -628,8 +655,8 @@ function redibujarHist(){
   orig.forEach(function(o){
     ys.forEach(function(y,k){
       trazas.push({
-        x:o.datos.map(function(p){return p[ejeX];}),
-        y:o.datos.map(function(p){return p[y];}),
+        x:o.datos.map(function(p){return sano(p, ejeX);}),
+        y:o.datos.map(function(p){return sano(p, y);}),
         name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
         marker:{size:o.idx===0?5:4, color:o.color, opacity:o.idx===0?0.9:0.55,
@@ -733,11 +760,19 @@ function dibujarMapa(){
   var min = Infinity, max = -Infinity;
   orig.forEach(function(x){
     x.datos.forEach(function(p){
-      var v = p[campo];
+      var v = sano(p, campo);
+      if (v === null) return;               // un nulo no participa en la escala
       if (v < min) min = v;
       if (v > max) max = v;
     });
   });
+  if (min === Infinity){                     // la variable no tiene ni un dato
+    document.getElementById('h-mapname').textContent = o.etiqueta + ' · ' + m.nombre + '  (sin datos)';
+    document.getElementById('h-min').textContent = '—';
+    document.getElementById('h-max').textContent = '—';
+    barra.style.background = '#222';
+    return;
+  }
   var comun = orig.length > 1;
   document.getElementById('h-min').textContent = min.toFixed(1)+' '+m.unidad;
   document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad +
@@ -747,19 +782,32 @@ function dibujarMapa(){
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
+  var huecosGps = 0, huecosValor = 0;
   for (var i=1;i<o.datos.length;i++){
     var a = o.datos[i-1], b = o.datos[i];
-    var f2 = max>min ? (b[campo]-min)/(max-min) : 0.5;
+    // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el mapa
+    // a medio dibujar: ahora el tramo simplemente no se traza
+    if (!coordValida(a) || !coordValida(b)){ huecosGps++; continue; }
+    var vb = sano(b, campo);
+    if (vb === null){ huecosValor++; continue; }
+    var f2 = max>min ? (vb-min)/(max-min) : 0.5;
     capaTrazado.push(L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
       {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
   }
+  var faltantes = [];
+  if (huecosGps) faltantes.push(huecosGps+' sin GPS');
+  if (huecosValor) faltantes.push(huecosValor+' sin valor');
+  document.getElementById('h-mapname').textContent =
+    o.etiqueta + ' · ' + m.nombre +
+    (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas)' : '') +
+    (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
   var clave = o.fecha+'|'+o.sesion+'|'+o.alcance;
   if (clave !== ultimoAjuste){
     // animate:false — con la animación por defecto el encuadre puede quedarse
     // a medias y el mapa se queda en el zoom anterior
-    mapa.fitBounds(L.latLngBounds(o.datos.map(function(p){return [p.lat,p.lon];})),
-                   {padding:[18,18], animate:false});
+    var puntosValidos = o.datos.filter(coordValida).map(function(p){return [p.lat,p.lon];});
+    if (puntosValidos.length) mapa.fitBounds(L.latLngBounds(puntosValidos), {padding:[18,18], animate:false});
     ultimoAjuste = clave;
   }
 }
@@ -802,7 +850,7 @@ function moverCursor(valorX, nTraza, idxPunto){
   // En dispersión solo un origen tiene punto; si no es el del mapa, se marca ese
   if (!oMapa.punto){ oMapa = orig.find(function(x){ return !!x.punto; }) || oMapa; }
 
-  if (oMapa.punto){
+  if (oMapa.punto && coordValida(oMapa.punto)){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
     marcadorCursor = L.circleMarker([oMapa.punto.lat, oMapa.punto.lon],
       {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
@@ -815,16 +863,24 @@ function moverCursor(valorX, nTraza, idxPunto){
   orig.forEach(function(o){ html += '<th style="color:'+o.color+'">'+o.etiqueta+'</th>'; });
   html += '</tr></thead><tbody>';
 
+  // Un campo condicional que no se cumplió llega nulo. Escribirlo tal cual
+  // pondría la palabra "null" donde debería verse que no hay dato.
+  function celda(o, campo){
+    if (!o.punto) return '<td>—</td>';
+    var v = sano(o.punto, campo);
+    return '<td>' + (v !== null ? v : '<span style="color:#555">sin dato</span>') + '</td>';
+  }
+
   ['t_vuelta','d_vuelta'].forEach(function(campo){
     var m = meta(campo);
     html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){ html += '<td>'+(o.punto ? o.punto[campo] : '—')+'</td>'; });
+    orig.forEach(function(o){ html += celda(o, campo); });
     html += '</tr>';
   });
   ys.forEach(function(y){
     var m = meta(y), clase = (y === campoMapa) ? ' class="destacada"' : '';
     html += '<tr'+clase+'><td>'+m.nombre+' ['+m.unidad+']</td>';
-    orig.forEach(function(o){ html += '<td>'+(o.punto ? o.punto[y] : '—')+'</td>'; });
+    orig.forEach(function(o){ html += celda(o, y); });
     html += '</tr>';
   });
   html += '</tbody></table>';
