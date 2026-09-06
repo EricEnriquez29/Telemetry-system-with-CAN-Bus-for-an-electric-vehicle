@@ -408,7 +408,12 @@ function indiceMasCercano(datos, campoX, valorX){
     if (v < min) min = v;
     if (v > max) max = v;
   }
-  var margen = (max - min) * 0.01;
+  // La tolerancia no puede ser un porcentaje del recorrido: daba 4 m en una
+  // vuelta y 22 m en una sesión completa, así que un punto a 22 metros se
+  // presentaba como si estuviera alineado. Se deriva del paso real entre
+  // muestras, que es lo que fija la resolución de la comparación.
+  var paso = (max - min) / Math.max(1, datos.length - 1);
+  var margen = paso * 3;
   if (valorX < min - margen || valorX > max + margen) return null;
 
   // Tiempo y distancia siempre crecen dentro de un origen, así que se puede
@@ -787,15 +792,26 @@ function dibujarMapa(){
   // muestra. Si cada uno se normalizara consigo mismo, el mismo color
   // significaría valores distintos y alternar entre orígenes en el mapa daría
   // una comparación visual falsa.
-  var min = Infinity, max = -Infinity;
+  // La escala se recorta al percentil 2–98. Con los extremos crudos, un solo
+  // pico —una punta de corriente, un salto de GPS— comprimía todo lo demás:
+  // con un valor aislado de 45 kW, el 100 % de las muestras caía en el primer
+  // tercio de color y el mapa dejaba de distinguir nada.
+  var todos = [];
   orig.forEach(function(x){
     x.datos.forEach(function(p){
       var v = sano(p, campo);
-      if (v === null) return;               // un nulo no participa en la escala
-      if (v < min) min = v;
-      if (v > max) max = v;
+      if (v !== null) todos.push(v);
     });
   });
+  var min = Infinity, max = -Infinity, recortada = false;
+  if (todos.length){
+    todos.sort(function(a,b){ return a-b; });
+    var lo = todos[Math.floor(todos.length*0.02)];
+    var hi = todos[Math.ceil(todos.length*0.98) - 1];
+    recortada = (lo > todos[0] || hi < todos[todos.length-1]);
+    min = lo; max = hi;
+    if (min === max){ min = todos[0]; max = todos[todos.length-1]; recortada = false; }
+  }
   if (min === Infinity){                     // la variable no tiene ni un dato
     document.getElementById('h-mapname').textContent = o.etiqueta + ' · ' + m.nombre + '  (sin datos)';
     document.getElementById('h-min').textContent = '—';
@@ -806,7 +822,7 @@ function dibujarMapa(){
   var comun = orig.length > 1;
   document.getElementById('h-min').textContent = formatear(min, campo)+' '+m.unidad;
   document.getElementById('h-max').textContent = formatear(max, campo)+' '+m.unidad +
-    (comun ? '  (escala común)' : '');
+    (comun ? '  (escala común)' : '') + (recortada ? '  · p2–p98' : '');
 
   var paradas = [];
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
