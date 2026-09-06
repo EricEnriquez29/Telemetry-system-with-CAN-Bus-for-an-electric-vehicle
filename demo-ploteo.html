@@ -899,12 +899,16 @@ function avisarComparacionDudosa(orig, ejeX){
                 'distintos del circuito. Para comparar, usa <b>Posición en la pista</b>.');
   }
 
-  if (orig.length > 1 && (ejeX === 'd_vuelta' || ejeX === 't_vuelta')){
+  // El aviso vale para los tres ejes de recorrido, incluida la posicion en la
+  // pista: en una sesion se encadena vuelta tras vuelta, asi que una vuelta
+  // suelta solo coincide con la PRIMERA vuelta de la sesion y a partir de ahi
+  // se queda sin datos, aunque la grafica siga dibujando la sesion.
+  if (orig.length > 1 && esEjeDeRecorrido(ejeX)){
     var completas = orig.filter(function(o){ return o.alcance === 'all'; }).length;
     if (completas > 0 && completas < orig.length){
       avisos.push('<b>Alcances mezclados.</b> Se están comparando vueltas sueltas con sesiones completas: ' +
                   'en una vuelta el eje cuenta desde su cruce de meta, y en una sesión se acumula sobre todas las vueltas. ' +
-                  'Los valores no son equivalentes.');
+                  'La vuelta suelta solo coincide con la primera vuelta de la sesión; más allá, la tabla marca «sin dato».');
     }
   }
 
