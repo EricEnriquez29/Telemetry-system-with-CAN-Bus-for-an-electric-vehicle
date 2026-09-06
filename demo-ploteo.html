@@ -202,25 +202,28 @@
 // falsea los promedios y colorea el mapa con un valor que nunca ocurrió.
 // Solo se declara donde el mínimo es indiscutible: la corriente del paquete y
 // las fuerzas G sí pueden ser negativas, así que se dejan sin filtro.
+// `dec` son los decimales con los que tiene sentido leer cada variable. La
+// base devuelve flotantes crudos —42.199999999999996 km/h— y mostrarlos tal
+// cual llena la tabla de dígitos que no significan nada.
 var VARIABLES = [
-  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h', min:0},
-  {id:'rpm',     nombre:'RPM',              unidad:'rpm',  min:0},
-  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W',    min:0},
-  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W',    min:0},
-  {id:'curr_p',  nombre:'Corriente pack',   unidad:'A'},
-  {id:'throttle',nombre:'Acelerador',       unidad:'%',    min:0},
-  {id:'brake',   nombre:'Freno',            unidad:'%',    min:0},
-  {id:'Gx',      nombre:'G longitudinal',   unidad:'G'},
-  {id:'Gy',      nombre:'G lateral',        unidad:'G'},
-  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh',   min:0},
-  {id:'eta',     nombre:'Eficiencia motor', unidad:'%',    min:0},
-  {id:'soc',     nombre:'SOC',              unidad:'%',    min:0}
+  {id:'speed_v', nombre:'Velocidad',        unidad:'km/h', min:0, dec:1},
+  {id:'rpm',     nombre:'RPM',              unidad:'rpm',  min:0, dec:0},
+  {id:'p_hv',    nombre:'Potencia HV',      unidad:'W',    min:0, dec:0},
+  {id:'p_mec',   nombre:'Potencia mecánica',unidad:'W',    min:0, dec:0},
+  {id:'curr_p',  nombre:'Corriente pack',   unidad:'A',           dec:1},
+  {id:'throttle',nombre:'Acelerador',       unidad:'%',    min:0, dec:0},
+  {id:'brake',   nombre:'Freno',            unidad:'%',    min:0, dec:0},
+  {id:'Gx',      nombre:'G longitudinal',   unidad:'G',           dec:2},
+  {id:'Gy',      nombre:'G lateral',        unidad:'G',           dec:2},
+  {id:'E_HV',    nombre:'Energía consumida',unidad:'Wh',   min:0, dec:2},
+  {id:'eta',     nombre:'Eficiencia motor', unidad:'%',    min:0, dec:1},
+  {id:'soc',     nombre:'SOC',              unidad:'%',    min:0, dec:1}
 ];
 // Nombres neutros a propósito: en una vuelta suelta son tiempo y distancia DE
 // LA VUELTA, pero en una sesión completa están acumulados sobre todas las
 // vueltas. Llamarlos "de vuelta" haría leer 193 s como si fuera una vuelta.
-var EJES_X = [{id:'t_vuelta',nombre:'Tiempo transcurrido',unidad:'s'},
-              {id:'d_vuelta',nombre:'Distancia recorrida',unidad:'km'}].concat(VARIABLES);
+var EJES_X = [{id:'t_vuelta',nombre:'Tiempo transcurrido',unidad:'s',dec:1},
+              {id:'d_vuelta',nombre:'Distancia recorrida',unidad:'km',dec:3}].concat(VARIABLES);
 
 var CENTRO = {lat:19.5042, lon:-99.1467};
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
@@ -380,9 +383,11 @@ var LAYOUT_BASE = {
 };
 // Con tres variables, el tercer eje tiene que apartarse: si se deja en 'left'
 // sin desplazar, se dibuja justo encima del primero y los dos rótulos se pisan.
-function ejeY(k, etiqueta, color){
+function ejeY(k, etiqueta, color, campo){
+  var m = campo ? meta(campo) : {};
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
-           zerolinecolor:'#222', tickfont:{color:color}, fixedrange:true};
+           zerolinecolor:'#222', tickfont:{color:color}, fixedrange:true,
+           hoverformat: '.'+(m.dec !== undefined ? m.dec : 2)+'f'};
   if (k===1){ e.overlaying='y'; e.side='right'; }
   if (k===2){ e.overlaying='y'; e.side='left'; e.anchor='free'; e.position=0; }
   return e;
@@ -429,6 +434,12 @@ function valorValido(v){ return v !== null && v !== undefined && isFinite(v); }
 
 // Devuelve el valor, o null si no es medible: nulo, no numérico, o por debajo
 // del mínimo físico de esa variable (el -1 que el MGT usa como "sin dato").
+function formatear(v, campo){
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  var m = meta(campo);
+  return v.toFixed(m.dec !== undefined ? m.dec : 2);
+}
+
 function sano(punto, campo){
   if (!punto) return null;
   var v = punto[campo];
@@ -529,7 +540,7 @@ function redibujarVivo(){
   }
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k]);
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y);
   });
   Plotly.react('g-vivo', trazas, lay, CONFIG_VIVO);
 }
@@ -687,12 +698,13 @@ function redibujarHist(){
 
   var lay = JSON.parse(JSON.stringify(LAYOUT_BASE));
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
-               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
+               gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true,
+               hoverformat: '.'+(meta(ejeX).dec !== undefined ? meta(ejeX).dec : 2)+'f'};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
   // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0');
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y);
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
@@ -792,8 +804,8 @@ function dibujarMapa(){
     return;
   }
   var comun = orig.length > 1;
-  document.getElementById('h-min').textContent = min.toFixed(1)+' '+m.unidad;
-  document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad +
+  document.getElementById('h-min').textContent = formatear(min, campo)+' '+m.unidad;
+  document.getElementById('h-max').textContent = formatear(max, campo)+' '+m.unidad +
     (comun ? '  (escala común)' : '');
 
   var paradas = [];
@@ -886,7 +898,7 @@ function moverCursor(valorX, nTraza, idxPunto){
   function celda(o, campo){
     if (!o.punto) return '<td>—</td>';
     var v = sano(o.punto, campo);
-    return '<td>' + (v !== null ? v : '<span style="color:#555">sin dato</span>') + '</td>';
+    return '<td>' + (v !== null ? formatear(v, campo) : '<span style="color:#555">sin dato</span>') + '</td>';
   }
 
   ['t_vuelta','d_vuelta'].forEach(function(campo){
