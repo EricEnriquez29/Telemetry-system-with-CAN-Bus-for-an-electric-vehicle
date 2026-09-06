@@ -298,7 +298,13 @@ function datosVuelta(fecha, sesion, vuelta){
 // encadenarlos, o las vueltas se dibujan unas sobre otras en el mismo rango y
 // aparecen rectas espurias al saltar del final de una vuelta al inicio de la
 // siguiente.
+// Con caché, igual que las vueltas sueltas. Sin ella, cada movimiento del
+// cursor reconstruía las ~2000 muestras de la sesión entera —origenesActivos()
+// se llama en cada evento— y eso se notaba en el ratón.
+var CACHE_SESION = {};
 function datosSesion(fecha, sesion){
+  var clave = fecha+'|'+sesion;
+  if (CACHE_SESION[clave]) return CACHE_SESION[clave];
   var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0;
   for (var v=1; v<=s.vueltas; v++){
     var lv = datosVuelta(fecha,sesion,v);
@@ -312,6 +318,7 @@ function datosSesion(fecha, sesion){
     despT += lv[lv.length-1].t_vuelta;
     despD += lv[lv.length-1].d_vuelta;
   }
+  CACHE_SESION[clave] = todo;
   return todo;
 }
 
@@ -571,8 +578,7 @@ function filaOrigen(i){
   div.innerHTML = '<div class="swatch" style="background:'+COLORES[i]+'"></div>' +
                   '<select class="o-dia"></select>' +
                   '<select class="o-sesion"></select>' +
-                  '<select class="o-alcance"></select>' +
-                  (i===0 ? '<span class="ref-tag">ref</span>' : '<span></span>');
+                  '<select class="o-alcance"></select><span class="ref-slot"></span>';
 
   var selD = div.querySelector('.o-dia'),
       selS = div.querySelector('.o-sesion'),
@@ -619,7 +625,19 @@ function origenesActivos(){
       etiqueta: d.slice(5)+' S'+s+' '+(a==='all'?'completa':'V'+a),
       datos: a==='all' ? datosSesion(d,+s) : datosVuelta(d,+s,+a)});
   });
+  // La referencia es el primer origen ACTIVO. Atarla a la fila 0 dejaba la
+  // comparación sin referencia cuando esa fila estaba vacía: todas las trazas
+  // salían finas y atenuadas, y la etiqueta se quedaba en una fila sin datos.
+  res.forEach(function(o, k){ o.esRef = (k === 0); });
+  marcarFilaReferencia(res.length ? res[0].idx : -1);
   return res;
+}
+
+function marcarFilaReferencia(idxRef){
+  document.querySelectorAll('#h-origenes .origen-row').forEach(function(row, i){
+    var celda = row.querySelector('.ref-slot');
+    if (celda) celda.innerHTML = (i === idxRef) ? '<span class="ref-tag">ref</span>' : '';
+  });
 }
 
 // El selector del mapa solo ofrece las variables ya elegidas en Y
@@ -640,7 +658,7 @@ function sincronizarOrigenMapa(){
   var previo = sel.value;
   sel.innerHTML = '';
   if (!orig.length){ opcion(sel, '', '— sin orígenes —'); return; }
-  orig.forEach(function(o){ opcion(sel, String(o.idx), o.etiqueta + (o.idx===0 ? '  (ref)' : '')); });
+  orig.forEach(function(o){ opcion(sel, String(o.idx), o.etiqueta + (o.esRef ? '  (ref)' : '')); });
   var existe = orig.some(function(o){ return String(o.idx) === previo; });
   sel.value = existe ? previo : String(orig[0].idx);
 }
@@ -659,9 +677,9 @@ function redibujarHist(){
         y:o.datos.map(function(p){return sano(p, y);}),
         name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
-        marker:{size:o.idx===0?5:4, color:o.color, opacity:o.idx===0?0.9:0.55,
+        marker:{size:o.esRef?5:4, color:o.color, opacity:o.esRef?0.9:0.55,
                 symbol:SIMBOLOS[k]},
-        line:{width:o.idx===0?2.4:1.3, color:o.color, dash:DASHES[k]},
+        line:{width:o.esRef?2.4:1.3, color:o.color, dash:DASHES[k]},
         yaxis: k===0 ? 'y' : 'y'+(k+1)
       });
     });
