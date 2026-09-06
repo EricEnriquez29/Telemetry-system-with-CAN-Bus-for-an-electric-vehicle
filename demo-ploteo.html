@@ -439,16 +439,21 @@ function inicializarVivo(){
 
 function tickVivo(){
   if (!vivo.corriendo) return;
-  var p = vivo.datos[vivo.i];
-  vivo.buffer.push(p);
-  var limite = p.t_vuelta - VENTANA_S;
-  while (vivo.buffer.length && vivo.buffer[0].t_vuelta < limite) vivo.buffer.shift();
-  vivo.i++;
+
+  // El cambio de vuelta se resuelve ANTES de dibujar. Si se hiciera después,
+  // quedaría un fotograma con el buffer vacío y la gráfica parpadearía en
+  // negro en cada cruce de meta.
   if (vivo.i >= vivo.datos.length){
     vivo.vuelta++;
     vivo.datos = datosVuelta('2026-08-19',1,((vivo.vuelta-1)%7)+1);
     vivo.i = 0; vivo.buffer = [];
   }
+
+  var p = vivo.datos[vivo.i];
+  vivo.buffer.push(p);
+  var limite = p.t_vuelta - VENTANA_S;
+  while (vivo.buffer.length && vivo.buffer[0].t_vuelta < limite) vivo.buffer.shift();
+  vivo.i++;
   document.getElementById('v-hint').textContent = 'vuelta '+vivo.vuelta+' · '+p.t_vuelta.toFixed(1)+' s';
   // El buffer se sigue llenando aunque no se vea, pero no tiene sentido
   // redibujar diez veces por segundo una gráfica que está en la pestaña oculta
@@ -475,10 +480,12 @@ function redibujarVivo(){
   lay.xaxis = {title:{text:meta(ejeX).nombre+' ['+meta(ejeX).unidad+']',font:{size:9}},
                gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:true};
   if (ejeX === 't_vuelta'){
-    // Ventana fija de 20 s: se mantiene estable aunque al inicio de la vuelta
-    // todavía no haya datos suficientes para llenarla
+    // Ventana fija de 20 s. Anclada en cero durante los primeros 20 s de cada
+    // vuelta: sin esa sujeción el eje arrancaba en −20 s, y un tiempo de vuelta
+    // negativo no significa nada.
     var ult = b[b.length-1].t_vuelta;
-    lay.xaxis.range = [ult - VENTANA_S, ult];
+    var ini = Math.max(0, ult - VENTANA_S);
+    lay.xaxis.range = [ini, ini + VENTANA_S];
   } else if (ejeX === 'd_vuelta'){
     // En distancia, la ventana la marca lo que realmente hay en el buffer: los
     // mismos 20 s cubren más o menos metros según la velocidad, así que un
@@ -719,10 +726,22 @@ function dibujarMapa(){
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre + (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas)' : '');
 
-  var vals = o.datos.map(function(p){return p[campo];});
-  var min = Math.min.apply(null,vals), max = Math.max.apply(null,vals);
+  // La escala se calcula sobre TODOS los orígenes activos, no solo el que se
+  // muestra. Si cada uno se normalizara consigo mismo, el mismo color
+  // significaría valores distintos y alternar entre orígenes en el mapa daría
+  // una comparación visual falsa.
+  var min = Infinity, max = -Infinity;
+  orig.forEach(function(x){
+    x.datos.forEach(function(p){
+      var v = p[campo];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    });
+  });
+  var comun = orig.length > 1;
   document.getElementById('h-min').textContent = min.toFixed(1)+' '+m.unidad;
-  document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad;
+  document.getElementById('h-max').textContent = max.toFixed(1)+' '+m.unidad +
+    (comun ? '  (escala común)' : '');
 
   var paradas = [];
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
