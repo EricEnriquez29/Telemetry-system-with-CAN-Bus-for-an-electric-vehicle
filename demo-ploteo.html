@@ -38,6 +38,12 @@
   button{cursor:pointer;}
   button:hover{border-color:var(--orange);color:var(--orange);}
 
+  .rango-fila{display:grid;grid-template-columns:1fr 62px 62px;gap:5px;align-items:center;margin-bottom:4px;}
+  .rango-fila span{font-size:9.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rango-fila input{background:#111;border:1px solid var(--border);border-radius:3px;color:var(--fg);
+    font-family:inherit;font-size:10.5px;padding:3px 5px;width:100%;}
+  .rango-fila input::placeholder{color:#555;}
+  .rango-nota{font-size:9px;color:#666;margin-top:2px;}
   .chk-list{background:#111;border:1px solid var(--border);border-radius:3px;padding:4px;max-height:132px;overflow-y:auto;min-width:190px;}
   .chk-item{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:2px;cursor:pointer;font-size:11px;}
   .chk-item:hover{background:#181818;}
@@ -159,11 +165,15 @@
       <div class="chk-list" id="h-y"></div>
       <div class="chk-cuenta" id="h-y-cuenta"></div>
     </div>
+    <div class="field">
+      <label>Rango de cada eje Y</label>
+      <div id="h-rangos"></div>
+    </div>
   </div>
 
   <div class="grid-hist">
     <div class="card">
-      <div class="card-title"><span>Gráfica</span><span class="hint">arrastra para ampliar · rueda para acercar · doble clic para volver</span></div>
+      <div class="card-title"><span>Gráfica</span><span class="hint">rueda para acercar · arrastra para moverte · doble clic para volver</span></div>
       <div id="h-aviso"></div>
       <div id="g-hist" style="height:470px;"></div>
     </div>
@@ -545,11 +555,12 @@ var LAYOUT_BASE = {
 // redibuja diez veces por segundo y cualquier zoom se perderia en el acto—,
 // pero en el histórico los datos no se mueven y ampliar una curva concreta es
 // justo lo que hace falta para analizar.
-function ejeY(k, etiqueta, color, campo, fijo){
+function ejeY(k, etiqueta, color, campo, fijo, rango){
   var m = campo ? meta(campo) : {};
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
            zerolinecolor:'#222', tickfont:{color:color}, fixedrange:(fijo !== false),
            hoverformat: '.'+(m.dec !== undefined ? m.dec : 2)+'f'};
+  if (rango){ e.range = rango.slice(); e.autorange = false; }
   if (k===1){ e.overlaying='y'; e.side='right'; }
   if (k===2){ e.overlaying='y'; e.side='left'; e.anchor='free'; e.position=0; }
   return e;
@@ -627,8 +638,8 @@ function escalaColor(f){
 var CONFIG_VIVO = {staticPlot:true, responsive:true};
 // Histórico: con zoom, y conservando el cursor. staticPlot desactivaría ambos
 // y con ellos la sincronización con el mapa, así que se configura a mano.
-// Doble clic devuelve la vista completa; no hay barra de herramientas porque
-// arrastrar, rueda y doble clic cubren todo lo que hace falta.
+// Rueda para acercar, arrastrar para moverse, doble clic para volver a la
+// vista completa. Sin barra de herramientas: eso lo cubre todo.
 var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:true, doubleClick:'reset'};
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -727,6 +738,7 @@ function inicializarHist(){
   llenarSelect(document.getElementById('h-x'), EJES_X, 's_pista');
   construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
     sincronizarSelectorMapa();
+    pintarRangosY();
     redibujarHist();
   });
   document.getElementById('h-x').onchange = redibujarHist;
@@ -749,6 +761,7 @@ function inicializarHist(){
   });
 
   sincronizarSelectorMapa();
+  pintarRangosY();
   redibujarHist();
 }
 
@@ -822,6 +835,50 @@ function marcarFilaReferencia(idxRef){
 }
 
 // El selector del mapa solo ofrece las variables ya elegidas en Y
+// Rango fijado a mano para cada variable. Vacío = automático.
+// Un pico aislado —200 A durante dos décimas— estira el eje hasta 200 y deja
+// los 50 A en que de verdad se mueve la señal aplastados contra el cero. Poner
+// el eje a mano devuelve la resolución donde hace falta; el pico se sale de la
+// gráfica, que es exactamente lo que se quiere en ese caso.
+var RANGO_Y = {};
+
+function pintarRangosY(){
+  var cont = document.getElementById('h-rangos');
+  var ys = marcadasDe(document.getElementById('h-y'));
+  if (!ys.length){ cont.innerHTML = '<div class="rango-nota">Elige variables.</div>'; return; }
+  cont.innerHTML = '';
+  ys.forEach(function(id){
+    var m = meta(id), r = RANGO_Y[id] || {};
+    var fila = document.createElement('div');
+    fila.className = 'rango-fila';
+    fila.innerHTML = '<span title="'+m.nombre+'">'+m.nombre+'</span>' +
+                     '<input type="number" placeholder="auto" data-id="'+id+'" data-cual="min"' +
+                     (r.min !== undefined && r.min !== null ? ' value="'+r.min+'"' : '') + '>' +
+                     '<input type="number" placeholder="auto" data-id="'+id+'" data-cual="max"' +
+                     (r.max !== undefined && r.max !== null ? ' value="'+r.max+'"' : '') + '>';
+    cont.appendChild(fila);
+  });
+  cont.insertAdjacentHTML('beforeend',
+    '<div class="rango-nota">Vacío = automático. Se aplican los dos o ninguno.</div>');
+  cont.querySelectorAll('input').forEach(function(inp){
+    inp.onchange = function(){
+      var id = inp.dataset.id;
+      if (!RANGO_Y[id]) RANGO_Y[id] = {};
+      var v = inp.value.trim();
+      RANGO_Y[id][inp.dataset.cual] = (v === '' || !isFinite(+v)) ? null : +v;
+      redibujarHist();
+    };
+  });
+}
+
+// Devuelve [min,max] solo si los dos están puestos y son distintos: medio rango
+// dejaría el otro extremo automático y la escala saltaría al mover el cursor.
+function rangoFijoDe(id){
+  var r = RANGO_Y[id];
+  if (!r || r.min === null || r.max === null || r.min === undefined || r.max === undefined) return null;
+  return (r.min < r.max) ? [r.min, r.max] : null;
+}
+
 function sincronizarSelectorMapa(){
   var sel = document.getElementById('h-mapvar');
   var ys = marcadasDe(document.getElementById('h-y'));
@@ -871,15 +928,17 @@ function redibujarHist(){
                gridcolor:'#1a1a1a', zerolinecolor:'#222', fixedrange:false,
                hoverformat: '.'+(meta(ejeX).dec !== undefined ? meta(ejeX).dec : 2)+'f'};
   lay.hovermode = dispersion ? 'closest' : 'x unified';
-  // Arrastrar amplía; el resto de la interacción la fija CONFIG_HIST
-  lay.dragmode = 'zoom';
+  // Arrastrar DESPLAZA la vista, no recorta. El rectángulo de selección de
+  // Plotly reencuadra los dos ejes a la vez y deja la escala del eje X en
+  // valores arbitrarios; con desplazamiento + rueda el zoom es el de siempre.
+  lay.dragmode = 'pan';
   // Al cambiar de variables o de orígenes se vuelve a la vista completa, que es
   // lo correcto: el zoom anterior estaba puesto sobre otros datos. Pero mover el
   // cursor NO redibuja, así que la ampliación aguanta mientras se lee la tabla.
   // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y, false);
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y, false, rangoFijoDe(y));
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
