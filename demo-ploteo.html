@@ -1421,11 +1421,7 @@ function dibujarMapa(){
   }
 
   var m = meta(campo);
-  // Una sesión completa recorre el mismo circuito varias veces, así que los
-  // trazados de todas las vueltas quedan encimados y solo se ve el último
   var nVueltas = o.alcance === 'all' ? buscaSesion(o.fecha, o.sesion).vueltas : 1;
-  document.getElementById('h-mapname').textContent =
-    o.etiqueta + ' · ' + m.nombre + (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas)' : '');
 
   // La escala se calcula sobre TODOS los orígenes activos, no solo el que se
   // muestra. Si cada uno se normalizara consigo mismo, el mismo color
@@ -1467,7 +1463,17 @@ function dibujarMapa(){
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
-  var huecosGps = 0, huecosValor = 0;
+  // En una sesión completa las vueltas caen físicamente en el mismo sitio: en el
+  // mapa no se pueden poner una detrás de otra como en la gráfica, donde el eje
+  // X va creciendo. Antes se dibujaban en orden y la última tapaba a las
+  // demás, así que lo que se veía era el mapa de la última vuelta con trozos
+  // de las otras asomando.
+  //
+  // Ahora se dibujan TODOS los tramos de la sesión, ordenados por valor de
+  // menor a mayor. Se pintan igual, pero el que queda arriba en cada punto es
+  // el más alto que se registró ahí en toda la sesión. Ninguna vuelta tapa a
+  // otra por ser la última: tapa la que tiene más que enseñar.
+  var huecosGps = 0, huecosValor = 0, tramos = [];
   for (var i=1;i<o.datos.length;i++){
     var a = o.datos[i-1], b = o.datos[i];
     // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el mapa
@@ -1475,16 +1481,23 @@ function dibujarMapa(){
     if (!coordValida(a) || !coordValida(b)){ huecosGps++; continue; }
     var vb = sano(b, campo);
     if (vb === null){ huecosValor++; continue; }
-    var f2 = max>min ? (vb-min)/(max-min) : 0.5;
-    capaTrazado.push(L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
-      {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
+    // El salto entre el final de una vuelta y el principio de la siguiente no
+    // es un tramo recorrido: uniría la meta consigo misma cruzando el circuito
+    if (a.n_vuelta !== undefined && b.n_vuelta !== undefined && a.n_vuelta !== b.n_vuelta) continue;
+    tramos.push({a:a, b:b, v:vb});
   }
+  tramos.sort(function(p, q){ return p.v - q.v; });
+  tramos.forEach(function(t){
+    var f2 = max>min ? (t.v-min)/(max-min) : 0.5;
+    capaTrazado.push(L.polyline([[t.a.lat,t.a.lon],[t.b.lat,t.b.lon]],
+      {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
+  });
   var faltantes = [];
   if (huecosGps) faltantes.push(huecosGps+' sin GPS');
   if (huecosValor) faltantes.push(huecosValor+' sin valor');
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
-    (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas)' : '') +
+    (nVueltas > 1 ? '  ('+nVueltas+' vueltas, arriba el valor más alto de cada punto)' : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
   var clave = o.fecha+'|'+o.sesion+'|'+o.alcance;
