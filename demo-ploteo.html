@@ -808,12 +808,53 @@ var LAYOUT_BASE = {
 // redibuja diez veces por segundo y cualquier zoom se perderia en el acto—,
 // pero en el histórico los datos no se mueven y ampliar una curva concreta es
 // justo lo que hace falta para analizar.
-function ejeY(k, etiqueta, color, campo, fijo, rango){
+// Marcas del eje Y con dos extra, en los extremos que la señal alcanzó de
+// verdad. Sin ellas hay que interpolar a ojo entre dos rayas: con divisiones de
+// diez en diez y una punta de 63.7 km/h, el eje dice 60 y 70 y el dato exacto no
+// aparece en ninguna parte.
+//
+// Se marcan los DOS extremos y no solo el alto, porque en una variable con
+// signo el pico está en el otro lado: la corriente de pack es negativa toda la
+// vuelta, y su máximo, −40 A, es el momento de menos demanda. El pico de
+// verdad, −120 A, es el mínimo.
+//
+// Una marca de extremo desplaza a la regular que le quede demasiado cerca, o se
+// solaparían las dos etiquetas y no se leería ninguna.
+function ticksConExtremos(lo, hi, vmin, vmax, dec){
+  var rango = hi - lo;
+  if (!(rango > 0)) return null;
+  var extra = [vmin, vmax].filter(function(v){ return v !== null && v !== undefined && isFinite(v); });
+  if (!extra.length) return null;
+  // Con la señal casi plana los dos extremos caen encima: sobra con uno
+  if (extra.length === 2 && Math.abs(extra[1] - extra[0]) < rango*0.05) extra = [extra[1]];
+
+  var crudo = rango/5;
+  var pot = Math.pow(10, Math.floor(Math.log10(crudo)));
+  var mult = 10;
+  [1, 2, 2.5, 5, 10].some(function(x){ if (crudo <= pot*x){ mult = x; return true; } return false; });
+  var paso = pot*mult;
+  var vals = [];
+  for (var t = Math.ceil(lo/paso)*paso; t <= hi + paso*1e-6; t += paso) vals.push(+t.toFixed(10));
+  vals = vals.filter(function(t){
+    return extra.every(function(v){ return Math.abs(t - v) > rango*0.05; });
+  });
+  vals = vals.concat(extra);
+  vals.sort(function(a, b){ return a - b; });
+  var d = (dec !== undefined) ? dec : 2;
+  return {tickvals: vals, ticktext: vals.map(function(t){ return t.toFixed(d); })};
+}
+
+function ejeY(k, etiqueta, color, campo, fijo, rango, vmin, vmax){
   var m = campo ? meta(campo) : {};
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
            zerolinecolor:'#222', tickfont:{color:color}, fixedrange:(fijo !== false),
            hoverformat: '.'+(m.dec !== undefined ? m.dec : 2)+'f'};
   if (rango){ e.range = rango.slice(); e.autorange = false; }
+  if (vmax !== undefined && vmax !== null && isFinite(vmax)){
+    var lo = rango ? rango[0] : vmin, hi = rango ? rango[1] : vmax;
+    var tk = ticksConExtremos(lo, hi, vmin, vmax, m.dec);
+    if (tk){ e.tickmode = 'array'; e.tickvals = tk.tickvals; e.ticktext = tk.ticktext; }
+  }
   if (k===1){ e.overlaying='y'; e.side='right'; }
   if (k===2){ e.overlaying='y'; e.side='left'; e.anchor='free'; e.position=0; }
   return e;
@@ -1008,7 +1049,9 @@ function redibujarVivo(){
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   var rangos = cerosAlineados(b, ys);
   ys.forEach(function(y,k){
-    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k], y, false, rangos[k]);
+    var ex = extremosDe([b], y);
+    lay[k===0 ? 'yaxis' : 'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', COLORES[k],
+      y, false, rangos[k], ex && ex.min, ex && ex.max);
   });
   // La vista que puso el usuario manda sobre la ventana deslizante y sobre el
   // autoescalado, hasta que la suelte con doble clic
@@ -1190,6 +1233,21 @@ function cerosAlineados(datos, campos){
   });
 }
 
+// Mínimo y máximo de una variable sobre todos los orígenes que comparten su eje
+function extremosDe(origenes, campo){
+  var mn = Infinity, mx = -Infinity;
+  origenes.forEach(function(o){
+    var datos = o.datos || o;
+    for (var i=0;i<datos.length;i++){
+      var v = sano(datos[i], campo);
+      if (v === null) continue;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+  });
+  return (mn === Infinity) ? null : {min:mn, max:mx};
+}
+
 // Rango fijado a mano para cada variable. Vacío = automático.
 // Un pico aislado —200 A durante dos décimas— estira el eje hasta 200 y deja
 // los 50 A en que de verdad se mueve la señal aplastados contra el cero. Poner
@@ -1342,7 +1400,9 @@ function redibujarHist(){
   // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
   if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
   ys.forEach(function(y,k){
-    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0', y, false, rangoFijoDe(y));
+    var ex = extremosDe(orig, y);
+    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0',
+      y, false, rangoFijoDe(y), ex && ex.min, ex && ex.max);
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
