@@ -167,10 +167,7 @@
       <label>Variables en Y</label>
       <div class="chk-list" id="h-y"></div>
       <div class="chk-cuenta" id="h-y-cuenta"></div>
-    </div>
-    <div class="field">
-      <label>Rango de cada eje Y</label>
-      <div id="h-rangos"></div>
+
     </div>
   </div>
 
@@ -179,7 +176,7 @@
       <div class="card-title"><span>Gráfica</span><span class="hint">rueda para acercar · arrastra para moverte · doble clic para volver</span></div>
       <div id="h-aviso"></div>
       <div id="h-refinfo" class="ref-info"></div>
-      <div id="g-hist" style="height:470px;"></div>
+      <div id="g-hist" style="height:620px;"></div>
     </div>
 
     <div>
@@ -844,6 +841,16 @@ function ticksConExtremos(lo, hi, vmin, vmax, dec){
   return {tickvals: vals, ticktext: vals.map(function(t){ return t.toFixed(d); })};
 }
 
+// Nombre del eje de la franja k, contando desde arriba. Plotly numera los ejes
+// de abajo hacia arriba, así que la franja de arriba es el eje de mayor índice.
+function ejeDeFranja(k){ return k === 0 ? 'y' : 'y' + (k+1); }
+// Alto que ocupa cada franja, con un hueco entre ellas para que no se toquen
+function dominioFranja(k, total){
+  var hueco = 0.06, alto = (1 - hueco*(total-1)) / total;
+  var arriba = 1 - k*(alto + hueco);
+  return [+(arriba - alto).toFixed(4), +arriba.toFixed(4)];
+}
+
 function ejeY(k, etiqueta, color, campo, fijo, rango, vmin, vmax){
   var m = campo ? meta(campo) : {};
   var e = {title:{text:etiqueta,font:{size:9,color:color}}, gridcolor:'#1a1a1a',
@@ -1069,6 +1076,17 @@ function redibujarVivo(){
 //  HISTÓRICO
 // ═══════════════════════════════════════════════════════════════════════
 var mapa, capaTrazado = [], marcadorCursor = null, ultimoAjuste = '';
+// Ancho del coche. La traza se dibuja con ese grosor REAL, no con un número de
+// píxeles: así lo que se ve en el mapa es la huella que deja el coche, y dos
+// vueltas se pisan cuando de verdad pasaron por el mismo asfalto, no porque la
+// línea de dibujo sea más ancha que la separación entre ellas.
+var ANCHO_COCHE_M = 1.5;
+function grosorPx(){
+  if (!mapa) return 3;
+  var lat = mapa.getCenter().lat;
+  var mPorPx = 156543.03392 * Math.cos(lat*Math.PI/180) / Math.pow(2, mapa.getZoom());
+  return Math.max(1, ANCHO_COCHE_M / mPorPx);
+}
 // Orígenes ya evaluados contra la regla de medir, tal como se dibujaron
 var ORIGENES = [];
 
@@ -1079,7 +1097,6 @@ function inicializarHist(){
   llenarSelect(document.getElementById('h-x'), EJES_X, 's_pista');
   construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
     sincronizarSelectorMapa();
-    pintarRangosY();
     redibujarHist();
   });
   document.getElementById('h-x').onchange = redibujarHist;
@@ -1106,7 +1123,6 @@ function inicializarHist(){
   });
 
   sincronizarSelectorMapa();
-  pintarRangosY();
   redibujarHist();
 }
 
@@ -1248,51 +1264,6 @@ function extremosDe(origenes, campo){
   return (mn === Infinity) ? null : {min:mn, max:mx};
 }
 
-// Rango fijado a mano para cada variable. Vacío = automático.
-// Un pico aislado —200 A durante dos décimas— estira el eje hasta 200 y deja
-// los 50 A en que de verdad se mueve la señal aplastados contra el cero. Poner
-// el eje a mano devuelve la resolución donde hace falta; el pico se sale de la
-// gráfica, que es exactamente lo que se quiere en ese caso.
-var RANGO_Y = {};
-
-function pintarRangosY(){
-  var cont = document.getElementById('h-rangos');
-  var ys = marcadasDe(document.getElementById('h-y'));
-  var almacen = RANGO_Y;
-  if (!ys.length){ cont.innerHTML = '<div class="rango-nota">Elige variables.</div>'; return; }
-  cont.innerHTML = '';
-  ys.forEach(function(id){
-    var m = meta(id), r = almacen[id] || {};
-    var fila = document.createElement('div');
-    fila.className = 'rango-fila';
-    fila.innerHTML = '<span title="'+m.nombre+'">'+m.nombre+'</span>' +
-                     '<input type="number" placeholder="auto" data-id="'+id+'" data-cual="min"' +
-                     (r.min !== undefined && r.min !== null ? ' value="'+r.min+'"' : '') + '>' +
-                     '<input type="number" placeholder="auto" data-id="'+id+'" data-cual="max"' +
-                     (r.max !== undefined && r.max !== null ? ' value="'+r.max+'"' : '') + '>';
-    cont.appendChild(fila);
-  });
-  cont.insertAdjacentHTML('beforeend',
-    '<div class="rango-nota">Vacío = automático. Se aplican los dos o ninguno.</div>');
-  cont.querySelectorAll('input').forEach(function(inp){
-    inp.onchange = function(){
-      var id = inp.dataset.id;
-      if (!almacen[id]) almacen[id] = {};
-      var v = inp.value.trim();
-      almacen[id][inp.dataset.cual] = (v === '' || !isFinite(+v)) ? null : +v;
-      redibujarHist();
-    };
-  });
-}
-
-// Devuelve [min,max] solo si los dos están puestos y son distintos: medio rango
-// dejaría el otro extremo automático y la escala saltaría al mover el cursor.
-function rangoFijoDe(id){
-  var r = RANGO_Y[id];
-  if (!r || r.min === null || r.max === null || r.min === undefined || r.max === undefined) return null;
-  return (r.min < r.max) ? [r.min, r.max] : null;
-}
-
 function sincronizarSelectorMapa(){
   var sel = document.getElementById('h-mapvar');
   var ys = marcadasDe(document.getElementById('h-y'));
@@ -1369,18 +1340,28 @@ function redibujarHist(){
   var ejeX = selX.value;
   var dispersion = !esEjeDeRecorrido(ejeX);
 
+  // Cada señal en su propia franja, apiladas y compartiendo el eje X. Antes iban
+  // superpuestas en tres ejes Y sobre el mismo dibujo, y con tres variables la
+  // maraña no dejaba leer ninguna. Separadas, cada una tiene toda su altura.
+  //
+  // Con una franja por variable, el color puede identificar al ORIGEN y ya no
+  // hacen falta trazos punteados para distinguir variables: dentro de una franja
+  // solo hay una variable, y lo que se compara son las vueltas.
   var trazas = [];
-  orig.forEach(function(o){
+  orig.forEach(function(o, io_){
     ys.forEach(function(y,k){
       trazas.push({
         x:o.datos.map(function(_, i){ return valorEjeX(o, i, ejeX); }),
         y:o.datos.map(function(p){ return sano(p, y); }),
-        name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
+        name:o.etiqueta, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
-        marker:{size:o.esRef?5:4, color:o.color, opacity:o.esRef?0.9:0.55,
-                symbol:SIMBOLOS[k]},
-        line:{width:o.esRef?2.4:1.3, color:o.color, dash:DASHES[k]},
-        yaxis: k===0 ? 'y' : 'y'+(k+1)
+        marker:{size:o.esRef?4:3, color:o.color, opacity:0.9},
+        line:{width:o.esRef?2:1.5, color:o.color},
+        yaxis: ejeDeFranja(k),
+        legendgroup: o.etiqueta,
+        // Una entrada de leyenda por origen, no una por origen y variable: con
+        // tres de cada saldrian nueve para tres colores
+        showlegend: k === 0
       });
     });
   });
@@ -1397,13 +1378,25 @@ function redibujarHist(){
   // Al cambiar de variables o de orígenes se vuelve a la vista completa, que es
   // lo correcto: el zoom anterior estaba puesto sobre otros datos. Pero mover el
   // cursor NO redibuja, así que la ampliación aguanta mientras se lee la tabla.
-  // Con un tercer eje Y hay que estrechar el area de dibujo para que quepa
-  if (ys.length >= 3) lay.xaxis.domain = [0.085, 1];
+  lay.annotations = [];
   ys.forEach(function(y,k){
     var ex = extremosDe(orig, y);
-    lay[k===0?'yaxis':'yaxis'+(k+1)] = ejeY(k, meta(y).nombre+' ['+meta(y).unidad+']', '#b0b0b0',
-      y, false, rangoFijoDe(y), ex && ex.min, ex && ex.max);
+    var e = ejeY(k, '', '#b0b0b0', y, false, null, ex && ex.min, ex && ex.max);
+    e.domain = dominioFranja(k, ys.length);
+    e.anchor = 'x';
+    delete e.overlaying; delete e.side; delete e.position;
+    lay[ejeDeFranja(k).replace('y', 'yaxis').replace('yaxis', 'yaxis')] = e;
+    // El nombre va pegado a su franja: yref al dominio del eje, así que sube y
+    // baja con ella y se queda donde esté la señal aunque se desplace la vista
+    lay.annotations.push({
+      text: meta(y).nombre + '  [' + meta(y).unidad + ']',
+      xref:'paper', x:0.004, xanchor:'left',
+      yref: ejeDeFranja(k) + ' domain', y:1, yanchor:'top',
+      showarrow:false, font:{size:10, color:'#d8d8d8'},
+      bgcolor:'rgba(13,13,13,0.75)', borderpad:3
+    });
   });
+  lay.margin = {l:56, r:16, t:10, b:42};
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
   avisarComparacionDudosa(orig, ejeX, bloqueados);
@@ -1584,7 +1577,7 @@ function dibujarMapa(){
   tramos.forEach(function(t){
     var f2 = max>min ? (t.v-min)/(max-min) : 0.5;
     capaTrazado.push(L.polyline([[t.a.lat,t.a.lon],[t.b.lat,t.b.lon]],
-      {color:escalaColor(f2), weight:5, opacity:0.95}).addTo(mapa));
+      {color:escalaColor(f2), weight:grosorPx(), opacity:0.95}).addTo(mapa));
   });
   var faltantes = [];
   if (huecosGps) faltantes.push(huecosGps+' sin GPS');
