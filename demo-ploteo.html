@@ -262,102 +262,152 @@ function esEjeDeRecorrido(id){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  LA PISTA
-//  Contorno real del kartódromo, en [lon, lat]. Antes era una elipse
-//  paramétrica; con la geometría de verdad el demo prueba lo que importa —que
-//  la posición en la pista aguanta un trazado que se dobla sobre sí mismo— en
-//  vez de una forma cómoda inventada para que funcione.
+//  LAS PISTAS
+//
+//  Dos sitios reales y distintos: el kartódromo, con su contorno tal cual, y
+//  un circuito de conos en la explanada de UPIITA. Están a 475 km uno del
+//  otro, que es justo el caso que el análisis tiene que saber rechazar.
+//
+//  `meta` es la línea de meta, los dos puntos que el equipo marca al llegar.
+//  En el sistema real ya se manda por HTTP y vive en el backend; aquí va con
+//  cada pista, que es como llegaría al Frontend si se etiquetara con ella
+//  cada muestra guardada.
 // ═══════════════════════════════════════════════════════════════════════
-var TRAZADO = [
-  [-103.4836009,20.7368823],[-103.4836291,20.7368889],[-103.4836644,20.7368955],[-103.4837104,20.7368955],[-103.4837633,20.7369054],[-103.4837986,20.7369186],
-  [-103.4838234,20.7369186],[-103.4838622,20.7369285],[-103.4839902,20.7369351],[-103.4840679,20.7369517],[-103.4841138,20.7369616],[-103.4841597,20.7369649],
-  [-103.4842374,20.7369781],[-103.4843433,20.7370012],[-103.4844669,20.7370078],[-103.4845270,20.7370210],[-103.4846011,20.7370309],[-103.4846612,20.7370474],
-  [-103.4847389,20.7370507],[-103.4847812,20.7370540],[-103.4848625,20.7370606],[-103.4848942,20.7370772],[-103.4849437,20.7370772],[-103.4849861,20.7370639],
-  [-103.4850179,20.7370408],[-103.4850214,20.7370144],[-103.4850143,20.7369682],[-103.4850037,20.7369318],[-103.4849896,20.7369054],[-103.4849508,20.7368889],
-  [-103.4849331,20.7368658],[-103.4848942,20.7368427],[-103.4848448,20.7368129],[-103.4848024,20.7367931],[-103.4847495,20.7367898],[-103.4846824,20.7367898],
-  [-103.4846400,20.7367997],[-103.4845905,20.7368063],[-103.4845340,20.7368096],[-103.4844740,20.7368129],[-103.4844316,20.7368129],[-103.4843963,20.7368129],
-  [-103.4843221,20.7368195],[-103.4842444,20.7368328],[-103.4842021,20.7368261],[-103.4841667,20.7368030],[-103.4841102,20.7368030],[-103.4840890,20.7367898],
-  [-103.4840608,20.7367832],[-103.4840396,20.7367766],[-103.4840008,20.7367667],[-103.4839478,20.7367568],[-103.4839513,20.7367370],[-103.4839690,20.7367039],
-  [-103.4839725,20.7366016],[-103.4839407,20.7365784],[-103.4839019,20.7365619],[-103.4838524,20.7365322],[-103.4837959,20.7364992],[-103.4837853,20.7364628],
-  [-103.4837747,20.7364133],[-103.4838065,20.7363869],[-103.4838630,20.7363737],[-103.4839443,20.7363704],[-103.4839902,20.7363704],[-103.4840467,20.7363671],
-  [-103.4841138,20.7363869],[-103.4841738,20.7363869],[-103.4842338,20.7363869],[-103.4843045,20.7363869],[-103.4843786,20.7364265],[-103.4844281,20.7364628],
-  [-103.4844669,20.7364893],[-103.4845446,20.7365223],[-103.4846153,20.7365421],[-103.4846788,20.7365553],[-103.4847495,20.7365784],[-103.4848201,20.7365950],
-  [-103.4848711,20.7366094],[-103.4849366,20.7366150],[-103.4850199,20.7366539],[-103.4850378,20.7366539],[-103.4851040,20.7366314],[-103.4851370,20.7366172],
-  [-103.4851549,20.7365875],[-103.4851589,20.7365763],[-103.4851649,20.7365503],[-103.4851649,20.7365242],[-103.4851649,20.7364926],[-103.4851609,20.7364610],
-  [-103.4851370,20.7364350],[-103.4851132,20.7364220],[-103.4850774,20.7364090],[-103.4850416,20.7363941],[-103.4850098,20.7363848],[-103.4849859,20.7363718],
-  [-103.4849621,20.7363606],[-103.4849263,20.7363532],[-103.4848905,20.7363365],[-103.4848428,20.7363197],[-103.4847792,20.7362881],[-103.4847275,20.7362695],
-  [-103.4846778,20.7362547],[-103.4846400,20.7362435],[-103.4846082,20.7362342],[-103.4845824,20.7362175],[-103.4845486,20.7362119],[-103.4845207,20.7361933],
-  [-103.4844909,20.7361821],[-103.4844094,20.7361561],[-103.4843405,20.7361400],[-103.4842485,20.7360916],[-103.4840875,20.7360432],[-103.4839380,20.7359841],
-  [-103.4838747,20.7359680],[-103.4837942,20.7359411],[-103.4837310,20.7359411],[-103.4836792,20.7359411],[-103.4835757,20.7359733],[-103.4835297,20.7359733],
-  [-103.4834837,20.7360271],[-103.4834090,20.7360809],[-103.4833687,20.7361562],[-103.4832910,20.7362854],[-103.4832335,20.7363768],[-103.4831703,20.7364413],
-  [-103.4831243,20.7365059],[-103.4830840,20.7365758],[-103.4830668,20.7366242],[-103.4830093,20.7366994],[-103.4829863,20.7367855],[-103.4829288,20.7368823],
-  [-103.4829058,20.7369576],[-103.4828943,20.7370382],[-103.4828943,20.7371243],[-103.4829403,20.7372049],[-103.4829863,20.7372264],[-103.4830553,20.7372426],
-  [-103.4831358,20.7372695],[-103.4831990,20.7372695],[-103.4832565,20.7372695],[-103.4832738,20.7372211],[-103.4832968,20.7371781],[-103.4833025,20.7371081],
-  [-103.4833140,20.7370597],[-103.4833313,20.7370113],[-103.4833370,20.7369522],[-103.4833600,20.7368930],[-103.4833715,20.7368554],[-103.4834233,20.7368500],
-  [-103.4834808,20.7368500],[-103.4835383,20.7368500],[-103.4835613,20.7368715],[-103.4836073,20.7368715]
-];
+var TRAZADOS = {
+  kart: {
+    nombre: 'Kartódromo',
+    meta: [[-103.4836070,20.7368378],[-103.4835948,20.7369268]],
+    puntos: [
+    [-103.4836009,20.7368823],[-103.4836291,20.7368889],[-103.4836644,20.7368955],[-103.4837104,20.7368955],[-103.4837633,20.7369054],[-103.4837986,20.7369186],
+    [-103.4838234,20.7369186],[-103.4838622,20.7369285],[-103.4839902,20.7369351],[-103.4840679,20.7369517],[-103.4841138,20.7369616],[-103.4841597,20.7369649],
+    [-103.4842374,20.7369781],[-103.4843433,20.7370012],[-103.4844669,20.7370078],[-103.4845270,20.7370210],[-103.4846011,20.7370309],[-103.4846612,20.7370474],
+    [-103.4847389,20.7370507],[-103.4847812,20.7370540],[-103.4848625,20.7370606],[-103.4848942,20.7370772],[-103.4849437,20.7370772],[-103.4849861,20.7370639],
+    [-103.4850179,20.7370408],[-103.4850214,20.7370144],[-103.4850143,20.7369682],[-103.4850037,20.7369318],[-103.4849896,20.7369054],[-103.4849508,20.7368889],
+    [-103.4849331,20.7368658],[-103.4848942,20.7368427],[-103.4848448,20.7368129],[-103.4848024,20.7367931],[-103.4847495,20.7367898],[-103.4846824,20.7367898],
+    [-103.4846400,20.7367997],[-103.4845905,20.7368063],[-103.4845340,20.7368096],[-103.4844740,20.7368129],[-103.4844316,20.7368129],[-103.4843963,20.7368129],
+    [-103.4843221,20.7368195],[-103.4842444,20.7368328],[-103.4842021,20.7368261],[-103.4841667,20.7368030],[-103.4841102,20.7368030],[-103.4840890,20.7367898],
+    [-103.4840608,20.7367832],[-103.4840396,20.7367766],[-103.4840008,20.7367667],[-103.4839478,20.7367568],[-103.4839513,20.7367370],[-103.4839690,20.7367039],
+    [-103.4839725,20.7366016],[-103.4839407,20.7365784],[-103.4839019,20.7365619],[-103.4838524,20.7365322],[-103.4837959,20.7364992],[-103.4837853,20.7364628],
+    [-103.4837747,20.7364133],[-103.4838065,20.7363869],[-103.4838630,20.7363737],[-103.4839443,20.7363704],[-103.4839902,20.7363704],[-103.4840467,20.7363671],
+    [-103.4841138,20.7363869],[-103.4841738,20.7363869],[-103.4842338,20.7363869],[-103.4843045,20.7363869],[-103.4843786,20.7364265],[-103.4844281,20.7364628],
+    [-103.4844669,20.7364893],[-103.4845446,20.7365223],[-103.4846153,20.7365421],[-103.4846788,20.7365553],[-103.4847495,20.7365784],[-103.4848201,20.7365950],
+    [-103.4848711,20.7366094],[-103.4849366,20.7366150],[-103.4850199,20.7366539],[-103.4850378,20.7366539],[-103.4851040,20.7366314],[-103.4851370,20.7366172],
+    [-103.4851549,20.7365875],[-103.4851589,20.7365763],[-103.4851649,20.7365503],[-103.4851649,20.7365242],[-103.4851649,20.7364926],[-103.4851609,20.7364610],
+    [-103.4851370,20.7364350],[-103.4851132,20.7364220],[-103.4850774,20.7364090],[-103.4850416,20.7363941],[-103.4850098,20.7363848],[-103.4849859,20.7363718],
+    [-103.4849621,20.7363606],[-103.4849263,20.7363532],[-103.4848905,20.7363365],[-103.4848428,20.7363197],[-103.4847792,20.7362881],[-103.4847275,20.7362695],
+    [-103.4846778,20.7362547],[-103.4846400,20.7362435],[-103.4846082,20.7362342],[-103.4845824,20.7362175],[-103.4845486,20.7362119],[-103.4845207,20.7361933],
+    [-103.4844909,20.7361821],[-103.4844094,20.7361561],[-103.4843405,20.7361400],[-103.4842485,20.7360916],[-103.4840875,20.7360432],[-103.4839380,20.7359841],
+    [-103.4838747,20.7359680],[-103.4837942,20.7359411],[-103.4837310,20.7359411],[-103.4836792,20.7359411],[-103.4835757,20.7359733],[-103.4835297,20.7359733],
+    [-103.4834837,20.7360271],[-103.4834090,20.7360809],[-103.4833687,20.7361562],[-103.4832910,20.7362854],[-103.4832335,20.7363768],[-103.4831703,20.7364413],
+    [-103.4831243,20.7365059],[-103.4830840,20.7365758],[-103.4830668,20.7366242],[-103.4830093,20.7366994],[-103.4829863,20.7367855],[-103.4829288,20.7368823],
+    [-103.4829058,20.7369576],[-103.4828943,20.7370382],[-103.4828943,20.7371243],[-103.4829403,20.7372049],[-103.4829863,20.7372264],[-103.4830553,20.7372426],
+    [-103.4831358,20.7372695],[-103.4831990,20.7372695],[-103.4832565,20.7372695],[-103.4832738,20.7372211],[-103.4832968,20.7371781],[-103.4833025,20.7371081],
+    [-103.4833140,20.7370597],[-103.4833313,20.7370113],[-103.4833370,20.7369522],[-103.4833600,20.7368930],[-103.4833715,20.7368554],[-103.4834233,20.7368500],
+    [-103.4834808,20.7368500],[-103.4835383,20.7368500],[-103.4835613,20.7368715],[-103.4836073,20.7368715]
+    ]
+  },
+  upiita: {
+    nombre: 'Explanada UPIITA',
+    meta: [[-99.1265992,19.5115359],[-99.1266008,19.5114641]],
+    puntos: [
+  [-99.1266000,19.5115000],[-99.1265485,19.5114983],[-99.1264840,19.5114971],[-99.1264103,19.5114963],[-99.1263311,19.5114961],[-99.1262500,19.5114963],
+  [-99.1261708,19.5114971],[-99.1260972,19.5114983],[-99.1260329,19.5115000],[-99.1259766,19.5115019],[-99.1259240,19.5115038],[-99.1258748,19.5115060],
+  [-99.1258286,19.5115088],[-99.1257850,19.5115125],[-99.1257437,19.5115173],[-99.1257041,19.5115235],[-99.1256660,19.5115314],[-99.1256294,19.5115410],
+  [-99.1255947,19.5115520],[-99.1255621,19.5115642],[-99.1255316,19.5115776],[-99.1255032,19.5115922],[-99.1254772,19.5116077],[-99.1254536,19.5116242],
+  [-99.1254325,19.5116415],[-99.1254138,19.5116602],[-99.1253972,19.5116807],[-99.1253829,19.5117024],[-99.1253710,19.5117250],[-99.1253616,19.5117480],
+  [-99.1253547,19.5117708],[-99.1253506,19.5117931],[-99.1253491,19.5118144],[-99.1253506,19.5118355],[-99.1253547,19.5118570],[-99.1253616,19.5118787],
+  [-99.1253710,19.5118999],[-99.1253829,19.5119203],[-99.1253972,19.5119393],[-99.1254138,19.5119566],[-99.1254325,19.5119716],[-99.1254548,19.5119848],
+  [-99.1254811,19.5119969],[-99.1255106,19.5120076],[-99.1255420,19.5120168],[-99.1255743,19.5120243],[-99.1256065,19.5120298],[-99.1256374,19.5120333],
+  [-99.1256660,19.5120345],[-99.1256929,19.5120319],[-99.1257192,19.5120250],[-99.1257450,19.5120153],[-99.1257703,19.5120040],[-99.1257950,19.5119927],
+  [-99.1258193,19.5119825],[-99.1258430,19.5119751],[-99.1258662,19.5119716],[-99.1258886,19.5119718],[-99.1259102,19.5119742],[-99.1259311,19.5119785],
+  [-99.1259516,19.5119844],[-99.1259719,19.5119916],[-99.1259920,19.5120000],[-99.1260123,19.5120091],[-99.1260329,19.5120188],[-99.1260533,19.5120300],
+  [-99.1260731,19.5120433],[-99.1260926,19.5120582],[-99.1261122,19.5120738],[-99.1261323,19.5120894],[-99.1261533,19.5121043],[-99.1261757,19.5121176],
+  [-99.1261997,19.5121288],[-99.1262255,19.5121383],[-99.1262526,19.5121469],[-99.1262809,19.5121546],[-99.1263102,19.5121612],[-99.1263403,19.5121668],
+  [-99.1263709,19.5121712],[-99.1264020,19.5121743],[-99.1264332,19.5121760],[-99.1264655,19.5121765],[-99.1264995,19.5121759],[-99.1265345,19.5121741],
+  [-99.1265698,19.5121711],[-99.1266046,19.5121667],[-99.1266384,19.5121609],[-99.1266705,19.5121535],[-99.1267001,19.5121445],[-99.1267279,19.5121338],
+  [-99.1267549,19.5121212],[-99.1267808,19.5121070],[-99.1268054,19.5120915],[-99.1268282,19.5120747],[-99.1268490,19.5120568],[-99.1268676,19.5120381],
+  [-99.1268835,19.5120188],[-99.1268970,19.5119981],[-99.1269082,19.5119757],[-99.1269172,19.5119519],[-99.1269242,19.5119274],[-99.1269292,19.5119025],
+  [-99.1269324,19.5118777],[-99.1269338,19.5118534],[-99.1269336,19.5118301],[-99.1269313,19.5118074],[-99.1269267,19.5117847],[-99.1269200,19.5117621],
+  [-99.1269117,19.5117397],[-99.1269019,19.5117179],[-99.1268910,19.5116968],[-99.1268792,19.5116765],[-99.1268669,19.5116572],[-99.1268534,19.5116386],
+  [-99.1268382,19.5116202],[-99.1268217,19.5116024],[-99.1268043,19.5115855],[-99.1267864,19.5115696],[-99.1267683,19.5115551],[-99.1267506,19.5115423],
+  [-99.1267334,19.5115314],[-99.1267197,19.5115228],[-99.1267102,19.5115162],[-99.1267024,19.5115114],[-99.1266938,19.5115079],[-99.1266818,19.5115053],
+  [-99.1266638,19.5115034],[-99.1266374,19.5115018]
+    ]
+  }
+};
 
-var CENTRO = (function(){
-  var la=0, lo=0;
-  TRAZADO.forEach(function(p){ lo += p[0]; la += p[1]; });
-  return {lat: la/TRAZADO.length, lon: lo/TRAZADO.length};
-})();
-// Conversión grados→metros en el entorno de la pista. A escala de un
-// circuito la Tierra es plana y esta aproximación yerra centímetros, una
-// décima del error del propio GPS.
-var M_LAT = 111320, M_LON = 111320*Math.cos(CENTRO.lat*Math.PI/180);
-function aMetros(p){
-  return {x:(p.lon - CENTRO.lon)*M_LON, y:(p.lat - CENTRO.lat)*M_LAT};
+// Conversión grados→metros alrededor de un punto de referencia. A escala de un
+// circuito la Tierra es plana y esto yerra centímetros; con dos pistas a 475 km
+// la referencia no puede ser única, así que cada cálculo lleva la suya.
+var M_LAT = 111320;
+function mLon(lat){ return 111320*Math.cos(lat*Math.PI/180); }
+function aMetros(p, ref){
+  return {x:(p.lon - ref.lon)*mLon(ref.lat), y:(p.lat - ref.lat)*M_LAT};
+}
+function distanciaGeo(a, b){
+  var lm = (a.lat + b.lat)/2;
+  var dx = (a.lon - b.lon)*mLon(lm), dy = (a.lat - b.lat)*M_LAT;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function centroDe(linea){
+  return {lat:(linea[0][1]+linea[1][1])/2, lon:(linea[0][0]+linea[1][0])/2};
 }
 
-// Eje del circuito remuestreado a paso constante, con su curvatura. El
-// contorno viene con los puntos a distancias muy desiguales —de 1.3 a 17.6 m—
-// y sin remuestrear, la resolución de la pista cambiaría según la zona.
-var PISTA = (function(){
-  var pts = TRAZADO.map(function(p){ return aMetros({lon:p[0], lat:p[1]}); });
-  // Se cierra el circuito: el contorno termina cerca del inicio, no en él
-  pts.push({x:pts[0].x, y:pts[0].y});
+// Eje de cada circuito remuestreado a paso constante, con su curvatura. Los
+// contornos vienen con los puntos a distancias muy desiguales, y sin
+// remuestrear la resolución cambiaría según la zona.
+var PISTAS = (function(){
+  var res = {};
+  Object.keys(TRAZADOS).forEach(function(id){
+    var t = TRAZADOS[id];
+    var la=0, lo=0;
+    t.puntos.forEach(function(p){ lo += p[0]; la += p[1]; });
+    var centro = {lat: la/t.puntos.length, lon: lo/t.puntos.length};
 
-  var X=[pts[0].x], Y=[pts[0].y], S=[0], recorrido=0, resto=1.0;
-  for (var i=1;i<pts.length;i++){
-    var dx=pts[i].x-pts[i-1].x, dy=pts[i].y-pts[i-1].y;
-    var seg=Math.sqrt(dx*dx+dy*dy);
-    if (seg < 1e-9) continue;
-    var pos=0;
-    while (pos+resto <= seg){
-      pos += resto;
-      X.push(pts[i-1].x + dx*pos/seg);
-      Y.push(pts[i-1].y + dy*pos/seg);
-      S.push(recorrido+pos);
-      resto = 1.0;
+    var pts = t.puntos.map(function(p){ return aMetros({lon:p[0], lat:p[1]}, centro); });
+    pts.push({x:pts[0].x, y:pts[0].y});   // se cierra el circuito
+
+    var X=[pts[0].x], Y=[pts[0].y], recorrido=0, resto=1.0;
+    for (var i=1;i<pts.length;i++){
+      var dx=pts[i].x-pts[i-1].x, dy=pts[i].y-pts[i-1].y;
+      var seg=Math.sqrt(dx*dx+dy*dy);
+      if (seg < 1e-9) continue;
+      var pos=0;
+      while (pos+resto <= seg){
+        pos += resto;
+        X.push(pts[i-1].x + dx*pos/seg);
+        Y.push(pts[i-1].y + dy*pos/seg);
+        resto = 1.0;
+      }
+      resto -= (seg-pos);
+      recorrido += seg;
     }
-    resto -= (seg-pos);
-    recorrido += seg;
-  }
 
-  // Curvatura: cuánto gira la dirección por metro. Se mide sobre una base de
-  // ±6 m y luego se suaviza, porque el contorno está dibujado a mano y punto a
-  // punto el ángulo salta. Sin suavizar, el coche simulado frenaría por el
-  // ruido del dibujo en vez de por las curvas.
-  var n=X.length, K=new Array(n), b=6;
-  for (var i=0;i<n;i++){
-    var a=(i-b+n)%n, c=(i+b)%n;
-    var a1=Math.atan2(Y[i]-Y[a], X[i]-X[a]), a2=Math.atan2(Y[c]-Y[i], X[c]-X[i]);
-    var d=a2-a1;
-    while (d> Math.PI) d-=2*Math.PI;
-    while (d<-Math.PI) d+=2*Math.PI;
-    K[i]=Math.abs(d)/b;
-  }
-  var Ks=new Array(n), w=9;
-  for (var i=0;i<n;i++){
-    var acum=0;
-    for (var k=-w;k<=w;k++) acum += K[(i+k+n)%n];
-    Ks[i]=acum/(2*w+1);
-  }
-  var mx=Math.max.apply(null, Ks) || 1;
-  for (var i=0;i<n;i++) Ks[i] = Math.min(1, Ks[i]/mx*1.35);
+    // Curvatura: cuánto gira la dirección por metro, medida sobre ±6 m y
+    // suavizada. Sin suavizar, el coche simulado frenaría por el ruido del
+    // contorno en vez de por las curvas.
+    var n=X.length, K=new Array(n), b=6;
+    for (var i=0;i<n;i++){
+      var a=(i-b+n)%n, c=(i+b)%n;
+      var a1=Math.atan2(Y[i]-Y[a], X[i]-X[a]), a2=Math.atan2(Y[c]-Y[i], X[c]-X[i]);
+      var d=a2-a1;
+      while (d> Math.PI) d-=2*Math.PI;
+      while (d<-Math.PI) d+=2*Math.PI;
+      K[i]=Math.abs(d)/b;
+    }
+    var Ks=new Array(n), w=9;
+    for (var i=0;i<n;i++){
+      var acum=0;
+      for (var k=-w;k<=w;k++) acum += K[(i+k+n)%n];
+      Ks[i]=acum/(2*w+1);
+    }
+    var mx=Math.max.apply(null, Ks) || 1;
+    for (var i=0;i<n;i++) Ks[i] = Math.min(1, Ks[i]/mx*1.35);
 
-  return {X:X, Y:Y, S:S, K:Ks, largo:recorrido, n:n};
+    res[id] = {X:X, Y:Y, K:Ks, largo:recorrido, n:n, centro:centro,
+               meta:t.meta, nombre:t.nombre};
+  });
+  return res;
 })();
 
 var COLORES = ['#ef5e20','#3aa8bd','#a85cc0'];
@@ -371,47 +421,41 @@ var VENTANA_S = 20;
 function aleatorio(semilla){ var s=semilla; return function(){ s=(s*9301+49297)%233280; return s/233280; }; }
 
 // Posición sobre el eje del circuito, con u de 0 a 1. `desv` desplaza el punto
-// esos metros perpendicular a la pista, hacia un lado u otro: es lo que hace
-// que cada vuelta tenga su propia trazada y mida distinto.
-function puntoPista(u, desv, pista){
-  var n = PISTA.n;
+// esos metros perpendicular a la pista: es lo que hace que cada vuelta tenga su
+// propia trazada y mida distinto.
+function puntoPista(pista, u, desv){
+  var P = PISTAS[pista], n = P.n;
   var f = (((u % 1) + 1) % 1) * n;
   var i = Math.floor(f), t = f - i, j = (i+1) % n;
-  var x = PISTA.X[i] + (PISTA.X[j]-PISTA.X[i])*t;
-  var y = PISTA.Y[i] + (PISTA.Y[j]-PISTA.Y[i])*t;
-  if (pista) desv = (desv || 0) + deformacionDe(pista)(u);
+  var x = P.X[i] + (P.X[j]-P.X[i])*t;
+  var y = P.Y[i] + (P.Y[j]-P.Y[i])*t;
   if (desv){
-    // Base de ±4 m para la tangente. Con una base de 3 m, en las horquillas de
-    // 5 m de radio la cuerda giraba tanto entre muestra y muestra que la
-    // perpendicular temblaba, y el punto desplazado saltaba casi un metro de
-    // una muestra a la siguiente.
+    // Base de ±4 m para la tangente. Con una base más corta, en las horquillas
+    // la perpendicular temblaba y el punto desplazado saltaba casi un metro.
     var a = (i-4+n)%n, c = (i+5)%n;
-    var dx = PISTA.X[c]-PISTA.X[a], dy = PISTA.Y[c]-PISTA.Y[a];
+    var dx = P.X[c]-P.X[a], dy = P.Y[c]-P.Y[a];
     var L = Math.sqrt(dx*dx+dy*dy) || 1;
     x -= (dy/L)*desv;   // perpendicular: girar la tangente, no reflejarla
     y += (dx/L)*desv;
   }
-  return {lat: CENTRO.lat + y/M_LAT, lon: CENTRO.lon + x/M_LON};
+  return {lat: P.centro.lat + y/M_LAT, lon: P.centro.lon + x/mLon(P.centro.lat)};
 }
-function curvatura(u){
-  var f = (((u % 1) + 1) % 1) * PISTA.n;
-  return PISTA.K[Math.floor(f)];
+function curvatura(pista, u){
+  var P = PISTAS[pista];
+  return P.K[Math.floor((((u % 1) + 1) % 1) * P.n)];
 }
 function desvioDe(amp, fase){
   return function(u){ return amp*Math.sin(3*u*2*Math.PI + fase); };
 }
-// Metros de pista por unidad de u. El parámetro u NO avanza a ritmo constante
-// —la trazada tiene tramos más largos que otros para el mismo salto de u—, así
-// que repartir la velocidad a partes iguales de u haría que el coche recorriera
-// más o menos metros de los que marca su propio odómetro.
-function tasaArco(desvio, u, pista){
-  // La base tiene que ser mayor que el paso del eje remuestreado. Con 0.19 m
-  // se estaba derivando por debajo de la resolución de la propia pista, y en
-  // las horquillas el resultado se iba a la décima parte de su valor real: el
-  // coche simulado avanzaba treinta metros de golpe en una sola muestra.
-  var e = 2.5/PISTA.largo, u1 = Math.max(0, u-e), u2 = Math.min(1, u+e);
-  var a = aMetros(puntoPista(u1, desvio(u1), pista));
-  var b = aMetros(puntoPista(u2, desvio(u2), pista));
+// Metros de pista por unidad de u. El parámetro no avanza a ritmo constante,
+// así que repartir la velocidad a partes iguales de u haría que el coche
+// recorriera más o menos metros de los que marca su propio odómetro. La base
+// tiene que ser mayor que el paso del eje remuestreado.
+function tasaArco(pista, desvio, u){
+  var e = 2.5/PISTAS[pista].largo, u1 = Math.max(0, u-e), u2 = Math.min(1, u+e);
+  var ref = PISTAS[pista].centro;
+  var a = aMetros(puntoPista(pista, u1, desvio(u1)), ref);
+  var b = aMetros(puntoPista(pista, u2, desvio(u2)), ref);
   return Math.sqrt((b.x-a.x)*(b.x-a.x) + (b.y-a.y)*(b.y-a.y)) / (u2 - u1);
 }
 
@@ -419,27 +463,19 @@ function generarVuelta(semilla, nVuelta, pista){
   var rnd = aleatorio(semilla + nVuelta*137);
   var ritmo = 0.92 + rnd()*0.16, dt = 0.1;
   // Trazada propia: cada vuelta se abre y se cierra distinto, como en pista.
-  // La amplitud es la de un kart en un circuito estrecho —metro y medio largo,
-  // no cuatro—: con desviaciones del orden del radio de las horquillas, la
-  // proyección pierde precisión justo en el ápice, que es donde la trazada de
-  // referencia y la del coche dejan de ser paralelas.
+  // Metro y medio largo, que es lo que da un circuito estrecho.
   var ampLinea = 0.4 + rnd()*1.4, faseLinea = rnd()*2*Math.PI;
   var desvio = desvioDe(ampLinea, faseLinea);
-  // Antes la posición avanzaba a pasos iguales sin mirar la velocidad, así que
-  // el odómetro y el GPS describían recorridos distintos y abrirse en una curva
-  // no costaba ni un metro ni una décima. Ahora la velocidad empuja al coche
-  // por su propia línea: una trazada más abierta mide más y se tarda más en
-  // recorrerla, que es justo la deriva que el eje de posición en pista elimina.
   var pts = [], E = 0, d = 0, vAnt = 0, u = 0, i = 0;
   while (u < 1 && i < 20000){
-    var curv = curvatura(u);
+    var curv = curvatura(pista, u);
     var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
     var v = vAnt + (vObj - vAnt)*0.12;
     var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
     d += v*dt/3600;
-    var pos = puntoPista(u, desvio(u), pista);
-    u += (v*dt/3.6)/tasaArco(desvio, u, pista);
+    var pos = puntoPista(pista, u, desvio(u));
+    u += (v*dt/3.6)/tasaArco(pista, desvio, u);
     var thr = Math.max(0, Math.min(100, 50 + acc*22 + (rnd()-0.5)*6));
     var brk = acc < -0.6 ? Math.min(100, -acc*40) : 0;
     var pmec = Math.max(0, v*68 + acc*260);
@@ -460,30 +496,87 @@ function generarVuelta(semilla, nVuelta, pista){
   }
   return pts;
 }
+
+// `pista` es del SIMULADOR: hace las veces de la realidad, que es la que sabe
+// por dónde fue el coche. El análisis no la mira nunca. Solo usa el GPS y la
+// línea de meta, que es lo único que tendría el sistema real.
+var SESIONES = [
+  {fecha:'2026-07-03', sesion:1, semilla:1001, vueltas:5, pista:'kart'},
+  {fecha:'2026-07-03', sesion:2, semilla:2002, vueltas:5, pista:'kart'},
+  {fecha:'2026-07-03', sesion:3, semilla:3003, vueltas:5, pista:'kart'},
+  {fecha:'2026-08-19', sesion:1, semilla:4004, vueltas:5, pista:'upiita'},
+  {fecha:'2026-08-19', sesion:2, semilla:5005, vueltas:5, pista:'upiita'},
+  {fecha:'2026-08-19', sesion:3, semilla:6006, vueltas:5, pista:'upiita'}
+];
+
+function dias(){
+  var vistos = {}, res = [];
+  SESIONES.forEach(function(s){ if(!vistos[s.fecha]){ vistos[s.fecha]=1; res.push(s.fecha); } });
+  return res;
+}
+function sesionesDe(fecha){ return SESIONES.filter(function(s){return s.fecha===fecha;}); }
+function buscaSesion(fecha, sesion){ return SESIONES.find(function(s){return s.fecha===fecha && s.sesion===sesion;}); }
+// La línea de meta de una sesión: en el sistema real vendría etiquetada con
+// los datos, aquí sale de la pista donde se grabó.
+function metaDe(fecha, sesion){ return PISTAS[buscaSesion(fecha,sesion).pista].meta; }
+
+var CACHE = {};
+function datosVuelta(fecha, sesion, vuelta){
+  var k = fecha+'|'+sesion+'|'+vuelta;
+  if (!CACHE[k]){
+    var ses = buscaSesion(fecha, sesion);
+    CACHE[k] = generarVuelta(ses.semilla, vuelta, ses.pista);
+  }
+  return CACHE[k];
+}
+// En una sesión completa, tiempo y distancia se ACUMULAN a lo largo de todas
+// las vueltas. En la base ambos se reinician en cada cruce de meta —eso es lo
+// que permite superponer vueltas— pero al graficar la sesión entera hay que
+// encadenarlos, o las vueltas se dibujan unas sobre otras en el mismo rango y
+// aparecen rectas espurias al saltar del final de una vuelta al inicio de la
+// siguiente.
+var CACHE_SESION = {};
+function datosSesion(fecha, sesion){
+  var clave = fecha+'|'+sesion;
+  if (CACHE_SESION[clave]) return CACHE_SESION[clave];
+  var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0;
+  for (var v=1; v<=s.vueltas; v++){
+    var lv = datosVuelta(fecha,sesion,v);
+    for (var i=0;i<lv.length;i++){
+      var p = Object.assign({}, lv[i]);
+      p.t_vuelta = +(p.t_vuelta + despT).toFixed(1);
+      p.d_vuelta = +(p.d_vuelta + despD).toFixed(1);
+      p.n_vuelta = v;
+      todo.push(p);
+    }
+    despT += lv[lv.length-1].t_vuelta;
+    despD += lv[lv.length-1].d_vuelta;
+  }
+  CACHE_SESION[clave] = todo;
+  return todo;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  POSICIÓN EN LA PISTA
 //
 //  El odómetro (d_vuelta) integra la velocidad, así que mide la trayectoria
 //  que hizo ESE coche en ESA vuelta. Abrirse cuatro metros en una curva los
-//  suma al total, y esos cuatro metros se arrastran hasta la meta: a partir
-//  de ahí, el metro 500 de una vuelta y el metro 500 de la otra son puntos
-//  distintos del circuito. Comparar ahí no compara nada.
+//  suma al total, y esos metros se arrastran hasta la meta: a partir de ahí,
+//  el metro 500 de una vuelta y el metro 500 de la otra son puntos distintos
+//  del circuito. Comparar ahí no compara nada.
 //
-//  La solución es dejar de medir sobre la trayectoria propia y medir sobre
-//  UNA sola línea, la misma para todas las vueltas. Se toma una vuelta como
-//  referencia, se remuestrea su GPS cada metro, y a cada muestra de
-//  cualquier vuelta se le asigna la distancia del punto de la referencia que
-//  le queda más cerca. Abrirse deja de sumar metros al eje.
-//
-//  El resultado sigue estando en metros reales y sigue siendo un lugar
-//  concreto del asfalto, que es justo lo que hace falta para leer "en el
-//  metro 234 el motor iba a tanto" y para que la gráfica y el mapa de calor
-//  hablen del mismo punto: ambos salen del GPS.
+//  La solución es medir sobre UNA sola línea, la misma para todas. Esa línea
+//  —la regla de medir— es la vuelta del PRIMER ORIGEN, y se construye en el
+//  momento de graficar. No se guarda, no se precarga y no hay que declarar
+//  ninguna pista: se rueda donde sea, se eligen orígenes y ya hay eje.
 // ═══════════════════════════════════════════════════════════════════════
-var PASO_REF = 1.0;   // metros entre muestras de la referencia
+var PASO_REF = 1.0;      // metros entre muestras de la regla
+var META_MAX = 200;      // m entre líneas de meta: más que eso son sitios distintos
+var DESVIO_MAX = 6;      // m, percentil 95 de la distancia a la regla
+var COBERTURA_MIN = 0.5; // fracción de la regla que hay que recorrer
 
-// Remuestrea una polilínea a paso constante. Sin esto la referencia heredaría
-// el espaciado irregular del GPS —más denso donde el coche va lento— y la
+// Remuestrea una polilínea a paso constante. Sin esto la regla heredaría el
+// espaciado irregular del GPS —más denso donde el coche va lento— y la
 // resolución del eje cambiaría según la zona del circuito.
 function remuestrear(crudo, paso){
   var x = [crudo[0].x], y = [crudo[0].y], s = [0];
@@ -506,223 +599,147 @@ function remuestrear(crudo, paso){
   return {x:x, y:y, s:s, largo:recorrido};
 }
 
-// ── Elección automática de la vuelta de referencia ─────────────────────
+// La regla de medir sale de la PRIMERA vuelta del primer origen. Si ese origen
+// es una sesión completa se usa su vuelta 1, porque una regla tiene que ser una
+// vuelta, no cinco encadenadas.
+function reglaDe(origen){
+  var pts = origen.datos;
+  if (pts.length && pts[0].n_vuelta !== undefined){
+    pts = pts.filter(function(p){ return p.n_vuelta === pts[0].n_vuelta; });
+  }
+  var val = pts.filter(coordValida);
+  if (val.length < 20) return null;
+  var ref = {lat:val[0].lat, lon:val[0].lon};
+  var crudo = val.map(function(p){ return aMetros(p, ref); });
+  crudo.push({x:crudo[0].x, y:crudo[0].y});   // se cierra el circuito
+  var r = remuestrear(crudo, PASO_REF);
+  r.ref = ref;
+  return r;
+}
+
+// Proyecta cada muestra sobre la regla y devuelve su posición, más las dos
+// medidas que dicen si esa comparación tiene sentido.
 //
-// Nada de esto se configura a mano. Se rueda en una pista que no se ha visto
-// nunca —o en la de siempre con los conos cambiados— y el sistema saca su
-// propia regla de medir de las vueltas que acaba de grabar.
-//
-// Umbrales de los filtros, en metros.
-var REF_HUECO_MAX = 5;    // entre dos muestras seguidas: más que eso es un corte de GPS
-var REF_CIERRE_MAX = 10;  // del último punto al primero: más que eso no es una vuelta
-
-function huecoMaximo(pts){
-  var peor = 0;
-  for (var i=1;i<pts.length;i++){
-    var dx = pts[i].x-pts[i-1].x, dy = pts[i].y-pts[i-1].y;
-    var d = Math.sqrt(dx*dx+dy*dy);
-    if (d > peor) peor = d;
-  }
-  return peor;
-}
-function largoDe(pts){
-  var L = 0;
-  for (var i=1;i<pts.length;i++){
-    var dx = pts[i].x-pts[i-1].x, dy = pts[i].y-pts[i-1].y;
-    L += Math.sqrt(dx*dx+dy*dy);
-  }
-  return L;
-}
-function mediana(v){
-  var o = v.slice().sort(function(a,b){return a-b;});
-  var m = o.length >> 1;
-  return o.length % 2 ? o[m] : (o[m-1]+o[m])/2;
-}
-
-// Devuelve la vuelta elegida y el motivo de descarte de cada una, para poder
-// enseñarlo. Un sistema que elige solo tiene que poder explicar qué eligió.
-function elegirReferencia(vueltas){
-  var vivas = [], informe = [];
-  vueltas.forEach(function(v){
-    var pts = v.datos.filter(coordValida).map(aMetros);
-    if (pts.length < 20){ informe.push({n:v.n, motivo:'sin GPS suficiente'}); return; }
-    var hueco = huecoMaximo(pts);
-    if (hueco > REF_HUECO_MAX){
-      informe.push({n:v.n, motivo:'hueco de GPS de '+hueco.toFixed(0)+' m'}); return;
-    }
-    var dx = pts[pts.length-1].x-pts[0].x, dy = pts[pts.length-1].y-pts[0].y;
-    var cierre = Math.sqrt(dx*dx+dy*dy);
-    if (cierre > REF_CIERRE_MAX){
-      informe.push({n:v.n, motivo:'no cierra, '+cierre.toFixed(0)+' m'}); return;
-    }
-    vivas.push({n:v.n, pts:pts, largo:largoDe(pts)});
-  });
-  if (!vivas.length) return {elegida:null, informe:informe, mediana:null};
-
-  // Se elige la MÁS CERCANA A LA MEDIANA, no la más rápida: la rápida corta
-  // por dentro y como regla de medir queda sesgada hacia la trazada agresiva.
-  var med = mediana(vivas.map(function(v){return v.largo;}));
-  var atipicas = vivas.filter(function(v){ return Math.abs(v.largo-med)/med > 0.05; });
-  atipicas.forEach(function(v){
-    informe.push({n:v.n, motivo:'longitud atípica, '+v.largo.toFixed(0)+' m frente a '+med.toFixed(0)});
-  });
-  var tipicas = vivas.filter(function(v){ return Math.abs(v.largo-med)/med <= 0.05; });
-  if (!tipicas.length) tipicas = vivas;
-  tipicas.sort(function(a,b){ return Math.abs(a.largo-med) - Math.abs(b.largo-med); });
-  return {elegida:tipicas[0], informe:informe, mediana:med};
-}
-
-// Una referencia por trazado. En el sistema real esto sería una tabla guardada;
-// aquí basta un objeto, y el efecto es el mismo: se calcula una vez y se
-// congela. Recalcularla sola cada sesión correría el análisis histórico.
-var REFERENCIAS = {};
-function referencia(pista){
-  pista = pista || SESIONES[0].pista;
-  if (REFERENCIAS[pista]) return REFERENCIAS[pista];
-
-  // Candidatas: las vueltas de la primera sesión grabada en esa pista
-  var s0 = SESIONES.find(function(x){ return x.pista === pista; });
-  var vueltas = [];
-  for (var v=1; v<=s0.vueltas; v++){
-    vueltas.push({n:v, datos: generarVuelta(s0.semilla, v, pista)});
-  }
-  var r = elegirReferencia(vueltas);
-  if (!r.elegida){
-    REFERENCIAS[pista] = {x:[], y:[], s:[], largo:0, vuelta:null, informe:r.informe};
-    return REFERENCIAS[pista];
-  }
-  var crudo = r.elegida.pts.slice();
-  // Se cierra el circuito para que el último tramo antes de meta exista
-  crudo.push({x:crudo[0].x, y:crudo[0].y});
-  var ref = remuestrear(crudo, PASO_REF);
-  ref.vuelta = r.elegida.n;
-  ref.sesion = s0;
-  ref.informe = r.informe;
-  ref.candidatas = vueltas.length;
-  REFERENCIAS[pista] = ref;
-  return ref;
-}
-
-// Asigna p.s_pista a cada muestra. La búsqueda avanza solo hacia adelante
-// desde la última posición asignada: si buscara en todo el circuito, en una
-// horquilla o un cruce —donde la trazada pasa dos veces cerca del mismo
-// punto— el más cercano saltaría al tramo equivocado. Avanzar también
-// garantiza que el eje sea creciente, que es lo que espera la búsqueda por
-// bisección del cursor.
-function asignarPosicion(datos, pista){
-  var R = referencia(pista), N = R.x.length, j = 0, ant = null;
-  if (!N) return datos;   // sin referencia para esta pista no hay posición
+// La búsqueda avanza solo hacia adelante desde la última posición asignada, y
+// lo que acota el salto es cuánto se movió el coche: si avanzó 1.3 m, su
+// posición no puede avanzar dieciséis. Sin ese tope, en una horquilla donde la
+// entrada y la salida pasan a pocos metros una de otra, un punto por dentro del
+// ápice quedaba más cerca de la salida y la posición pegaba un salto. Con un
+// hueco de GPS el avance medido es grande y la ventana se abre sola, que es lo
+// que hace falta para reengancharse.
+function proyectar(datos, regla){
+  var N = regla.x.length, j = 0, ant = null, desp = 0, vuelta = null;
+  var s = new Array(datos.length), dists = [];
   for (var i=0; i<datos.length; i++){
     var p = datos[i];
-    if (!coordValida(p)){ p.s_pista = null; continue; }
-    var m = aMetros(p);
+    if (!coordValida(p)){ s[i] = null; continue; }
+    // Cada cruce de meta reinicia la búsqueda y suma una longitud de circuito
+    if (p.n_vuelta !== undefined && vuelta !== null && p.n_vuelta !== vuelta){
+      j = 0; ant = null; desp += regla.largo;
+    }
+    if (p.n_vuelta !== undefined) vuelta = p.n_vuelta;
 
-    // La ventana no puede ser un número fijo de metros. En este kartódromo hay
-    // horquillas donde la entrada y la salida pasan a 7 m una de otra estando
-    // separadas 16 m de recorrido: con una ventana de 30 m, un punto por dentro
-    // del ápice queda más cerca de la salida que de su propio sitio, y la
-    // posición pega un salto de dieciséis metros. Lo que acota el salto de
-    // verdad es cuánto se ha movido el coche desde la muestra anterior: si
-    // avanzó 1.3 m, su posición en la pista no puede avanzar dieciséis.
-    //
-    // El margen de 1.5 deja sitio a que el coche recorra algo más que la
-    // referencia por ir abierto, y el metro extra absorbe el redondeo. Con un
-    // hueco de GPS el avance medido es grande y la ventana se abre sola, que es
-    // justo lo que hace falta para reengancharse.
+    var m = aMetros(p, regla.ref);
     var salto;
     if (ant === null){
-      salto = Math.round(30/PASO_REF);   // primera muestra: no hay referencia previa
+      salto = Math.round(30/PASO_REF);
     } else {
       var ax = m.x - ant.x, ay = m.y - ant.y;
       salto = Math.ceil((Math.sqrt(ax*ax + ay*ay) * 1.5 + 1) / PASO_REF);
     }
-
     var hasta = Math.min(N-1, j + salto);
     var mejor = j, dMin = Infinity;
     for (var k=j; k<=hasta; k++){
-      var dx = R.x[k] - m.x, dy = R.y[k] - m.y, d2 = dx*dx + dy*dy;
+      var dx = regla.x[k] - m.x, dy = regla.y[k] - m.y, d2 = dx*dx + dy*dy;
       if (d2 < dMin){ dMin = d2; mejor = k; }
     }
     j = mejor;
     ant = m;
-    p.s_pista = +R.s[mejor].toFixed(1);
+    s[i] = +(regla.s[mejor] + desp).toFixed(1);
+    dists.push(Math.sqrt(dMin));
   }
-  return datos;
+  dists.sort(function(a,b){ return a-b; });
+  var p95 = dists.length ? dists[Math.floor(dists.length*0.95)] : Infinity;
+  var ultimo = null;
+  for (var i=s.length-1; i>=0; i--){ if (s[i] !== null){ ultimo = s[i]; break; } }
+  var vueltas = (datos.length && datos[datos.length-1].n_vuelta) || 1;
+  var cobertura = (ultimo === null) ? 0 : (ultimo - (vueltas-1)*regla.largo) / regla.largo;
+  return {s:s, p95:p95, cobertura:cobertura};
 }
 
-// `pista` identifica el TRAZADO, no el circuito. El mismo kartódromo con los
-// conos puestos de otra forma es otra pista: la referencia de una no sirve para
-// la otra. En el sistema real este identificador saldría de las coordenadas de
-// la línea de meta más la configuración que el equipo declare al abrir sesión.
-var SESIONES = [
-  {fecha:'2026-07-03', sesion:3, semilla:1001, vueltas:6, pista:'conos-A'},
-  {fecha:'2026-07-03', sesion:4, semilla:2002, vueltas:5, pista:'conos-A'},
-  {fecha:'2026-08-19', sesion:1, semilla:3003, vueltas:7, pista:'conos-B'},
-  {fecha:'2026-08-19', sesion:2, semilla:4004, vueltas:4, pista:'conos-B'}
-];
+// Decide, para cada origen, si puede compararse por posición en la pista.
+// Escribe o.spos con las posiciones, o o.motivo con la razón de que no.
+function evaluarOrigenes(orig){
+  orig.forEach(function(o){ o.spos = null; o.motivo = null; });
+  if (!orig.length) return;
 
-// Los conos de agosto cierran una parte del trazado: entre el 34 % y el 52 % de
-// la vuelta la trayectoria se mete hacia dentro hasta nueve metros. Es el caso
-// que hay que soportar —una pista que nunca se ha rodado— sin tocar nada a mano.
-var DEFORMACION = {
-  'conos-A': function(){ return 0; },
-  'conos-B': function(u){
-    var a = 0.34, b = 0.52;
-    if (u < a || u > b) return 0;
-    return -9 * Math.sin((u-a)/(b-a) * Math.PI);
+  var base = orig[0];
+  var regla = reglaDe(base);
+  if (!regla){
+    orig.forEach(function(o){ o.motivo = 'el origen de referencia no tiene GPS suficiente'; });
+    return;
   }
-};
-function deformacionDe(pista){ return DEFORMACION[pista] || DEFORMACION['conos-A']; }
-function dias(){
-  var vistos = {}, res = [];
-  SESIONES.forEach(function(s){ if(!vistos[s.fecha]){ vistos[s.fecha]=1; res.push(s.fecha); } });
-  return res;
-}
-function sesionesDe(fecha){ return SESIONES.filter(function(s){return s.fecha===fecha;}); }
-function buscaSesion(fecha, sesion){ return SESIONES.find(function(s){return s.fecha===fecha && s.sesion===sesion;}); }
+  var metaBase = centroDe(base.meta);
 
-var CACHE = {};
-function datosVuelta(fecha, sesion, vuelta){
-  var k = fecha+'|'+sesion+'|'+vuelta;
-  if (!CACHE[k]){
-    var ses = buscaSesion(fecha, sesion);
-    CACHE[k] = asignarPosicion(generarVuelta(ses.semilla, vuelta, ses.pista), ses.pista);
-  }
-  return CACHE[k];
-}
-// En una sesión completa, tiempo y distancia se ACUMULAN a lo largo de todas
-// las vueltas. En la base ambos se reinician en cada cruce de meta —eso es lo
-// que permite superponer vueltas— pero al graficar la sesión entera hay que
-// encadenarlos, o las vueltas se dibujan unas sobre otras en el mismo rango y
-// aparecen rectas espurias al saltar del final de una vuelta al inicio de la
-// siguiente.
-// Con caché, igual que las vueltas sueltas. Sin ella, cada movimiento del
-// cursor reconstruía las ~2000 muestras de la sesión entera —origenesActivos()
-// se llama en cada evento— y eso se notaba en el ratón.
-var CACHE_SESION = {};
-function datosSesion(fecha, sesion){
-  var clave = fecha+'|'+sesion;
-  if (CACHE_SESION[clave]) return CACHE_SESION[clave];
-  var s = buscaSesion(fecha,sesion), todo = [], despT = 0, despD = 0, despS = 0;
-  for (var v=1; v<=s.vueltas; v++){
-    var lv = datosVuelta(fecha,sesion,v);
-    for (var i=0;i<lv.length;i++){
-      var p = Object.assign({}, lv[i]);
-      p.t_vuelta = +(p.t_vuelta + despT).toFixed(1);
-      p.d_vuelta = +(p.d_vuelta + despD).toFixed(1);
-      // La posición en pista se encadena por el largo de la REFERENCIA, no
-      // por lo que recorrió cada vuelta: así cada vuelta ocupa exactamente
-      // una longitud de circuito y el eje sigue siendo comparable.
-      if (p.s_pista !== null && p.s_pista !== undefined) p.s_pista = +(p.s_pista + despS).toFixed(1);
-      p.n_vuelta = v;
-      todo.push(p);
+  orig.forEach(function(o, k){
+    if (k > 0){
+      // 1. ¿Es siquiera el mismo sitio? Esto se sabe sin calcular nada.
+      var d = distanciaGeo(metaBase, centroDe(o.meta));
+      if (d > META_MAX){
+        o.motivo = 'otro sitio: su línea de meta está a ' +
+                   (d > 1000 ? (d/1000).toFixed(1)+' km' : d.toFixed(0)+' m') +
+                   ' de la del origen de referencia';
+        return;
+      }
     }
-    despT += lv[lv.length-1].t_vuelta;
-    despD += lv[lv.length-1].d_vuelta;
-    despS += referencia(s.pista).largo;
+    var pr = proyectar(o.datos, regla);
+    if (k > 0){
+      // 2. Mismo sitio, ¿mismo trazado?
+      if (pr.cobertura < COBERTURA_MIN){
+        o.motivo = 'el recorrido no encaja con la referencia: solo cubre el ' +
+                   Math.round(pr.cobertura*100) + ' % de la vuelta';
+        return;
+      }
+      if (pr.p95 > DESVIO_MAX){
+        o.motivo = 'trazado distinto: el 5 % de la vuelta pasa a más de ' +
+                   pr.p95.toFixed(0) + ' m de la referencia';
+        return;
+      }
+    }
+    o.spos = pr.s;
+    o.p95 = pr.p95;
+  });
+  orig.regla = regla;
+}
+
+// El valor del eje X de una muestra. La posición en la pista no vive en el
+// dato, sino en el origen, porque depende de contra qué regla se midió.
+// Se llama valorEjeX y no valorX porque moverCursor recibe un parámetro con ese
+// nombre, y dentro de esa función tapaba a esta.
+function valorEjeX(o, i, campo){
+  if (campo === 's_pista') return o.spos ? o.spos[i] : null;
+  return sano(o.datos[i], campo);
+}
+// Índice de la muestra más cercana a un valor, sobre un arreglo de posiciones.
+function indiceEnPos(spos, valor){
+  var min = Infinity, max = -Infinity, n = 0;
+  for (var i=0;i<spos.length;i++){
+    var v = spos[i];
+    if (v === null) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+    n++;
   }
-  CACHE_SESION[clave] = todo;
-  return todo;
+  if (!n) return null;
+  var margen = (max - min) / Math.max(1, n - 1) * 3;
+  if (valor < min - margen || valor > max + margen) return null;
+  var mejor = null, dm = Infinity;
+  for (var i=0;i<spos.length;i++){
+    if (spos[i] === null) continue;
+    var d = Math.abs(spos[i] - valor);
+    if (d < dm){ dm = d; mejor = i; }
+  }
+  return mejor;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -887,7 +904,10 @@ var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:true, doubl
 var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null, zoom:null};
 
 function inicializarVivo(){
-  llenarSelect(document.getElementById('v-x'), EJES_X, 't_vuelta');
+  // En vivo no hay con qué comparar, así que tampoco hay regla de medir:
+  // la posición en la pista no tiene sentido y no se ofrece.
+  llenarSelect(document.getElementById('v-x'),
+    EJES_X.filter(function(e){ return e.id !== 's_pista'; }), 't_vuelta');
   construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], redibujarVivo);
   document.getElementById('v-x').onchange = redibujarVivo;
   document.getElementById('v-toggle').onclick = function(){
@@ -929,7 +949,8 @@ function tickVivo(){
   // negro en cada cruce de meta.
   if (vivo.i >= vivo.datos.length){
     vivo.vuelta++;
-    vivo.datos = datosVuelta('2026-08-19',1,((vivo.vuelta-1)%7)+1);
+    var sv = buscaSesion('2026-08-19',1);
+    vivo.datos = datosVuelta('2026-08-19',1,((vivo.vuelta-1)%sv.vueltas)+1);
     vivo.i = 0; vivo.buffer = [];
   }
 
@@ -1001,6 +1022,8 @@ function redibujarVivo(){
 //  HISTÓRICO
 // ═══════════════════════════════════════════════════════════════════════
 var mapa, capaTrazado = [], marcadorCursor = null, ultimoAjuste = '';
+// Orígenes ya evaluados contra la regla de medir, tal como se dibujaron
+var ORIGENES = [];
 
 function inicializarHist(){
   var cont = document.getElementById('h-origenes');
@@ -1021,7 +1044,8 @@ function inicializarHist(){
   mapa = L.map('mapa', {zoomControl:true, attributionControl:false, renderer:L.canvas()});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.65}).addTo(mapa);
-  mapa.setView([CENTRO.lat, CENTRO.lon], 16);
+  var c0 = PISTAS[SESIONES[0].pista].centro;
+  mapa.setView([c0.lat, c0.lon], 16);
 
   Plotly.newPlot('g-hist', [], JSON.parse(JSON.stringify(LAYOUT_BASE)), CONFIG_HIST);
   document.getElementById('g-hist').on('plotly_hover', function(ev){
@@ -1087,7 +1111,7 @@ function origenesActivos(){
         a = row.querySelector('.o-alcance').value;
     if (!d || !s || !a) return;
     res.push({idx:i, color:COLORES[i], fecha:d, sesion:+s, alcance:a,
-      pista: buscaSesion(d,+s).pista,
+      meta: metaDe(d, +s),
       etiqueta: d.slice(5)+' S'+s+' '+(a==='all'?'completa':'V'+a),
       datos: a==='all' ? datosSesion(d,+s) : datosVuelta(d,+s,+a)});
   });
@@ -1227,16 +1251,38 @@ function sincronizarOrigenMapa(){
 }
 
 function redibujarHist(){
-  var ejeX = document.getElementById('h-x').value;
+  var selX = document.getElementById('h-x');
   var ys = marcadasDe(document.getElementById('h-y'));
   var orig = origenesActivos();
+
+  // La regla de medir se construye aquí, con el primer origen, y se descarta al
+  // salir. Nada guardado, nada precargado: por eso funciona en una pista que no
+  // se ha rodado nunca.
+  evaluarOrigenes(orig);
+  // El cursor reutiliza esta evaluación: recalcular la regla en cada movimiento
+  // del ratón sería tirar el trabajo y se notaría al pasar por la gráfica.
+  ORIGENES = orig;
+  var bloqueados = orig.filter(function(o){ return o.motivo; });
+
+  // Si algún origen no se puede medir contra esa regla, comparar por posición
+  // en la pista no significa nada, así que la opción se desactiva. Un aviso al
+  // lado de una gráfica dibujada no basta: una gráfica creíble y falsa es lo
+  // único que puede llevar a una mala decisión.
+  var opt = Array.prototype.find.call(selX.options, function(x){ return x.value === 's_pista'; });
+  if (opt){
+    opt.disabled = bloqueados.length > 0;
+    opt.textContent = 'Posición en la pista [m]' + (opt.disabled ? '  — no disponible' : '');
+  }
+  if (selX.value === 's_pista' && bloqueados.length) selX.value = 't_vuelta';
+
+  var ejeX = selX.value;
   var dispersion = !esEjeDeRecorrido(ejeX);
 
   var trazas = [];
   orig.forEach(function(o){
     ys.forEach(function(y,k){
       trazas.push({
-        x:o.datos.map(function(p){return sano(p, ejeX);}),
+        x:o.datos.map(function(_, i){ return valorEjeX(o, i, ejeX); }),
         y:o.datos.map(function(p){ return sano(p, y); }),
         name:o.etiqueta+' · '+meta(y).nombre, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
@@ -1267,7 +1313,7 @@ function redibujarHist(){
   });
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
-  avisarComparacionDudosa(orig, ejeX);
+  avisarComparacionDudosa(orig, ejeX, bloqueados);
   mostrarReferencia(orig);
 
   // La tabla del cursor corresponde a la selección anterior: si no se limpia,
@@ -1279,33 +1325,27 @@ function redibujarHist(){
 }
 
 // Una herramienta de análisis no debe dejar comparar en silencio cosas que no
-// son equivalentes: superponer una vuelta con una sesión entera sobre el eje
-// de distancia enfrenta metros de vuelta contra metros de sesión.
-// Un sistema que elige la referencia solo tiene que decir cuál eligió y por qué
-// descartó las demás. Si no, cuando algo salga raro no hay por dónde empezar.
+// son equivalentes.
+// Un sistema que elige la regla de medir solo tiene que decir cuál eligió y qué
+// tan bien encaja lo demás. Si no, cuando algo salga raro no hay por dónde
+// empezar.
 function mostrarReferencia(orig){
   var cont = document.getElementById('h-refinfo');
   if (!orig.length){ cont.innerHTML = ''; return; }
-  var pistas = [];
-  orig.forEach(function(o){ if (pistas.indexOf(o.pista) < 0) pistas.push(o.pista); });
-
-  cont.innerHTML = pistas.map(function(p){
-    var R = referencia(p);
-    if (!R.vuelta){
-      return '<b>' + p + '</b> · sin vuelta de referencia: ninguna candidata pasó los filtros.';
-    }
-    var t = '<b>' + p + '</b> · referencia elegida sola: vuelta ' + R.vuelta + ' de ' +
-            R.sesion.fecha.slice(5) + ' S' + R.sesion.sesion +
-            ', ' + R.largo.toFixed(0) + ' m, entre ' + R.candidatas + ' candidatas';
-    if (R.informe && R.informe.length){
-      t += ' <span class="desc">· descartadas: ' +
-           R.informe.map(function(d){ return 'V'+d.n+' ('+d.motivo+')'; }).join(', ') + '</span>';
-    }
-    return t;
-  }).join('<br>');
+  var R = orig.regla;
+  if (!R){ cont.innerHTML = '<b>Sin regla de medir:</b> el origen de referencia no tiene GPS suficiente.'; return; }
+  var t = '<b>Regla de medir:</b> la vuelta de <b>' + orig[0].etiqueta + '</b>, ' +
+          R.largo.toFixed(0) + ' m. Se calcula al graficar y no se guarda.';
+  var ok = orig.filter(function(o, k){ return k > 0 && o.spos; });
+  if (ok.length){
+    t += ' <span class="desc">Encajan contra ella: ' +
+         ok.map(function(o){ return o.etiqueta + ' (' + o.p95.toFixed(1) + ' m)'; }).join(', ') +
+         '.</span>';
+  }
+  cont.innerHTML = t;
 }
 
-function avisarComparacionDudosa(orig, ejeX){
+function avisarComparacionDudosa(orig, ejeX, bloqueados){
   var cont = document.getElementById('h-aviso');
   var avisos = [];
 
@@ -1332,15 +1372,10 @@ function avisarComparacionDudosa(orig, ejeX){
     }
   }
 
-  // El mismo circuito con los conos de otra forma es otro trazado, y cada uno
-  // tiene su propia referencia. Superponerlos por posición en la pista compara
-  // el metro 300 de una regla contra el metro 300 de otra distinta.
-  var pistas = {};
-  orig.forEach(function(o){ pistas[o.pista] = true; });
-  if (Object.keys(pistas).length > 1 && ejeX === 's_pista'){
-    avisos.push('<b>Trazados distintos.</b> Los orígenes elegidos son de configuraciones ' +
-                'de pista diferentes (' + Object.keys(pistas).join(', ') + '), y cada una tiene su ' +
-                'propia vuelta de referencia. El mismo valor de X no es el mismo punto de asfalto.');
+  if (bloqueados && bloqueados.length){
+    avisos.push('<b>Sin posición en la pista.</b> ' +
+      bloqueados.map(function(o){ return o.etiqueta + ': ' + o.motivo; }).join('. ') +
+      '. Se comparan por tiempo, que sí vale entre circuitos distintos.');
   }
 
   var vistos = {}, duplicados = [];
@@ -1467,7 +1502,7 @@ function dibujarMapa(){
 // valor, de modo que la comparación es siempre en la misma distancia (o el
 // mismo instante), no en la misma posición del arreglo.
 function moverCursor(valorX, nTraza, idxPunto){
-  var orig = origenesActivos();
+  var orig = ORIGENES;
   var ys = marcadasDe(document.getElementById('h-y'));
   var cont = document.getElementById('h-valores');
   if (!orig.length || !ys.length){
@@ -1484,13 +1519,19 @@ function moverCursor(valorX, nTraza, idxPunto){
     // lugares opuestos del circuito que solo coinciden en ese valor, así que
     // se muestra únicamente el origen sobre el que está el cursor.
     var oCursor = orig[Math.floor((nTraza||0) / ys.length)] || orig[0];
-    orig.forEach(function(o){ o.punto = (o === oCursor) ? o.datos[idxPunto] : null; });
+    orig.forEach(function(o){
+      o.punto = (o === oCursor) ? o.datos[idxPunto] : null;
+      o.iPunto = (o === oCursor) ? idxPunto : null;
+    });
   } else {
     // Series contra tiempo o distancia: cada origen busca su punto más cercano
     // al mismo valor de X, para que la comparación sea del mismo punto de pista
     orig.forEach(function(o){
-      var i = indiceMasCercano(o.datos, ejeX, valorX);
+      var i = (ejeX === 's_pista')
+        ? (o.spos ? indiceEnPos(o.spos, valorX) : null)
+        : indiceMasCercano(o.datos, ejeX, valorX);
       o.punto = (i === null) ? null : o.datos[i];
+      o.iPunto = i;
     });
   }
 
@@ -1504,9 +1545,9 @@ function moverCursor(valorX, nTraza, idxPunto){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
     marcadorCursor = L.circleMarker([oMapa.punto.lat, oMapa.punto.lon],
       {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
-    var sP = oMapa.punto.s_pista;
+    var sP = (oMapa.spos && oMapa.iPunto !== null) ? oMapa.spos[oMapa.iPunto] : null;
     document.getElementById('h-cursor-pos').textContent =
-      (sP === null || sP === undefined ? '—' : sP.toFixed(0)+' m de pista') +
+      (sP === null || sP === undefined ? 'sin posición de pista' : sP.toFixed(0)+' m de pista') +
       ' · recorridos '+oMapa.punto.d_vuelta.toFixed(0)+' m · '+
       oMapa.punto.t_vuelta.toFixed(1)+' s';
   }
@@ -1520,7 +1561,7 @@ function moverCursor(valorX, nTraza, idxPunto){
   // pondría la palabra "null" donde debería verse que no hay dato.
   function celda(o, campo){
     if (!o.punto) return '<td>—</td>';
-    var v = sano(o.punto, campo);
+    var v = (campo === 's_pista') ? valorEjeX(o, o.iPunto, campo) : sano(o.punto, campo);
     return '<td>' + (v !== null ? formatear(v, campo) : '<span style="color:#555">sin dato</span>') + '</td>';
   }
 
