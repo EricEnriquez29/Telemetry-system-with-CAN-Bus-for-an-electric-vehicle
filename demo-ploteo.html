@@ -571,6 +571,10 @@ var PASO_REF = 1.0;      // metros entre muestras de la regla
 var META_MAX = 200;      // m entre líneas de meta: más que eso son sitios distintos
 var DESVIO_MAX = 6;      // m, percentil 95 de la distancia a la regla
 var COBERTURA_MIN = 0.5; // fracción de la regla que hay que recorrer
+var SUAVIZADO = 9;       // muestras de la media móvil que alisa la regla
+var AVANCE_MAX_M = 3;    // metros que puede avanzar el coche por muestra: 108 km/h a 10 Hz
+var CANDIDATAS_MAX = 6;  // vueltas que se prueban como regla en una sesión
+var COMPARADAS_MAX = 5;  // vueltas contra las que se mide cada candidata
 
 // Remuestrea una polilínea a paso constante. Sin esto la regla heredaría el
 // espaciado irregular del GPS —más denso donde el coche va lento— y la
@@ -596,43 +600,105 @@ function remuestrear(crudo, paso){
   return {x:x, y:y, s:s, largo:recorrido};
 }
 
-// La regla de medir sale de la PRIMERA vuelta del primer origen. Si ese origen
-// es una sesión completa se usa su vuelta 1, porque una regla tiene que ser una
-// vuelta, no cinco encadenadas.
-function reglaDe(origen){
-  var pts = origen.datos;
-  if (pts.length && pts[0].n_vuelta !== undefined){
-    pts = pts.filter(function(p){ return p.n_vuelta === pts[0].n_vuelta; });
-  }
+// Separa un origen en sus vueltas. Una vuelta suelta es una sola.
+function vueltasDe(datos){
+  if (!datos.length || datos[0].n_vuelta === undefined) return [datos];
+  var res = [], actual = null, n = null;
+  datos.forEach(function(p){
+    if (p.n_vuelta !== n){ actual = []; res.push(actual); n = p.n_vuelta; }
+    actual.push(p);
+  });
+  return res;
+}
+
+// ¿La vuelta tiene cortes de GPS? Cuenta muestras sin fijación y el mayor salto
+// entre dos posiciones seguidas. El umbral del salto es holgado a propósito: un
+// receptor a 1 Hz avanza 17 m entre posiciones a 60 km/h y eso no es un corte.
+function cortesDe(pts){
+  var ref = null, ant = null, peor = 0, sinFix = 0;
+  pts.forEach(function(p){
+    if (!coordValida(p)){ sinFix++; return; }
+    if (!ref) ref = {lat:p.lat, lon:p.lon};
+    var q = aMetros(p, ref);
+    if (ant) peor = Math.max(peor, Math.sqrt((q.x-ant.x)*(q.x-ant.x) + (q.y-ant.y)*(q.y-ant.y)));
+    ant = q;
+  });
+  return {saltoMax:peor, sinFix:sinFix, hayCorte: sinFix > 2 || peor > 25};
+}
+
+// Construye la regla a partir de UNA vuelta.
+//
+// Las posiciones se alisan con una media móvil antes de remuestrear. El ruido
+// del GPS dibuja un zigzag alrededor de la trazada, y un zigzag mide más que la
+// línea que sigue: con 2.5 m de ruido, una pista de 935 m salía de 1075 m, y
+// todos los metros del eje quedaban inflados un 15 %.
+function reglaDeVuelta(pts){
   var val = pts.filter(coordValida);
   if (val.length < 20) return null;
   var ref = {lat:val[0].lat, lon:val[0].lon};
   var crudo = val.map(function(p){ return aMetros(p, ref); });
-  crudo.push({x:crudo[0].x, y:crudo[0].y});   // se cierra el circuito
-  var r = remuestrear(crudo, PASO_REF);
+  var n = crudo.length, h = SUAVIZADO >> 1, suave = [];
+  for (var i=0; i<n; i++){
+    var sx = 0, sy = 0;
+    // Circular: la vuelta es un circuito cerrado y el final empalma con el principio
+    for (var k=-h; k<=h; k++){ var q = crudo[(i+k+n)%n]; sx += q.x; sy += q.y; }
+    suave.push({x:sx/(2*h+1), y:sy/(2*h+1)});
+  }
+  suave.push({x:suave[0].x, y:suave[0].y});   // se cierra el circuito
+  var r = remuestrear(suave, PASO_REF);
   r.ref = ref;
   return r;
 }
 
-// Proyecta cada muestra sobre la regla y devuelve su posición, más las dos
-// medidas que dicen si esa comparación tiene sentido.
+// La regla de medir sale del primer origen.
 //
-// La búsqueda avanza solo hacia adelante desde la última posición asignada, y
-// lo que acota el salto es cuánto se movió el coche: si avanzó 1.3 m, su
-// posición no puede avanzar dieciséis. Sin ese tope, en una horquilla donde la
-// entrada y la salida pasan a pocos metros una de otra, un punto por dentro del
-// ápice quedaba más cerca de la salida y la posición pegaba un salto. Con un
-// hueco de GPS el avance medido es grande y la ventana se abre sola, que es lo
-// que hace falta para reengancharse.
+// Si ese origen es una sesión, no se usa su primera vuelta: en una sesión real
+// la primera suele ser la de salida de boxes, que arranca fuera del circuito, y
+// con ella de regla las demás sesiones quedaban rechazadas. Tampoco sirve elegir
+// por longitud, porque la de salida mide casi lo mismo que las otras. Se elige
+// la vuelta que MÁS SE PARECE a las demás: cada candidata se usa de regla, se
+// miden contra ella las otras, y gana la que las deja más cerca.
+//
+// Las vueltas con cortes de GPS quedan fuera mientras haya alguna sin cortes.
+function reglaDe(origen){
+  var vueltas = vueltasDe(origen.datos).filter(function(v){
+    return v.filter(coordValida).length >= 20;
+  });
+  if (!vueltas.length) return null;
+
+  var elegida = vueltas[0];
+  if (vueltas.length > 1){
+    var cand = vueltas.slice(0, CANDIDATAS_MAX);
+    var limpias = cand.filter(function(v){ return !cortesDe(v).hayCorte; });
+    if (limpias.length) cand = limpias;
+    var mejor = Infinity;
+    cand.forEach(function(v){
+      var R = reglaDeVuelta(v);
+      if (!R) return;
+      var p95s = vueltas.filter(function(w){ return w !== v; }).slice(0, COMPARADAS_MAX)
+        .map(function(w){ return proyectar(w, R).p95; })
+        .sort(function(a, b){ return a - b; });
+      var med = p95s[p95s.length >> 1];
+      if (med < mejor){ mejor = med; elegida = v; }
+    });
+  }
+
+  var r = reglaDeVuelta(elegida);
+  if (!r) return null;
+  r.vuelta = elegida[0].n_vuelta;
+  r.cortes = cortesDe(elegida);
+  return r;
+}
+
 function proyectar(datos, regla){
-  var N = regla.x.length, j = 0, ant = null, desp = 0, vuelta = null;
+  var N = regla.x.length, j = 0, ant = null, desp = 0, vuelta = null, perdidas = 0;
   var s = new Array(datos.length), dists = [];
   for (var i=0; i<datos.length; i++){
     var p = datos[i];
-    if (!coordValida(p)){ s[i] = null; continue; }
+    if (!coordValida(p)){ s[i] = null; perdidas++; continue; }
     // Cada cruce de meta reinicia la búsqueda y suma una longitud de circuito
     if (p.n_vuelta !== undefined && vuelta !== null && p.n_vuelta !== vuelta){
-      j = 0; ant = null; desp += regla.largo;
+      j = 0; ant = null; desp += regla.largo; perdidas = 0;
     }
     if (p.n_vuelta !== undefined) vuelta = p.n_vuelta;
 
@@ -642,7 +708,13 @@ function proyectar(datos, regla){
       salto = Math.round(30/PASO_REF);
     } else {
       var ax = m.x - ant.x, ay = m.y - ant.y;
-      salto = Math.ceil((Math.sqrt(ax*ax + ay*ay) * 1.5 + 1) / PASO_REF);
+      var porDistancia = Math.sqrt(ax*ax + ay*ay) * 1.5 + 1;
+      // Tras un corte de GPS la línea recta desde la última posición atraviesa
+      // el circuito y es mucho más corta que lo recorrido, así que la ventana no
+      // llegaba: con 15 s sin señal la posición quedaba 193 m desviada para el
+      // resto de la vuelta. Se abre también según el tiempo sin señal.
+      var porTiempo = perdidas > 0 ? (perdidas + 1) * AVANCE_MAX_M : 0;
+      salto = Math.ceil(Math.max(porDistancia, porTiempo) / PASO_REF);
     }
     var hasta = Math.min(N-1, j + salto);
     var mejor = j, dMin = Infinity;
@@ -652,6 +724,7 @@ function proyectar(datos, regla){
     }
     j = mejor;
     ant = m;
+    perdidas = 0;
     s[i] = +(regla.s[mejor] + desp).toFixed(1);
     dists.push(Math.sqrt(dMin));
   }
@@ -1404,8 +1477,18 @@ function mostrarReferencia(orig){
   if (!orig.length){ cont.innerHTML = ''; return; }
   var R = orig.regla;
   if (!R){ cont.innerHTML = '<b>Sin regla de medir:</b> el origen de referencia no tiene GPS suficiente.'; return; }
-  var t = '<b>Regla de medir:</b> la vuelta de <b>' + orig[0].etiqueta + '</b>, ' +
-          R.largo.toFixed(0) + ' m. Se calcula al graficar y no se guarda.';
+  var cual = (orig[0].alcance === 'all' && R.vuelta !== undefined)
+    ? 'la vuelta ' + R.vuelta + ' de <b>' + orig[0].etiqueta + '</b>, la que más se parece a las demás'
+    : 'la vuelta de <b>' + orig[0].etiqueta + '</b>';
+  var t = '<b>Regla de medir:</b> ' + cual + ', ' + R.largo.toFixed(0) + ' m. Se calcula al graficar y no se guarda.';
+  // Una regla con un corte de GPS tiene un tramo recto donde debería haber
+  // curva: las posiciones de esa zona salen mal y el total de metros se acorta.
+  // Si no hubo otra vuelta sin cortes, al menos que se sepa.
+  if (R.cortes && R.cortes.hayCorte){
+    t += ' <span style="color:var(--yellow)">Esa vuelta tiene un corte de GPS' +
+         (R.cortes.sinFix ? ' (' + R.cortes.sinFix + ' muestras sin señal)' : '') +
+         ': la posición no es fiable en esa zona.</span>';
+  }
   var ok = orig.filter(function(o, k){ return k > 0 && o.spos; });
   if (ok.length){
     t += ' <span class="desc">Encajan contra ella: ' +
