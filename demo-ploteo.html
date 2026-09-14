@@ -193,10 +193,6 @@
             <label>Colorear con</label>
             <select id="h-mapvar"></select>
           </div>
-          <div class="field">
-            <label>De la sesión</label>
-            <select id="h-mapmodo"></select>
-          </div>
         </div>
       </div>
       <div class="card" style="margin-top:12px;">
@@ -1101,10 +1097,7 @@ function inicializarHist(){
   });
   document.getElementById('h-x').onchange = redibujarHist;
   document.getElementById('h-mapvar').onchange = dibujarMapa;
-  document.getElementById('h-mapmodo').onchange = dibujarMapa;
-  document.getElementById('h-maporigen').onchange = function(){
-    ultimoAjuste=''; sincronizarModoMapa(); dibujarMapa();
-  };
+  document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
   // renderer canvas: una sesión completa son ~2000 segmentos, y con el
   // renderizador SVG por defecto eso son 2000 nodos en el DOM
@@ -1274,32 +1267,6 @@ function sincronizarSelectorMapa(){
   sel.value = (ys.indexOf(previo) >= 0) ? previo : ys[0];
 }
 
-// Qué enseñar cuando el origen es una sesión completa. En el mapa las vueltas
-// caen unas sobre otras, así que hay que decidir cuál gana el solape, y la
-// respuesta depende de la variable: en corriente o temperatura interesa el
-// máximo, y en velocidad interesa el mínimo, que es donde están las frenadas.
-// Un criterio fijo escondería justo la mitad de los casos.
-function sincronizarModoMapa(){
-  var sel = document.getElementById('h-mapmodo');
-  var orig = origenesActivos();
-  var idxSel = document.getElementById('h-maporigen').value;
-  var o = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
-  var previo = sel.value;
-  sel.innerHTML = '';
-  if (!o || o.alcance !== 'all'){
-    opcion(sel, 'unica', 'una sola vuelta');
-    sel.disabled = true;
-    return;
-  }
-  sel.disabled = false;
-  opcion(sel, 'max', 'valor más alto de cada punto');
-  opcion(sel, 'min', 'valor más bajo de cada punto');
-  var n = buscaSesion(o.fecha, o.sesion).vueltas;
-  for (var v=1; v<=n; v++) opcion(sel, 'v'+v, 'solo la vuelta '+v);
-  var existe = Array.prototype.some.call(sel.options, function(x){ return x.value === previo; });
-  sel.value = existe ? previo : 'max';
-}
-
 // El selector de origen del mapa solo ofrece los orígenes ya graficados
 function sincronizarOrigenMapa(){
   var sel = document.getElementById('h-maporigen');
@@ -1413,7 +1380,6 @@ function redibujarHist(){
   limpiarCursor();
 
   sincronizarOrigenMapa();
-  sincronizarModoMapa();
   dibujarMapa();
 }
 
@@ -1496,7 +1462,9 @@ function dibujarMapa(){
   capaTrazado.forEach(function(c){ mapa.removeLayer(c); });
   capaTrazado = [];
 
-  var orig = origenesActivos();
+  // Los orígenes ya evaluados contra la regla de medir: son los únicos que
+  // llevan la posición en la pista, y sin ella no se puede agrupar por metro
+  var orig = ORIGENES;
   var idxSel = document.getElementById('h-maporigen').value;
   var o = orig.find(function(x){ return String(x.idx) === idxSel; }) || orig[0];
   var campo = document.getElementById('h-mapvar').value;
@@ -1556,44 +1524,64 @@ function dibujarMapa(){
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
-  // En una sesión completa las vueltas caen físicamente en el mismo sitio: en el
-  // mapa no se pueden poner una detrás de otra como en la gráfica, donde el eje
-  // X va creciendo. Hay que decidir cuál gana el solape, y eso lo elige el
-  // usuario: el valor más alto de cada punto, el más bajo, o una vuelta suelta.
-  // Se dibujan todos los tramos ordenados por valor, y el orden decide qué
-  // queda arriba.
-  var modo = document.getElementById('h-mapmodo').value || 'max';
-  var soloVuelta = (modo.charAt(0) === 'v' && modo !== 'unica') ? +modo.slice(1) : null;
-  var huecosGps = 0, huecosValor = 0, tramos = [];
-  for (var i=1;i<o.datos.length;i++){
-    var a = o.datos[i-1], b = o.datos[i];
-    // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el mapa
-    // a medio dibujar: ahora el tramo simplemente no se traza
-    if (!coordValida(a) || !coordValida(b)){ huecosGps++; continue; }
-    var vb = sano(b, campo);
-    if (vb === null){ huecosValor++; continue; }
-    // El salto entre el final de una vuelta y el principio de la siguiente no
-    // es un tramo recorrido: uniría la meta consigo misma cruzando el circuito
-    if (a.n_vuelta !== undefined && b.n_vuelta !== undefined && a.n_vuelta !== b.n_vuelta) continue;
-    if (soloVuelta !== null && b.n_vuelta !== soloVuelta) continue;
-    tramos.push({a:a, b:b, v:vb});
+  var huecosGps = 0, huecosValor = 0, sinDato = 0;
+  var porMedia = (o.alcance === 'all' && o.spos && ORIGENES.regla);
+
+  if (porMedia){
+    // ── Sesión completa: la MEDIA de todas las vueltas en cada metro ──────
+    // En el mapa las vueltas caen en el mismo asfalto y un punto de pantalla
+    // solo admite un color. Encimarlas dejaba ganar a una: con 20, 20, 20, 20 y
+    // 60 km/h se pintaba 60. Aquí cada metro de pista junta lo que midieron
+    // todas las vueltas y se pinta su media, 28. Se dibuja sobre la vuelta de
+    // referencia, que es el trazado común contra el que se midió todo.
+    var R = ORIGENES.regla, LR = Math.round(R.largo);
+    var suma = new Array(LR), cuenta = new Array(LR);
+    for (var i=0;i<o.datos.length;i++){
+      var sp = o.spos[i];
+      if (sp === null || sp === undefined){ huecosGps++; continue; }
+      var v = sano(o.datos[i], campo);
+      if (v === null){ huecosValor++; continue; }
+      var bin = Math.round(sp) % LR;
+      suma[bin] = (suma[bin] || 0) + v;
+      cuenta[bin] = (cuenta[bin] || 0) + 1;
+    }
+    var mlonR = mLon(R.ref.lat);
+    for (var b=0; b<LR; b++){
+      var b2 = (b+1) % LR;
+      if (!cuenta[b2]){ sinDato++; continue; }
+      var media = suma[b2] / cuenta[b2];
+      var f2 = max>min ? (media-min)/(max-min) : 0.5;
+      capaTrazado.push(L.polyline([
+        [R.ref.lat + R.y[b]/M_LAT,  R.ref.lon + R.x[b]/mlonR],
+        [R.ref.lat + R.y[b2]/M_LAT, R.ref.lon + R.x[b2]/mlonR]
+      ], {color:escalaColor(f2), weight:grosorPx(), opacity:0.95}).addTo(mapa));
+    }
+  } else {
+    // ── Una vuelta: cada tramo con su propio valor ──────────────────────
+    for (var i=1;i<o.datos.length;i++){
+      var a = o.datos[i-1], bb = o.datos[i];
+      // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el
+      // mapa a medio dibujar: ahora el tramo simplemente no se traza
+      if (!coordValida(a) || !coordValida(bb)){ huecosGps++; continue; }
+      var vb = sano(bb, campo);
+      if (vb === null){ huecosValor++; continue; }
+      // El salto de meta a meta entre dos vueltas no es un tramo recorrido
+      if (a.n_vuelta !== undefined && bb.n_vuelta !== undefined && a.n_vuelta !== bb.n_vuelta) continue;
+      var f3 = max>min ? (vb-min)/(max-min) : 0.5;
+      capaTrazado.push(L.polyline([[a.lat,a.lon],[bb.lat,bb.lon]],
+        {color:escalaColor(f3), weight:grosorPx(), opacity:0.95}).addTo(mapa));
+    }
   }
-  // Ascendente deja arriba el más alto; descendente, el más bajo
-  tramos.sort(function(p, q){ return modo === 'min' ? q.v - p.v : p.v - q.v; });
-  tramos.forEach(function(t){
-    var f2 = max>min ? (t.v-min)/(max-min) : 0.5;
-    capaTrazado.push(L.polyline([[t.a.lat,t.a.lon],[t.b.lat,t.b.lon]],
-      {color:escalaColor(f2), weight:grosorPx(), opacity:0.95}).addTo(mapa));
-  });
+
   var faltantes = [];
   if (huecosGps) faltantes.push(huecosGps+' sin GPS');
   if (huecosValor) faltantes.push(huecosValor+' sin valor');
+  if (sinDato) faltantes.push(sinDato+' m sin dato');
+  var modo = porMedia ? 'media' : 'tramos';
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
-    (nVueltas > 1
-      ? (soloVuelta !== null ? '  (vuelta '+soloVuelta+' de '+nVueltas+')'
-         : '  ('+nVueltas+' vueltas, arriba el valor más '+(modo==='min'?'bajo':'alto')+' de cada punto)')
-      : '') +
+    (porMedia ? '  (media de '+nVueltas+' vueltas en cada metro de pista)'
+              : (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas: sin posición en la pista)' : '')) +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
   var clave = o.fecha+'|'+o.sesion+'|'+o.alcance+'|'+modo;
