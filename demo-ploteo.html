@@ -1396,7 +1396,13 @@ function redibujarHist(){
       bgcolor:'rgba(13,13,13,0.75)', borderpad:3
     });
   });
-  lay.margin = {l:56, r:16, t:10, b:42};
+  // La leyenda va pegada encima de la primera franja, no flotando a distancia:
+  // con y:1.13 dejaba una banda vacía de casi cien píxeles sobre la gráfica.
+  lay.legend = {orientation:'h', x:0, y:1, xanchor:'left', yanchor:'bottom', font:{size:9}};
+  lay.margin = {l:56, r:16, t:24, b:42};
+  // El eje X, con sus números y su título, abajo del todo: anclado a la franja
+  // de arriba quedaba metido entre la primera y la segunda
+  lay.xaxis.anchor = ejeDeFranja(ys.length - 1);
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
   avisarComparacionDudosa(orig, ejeX, bloqueados);
