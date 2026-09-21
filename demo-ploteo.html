@@ -1694,6 +1694,13 @@ function dibujarMapa(){
     // dejan ver la nube, como las marcas de neumático sobre el asfalto.
     var capa;
     if (esSesion){
+      // El punto marca la muestra y la línea une con la anterior: así cada
+      // vuelta se lee como un trazo continuo, y a la vez se distingue dónde
+      // cayó cada muestra de GPS.
+      var union = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
+        {color: color, weight: Math.max(0.6, px/2), opacity: 0.85}).addTo(mapa);
+      union.anchoM = ancho/2;
+      capaTrazado.push(union);
       capa = L.circleMarker([b.lat, b.lon],
         {radius: px/2, color: color, fillColor: color, fillOpacity: 0.9, weight: 0}).addTo(mapa);
       capa.esPunto = true;
