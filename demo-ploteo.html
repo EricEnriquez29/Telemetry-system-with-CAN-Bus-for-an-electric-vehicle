@@ -576,7 +576,7 @@ function datosSesion(fecha, sesion){
 // ═══════════════════════════════════════════════════════════════════════
 var PASO_REF = 1.0;      // metros entre muestras de la regla
 var META_MAX = 200;      // m entre líneas de meta: más que eso son sitios distintos
-var DESVIO_MAX = 7;      // m, percentil 95 de la distancia a la regla. Provisional: se ajusta con la primera sesión real
+var DESVIO_MAX = 10;     // m, percentil 95 de la distancia a la regla: el ancho de una pista de kart. Provisional hasta la primera sesión real
 var COBERTURA_MIN = 0.5; // fracción de la regla que hay que recorrer
 var SUAVIZADO = 9;       // muestras de la media móvil que alisa la regla
 var AVANCE_MAX_M = 3;    // metros que puede avanzar el coche por muestra: 108 km/h a 10 Hz
