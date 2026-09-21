@@ -193,6 +193,13 @@
             <label>Colorear con</label>
             <select id="h-mapvar"></select>
           </div>
+          <div class="field">
+            <label>Color de la sesión</label>
+            <select id="h-mapmodo">
+              <option value="media">media de cada metro de pista</option>
+              <option value="propio">valor de cada vuelta</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="card" style="margin-top:12px;">
@@ -461,7 +468,7 @@ function generarVuelta(semilla, nVuelta, pista){
   var ritmo = 0.92 + rnd()*0.16, dt = 0.1;
   // Trazada propia: cada vuelta se abre y se cierra distinto, como en pista.
   // Metro y medio largo, que es lo que da un circuito estrecho.
-  var ampLinea = 0.4 + rnd()*1.4, faseLinea = rnd()*2*Math.PI;
+  var ampLinea = 1.0 + rnd()*3.0, faseLinea = rnd()*2*Math.PI;
   var desvio = desvioDe(ampLinea, faseLinea);
   var pts = [], E = 0, d = 0, vAnt = 0, u = 0, i = 0;
   while (u < 1 && i < 20000){
@@ -1149,12 +1156,15 @@ var mapa, capaTrazado = [], marcadorCursor = null, ultimoAjuste = '';
 // píxeles: así lo que se ve en el mapa es la huella que deja el coche, y dos
 // vueltas se pisan cuando de verdad pasaron por el mismo asfalto, no porque la
 // línea de dibujo sea más ancha que la separación entre ellas.
-var ANCHO_COCHE_M = 4.5;   // triple del ancho del coche (1.5 m), para que se lea bien
-function grosorPx(){
+// Con una sola traza la línea va gruesa para que se lea. Con las cinco vueltas
+// dibujadas a la vez tiene que ser fina, o cada una taparía a sus vecinas: van
+// a poco más de un metro unas de otras y una línea de 4.5 m las cubre todas.
+var ANCHO_UNA_M = 4.5, ANCHO_VARIAS_M = 1.2;
+function grosorPx(anchoM){
   if (!mapa) return 3;
   var lat = mapa.getCenter().lat;
   var mPorPx = 156543.03392 * Math.cos(lat*Math.PI/180) / Math.pow(2, mapa.getZoom());
-  return Math.max(1, ANCHO_COCHE_M / mPorPx);
+  return Math.max(0.8, (anchoM || ANCHO_UNA_M) / mPorPx);
 }
 // Orígenes ya evaluados contra la regla de medir, tal como se dibujaron
 var ORIGENES = [];
@@ -1170,6 +1180,7 @@ function inicializarHist(){
   });
   document.getElementById('h-x').onchange = redibujarHist;
   document.getElementById('h-mapvar').onchange = dibujarMapa;
+  document.getElementById('h-mapmodo').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
   document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
   // renderer canvas: una sesión completa son ~2000 segmentos, y con el
@@ -1183,8 +1194,7 @@ function inicializarHist(){
   // recalcular los pixeles. Sin esto la linea conservaba el grosor del zoom al
   // que se dibujo y dejaba de corresponder a metros.
   mapa.on('zoomend', function(){
-    var w = grosorPx();
-    capaTrazado.forEach(function(c){ c.setStyle({weight:w}); });
+    capaTrazado.forEach(function(c){ c.setStyle({weight:grosorPx(c.anchoM)}); });
   });
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.65}).addTo(mapa);
@@ -1618,64 +1628,77 @@ function dibujarMapa(){
   for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
-  var huecosGps = 0, huecosValor = 0, sinDato = 0;
-  var porMedia = (o.alcance === 'all' && o.spos && ORIGENES.regla);
+  var huecosGps = 0, huecosValor = 0, fueraPista = 0;
+  var esSesion = (o.alcance === 'all' && o.spos && ORIGENES.regla);
+  var modo = esSesion ? (document.getElementById('h-mapmodo').value || 'media') : 'propio';
+  var ancho = esSesion ? ANCHO_VARIAS_M : ANCHO_UNA_M;
 
-  if (porMedia){
-    // ── Sesión completa: la MEDIA de todas las vueltas en cada metro ──────
-    // En el mapa las vueltas caen en el mismo asfalto y un punto de pantalla
-    // solo admite un color. Encimarlas dejaba ganar a una: con 20, 20, 20, 20 y
-    // 60 km/h se pintaba 60. Aquí cada metro de pista junta lo que midieron
-    // todas las vueltas y se pinta su media, 28. Se dibuja sobre la vuelta de
-    // referencia, que es el trazado común contra el que se midió todo.
-    var R = ORIGENES.regla, LR = Math.round(R.largo);
+  // Siempre se dibujan las COORDENADAS reales de cada vuelta, así que se ve por
+  // dónde fue el coche de verdad, salidas de pista incluidas. Lo que cambia con
+  // el modo es qué valor decide el color de cada tramo.
+  //
+  //   media  — el promedio de todas las vueltas en ese metro de pista. Las cinco
+  //            líneas salen del mismo color: es el comportamiento típico.
+  //   propio — el valor de esa vuelta en ese punto. Se ven las diferencias entre
+  //            vueltas, que con la media quedan escondidas.
+  var media = null, LR = 0;
+  if (esSesion && modo === 'media'){
+    var R = ORIGENES.regla;
+    LR = Math.round(R.largo);
     var suma = new Array(LR), cuenta = new Array(LR);
     for (var i=0;i<o.datos.length;i++){
       var sp = o.spos[i];
-      if (sp === null || sp === undefined){ huecosGps++; continue; }
+      if (sp === null || sp === undefined) continue;
       var v = sano(o.datos[i], campo);
-      if (v === null){ huecosValor++; continue; }
+      if (v === null) continue;
       var bin = Math.round(sp) % LR;
       suma[bin] = (suma[bin] || 0) + v;
       cuenta[bin] = (cuenta[bin] || 0) + 1;
     }
-    var mlonR = mLon(R.ref.lat);
-    for (var b=0; b<LR; b++){
-      var b2 = (b+1) % LR;
-      if (!cuenta[b2]){ sinDato++; continue; }
-      var media = suma[b2] / cuenta[b2];
-      var f2 = max>min ? (media-min)/(max-min) : 0.5;
-      capaTrazado.push(L.polyline([
-        [R.ref.lat + R.y[b]/M_LAT,  R.ref.lon + R.x[b]/mlonR],
-        [R.ref.lat + R.y[b2]/M_LAT, R.ref.lon + R.x[b2]/mlonR]
-      ], {color:escalaColor(f2), weight:grosorPx(), opacity:0.95}).addTo(mapa));
+    media = new Array(LR);
+    for (var b=0;b<LR;b++) if (cuenta[b]) media[b] = suma[b]/cuenta[b];
+  }
+
+  for (var i=1;i<o.datos.length;i++){
+    var a = o.datos[i-1], b = o.datos[i];
+    // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el mapa
+    // a medio dibujar: ahora el tramo simplemente no se traza
+    if (!coordValida(a) || !coordValida(b)){ huecosGps++; continue; }
+    // El salto de meta a meta entre dos vueltas no es un tramo recorrido
+    if (a.n_vuelta !== undefined && b.n_vuelta !== undefined && a.n_vuelta !== b.n_vuelta) continue;
+    var vb = sano(b, campo);
+    if (vb === null){ huecosValor++; continue; }
+
+    var valor = vb, gris = false;
+    if (media){
+      var sp2 = o.spos[i];
+      if (sp2 === null || sp2 === undefined){
+        // Sin posición en la pista no hay metro al que pertenecer: es un tramo
+        // fuera del circuito, como una salida a boxes. Se dibuja, pero en gris,
+        // porque no forma parte del mapa de calor de la pista.
+        gris = true; fueraPista++;
+      } else {
+        var mb = media[Math.round(sp2) % LR];
+        if (mb === undefined) gris = true; else valor = mb;
+      }
     }
-  } else {
-    // ── Una vuelta: cada tramo con su propio valor ──────────────────────
-    for (var i=1;i<o.datos.length;i++){
-      var a = o.datos[i-1], bb = o.datos[i];
-      // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el
-      // mapa a medio dibujar: ahora el tramo simplemente no se traza
-      if (!coordValida(a) || !coordValida(bb)){ huecosGps++; continue; }
-      var vb = sano(bb, campo);
-      if (vb === null){ huecosValor++; continue; }
-      // El salto de meta a meta entre dos vueltas no es un tramo recorrido
-      if (a.n_vuelta !== undefined && bb.n_vuelta !== undefined && a.n_vuelta !== bb.n_vuelta) continue;
-      var f3 = max>min ? (vb-min)/(max-min) : 0.5;
-      capaTrazado.push(L.polyline([[a.lat,a.lon],[bb.lat,bb.lon]],
-        {color:escalaColor(f3), weight:grosorPx(), opacity:0.95}).addTo(mapa));
-    }
+    var f2 = max>min ? (valor-min)/(max-min) : 0.5;
+    var linea = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
+      {color: gris ? '#666' : escalaColor(f2), weight:grosorPx(ancho), opacity:0.95}).addTo(mapa);
+    linea.anchoM = ancho;
+    capaTrazado.push(linea);
   }
 
   var faltantes = [];
   if (huecosGps) faltantes.push(huecosGps+' sin GPS');
   if (huecosValor) faltantes.push(huecosValor+' sin valor');
-  if (sinDato) faltantes.push(sinDato+' m sin dato');
-  var modo = porMedia ? 'media' : 'tramos';
+  if (fueraPista) faltantes.push(fueraPista+' fuera de pista');
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
-    (porMedia ? '  (media de '+nVueltas+' vueltas en cada metro de pista)'
-              : (nVueltas > 1 ? '  ('+nVueltas+' vueltas encimadas: sin posición en la pista)' : '')) +
+    (esSesion ? (modo === 'media'
+        ? '  (' + nVueltas + ' vueltas, color = media de cada metro de pista)'
+        : '  (' + nVueltas + ' vueltas, color = valor de cada vuelta)')
+      : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
   var clave = o.fecha+'|'+o.sesion+'|'+o.alcance+'|'+modo;
