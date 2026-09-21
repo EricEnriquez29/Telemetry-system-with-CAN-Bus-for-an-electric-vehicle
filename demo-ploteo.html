@@ -463,17 +463,39 @@ function tasaArco(pista, desvio, u){
   return Math.sqrt((b.x-a.x)*(b.x-a.x) + (b.y-a.y)*(b.y-a.y)) / (u2 - u1);
 }
 
-function generarVuelta(semilla, nVuelta, pista){
+// Pit lane simulado: corre paralelo a la recta de meta, a PIT_SEP_M metros por
+// fuera de la pista. La vuelta de SALIDA arranca en él y se incorpora a la pista;
+// la de ENTRADA se sale de la pista antes de meta y termina parada en boxes. En
+// el pit lane el coche va con limitador, a PIT_KMH.
+//
+// Nada en el análisis detecta estos tramos: están para ver cómo se cuelan.
+var PIT_SEP_M = 12, PIT_KMH = 20;
+var PIT_SALIDA_FIN = 0.12;    // fracción de vuelta en la que termina de incorporarse
+var PIT_ENTRADA_INI = 0.88;   // fracción en la que empieza a meterse a boxes
+var PIT_ENTRADA_FIN = 0.97;   // donde se detiene
+function rampa(x){ x = Math.max(0, Math.min(1, x)); return x*x*(3 - 2*x); }
+function enBoxes(tipo, u){
+  if (tipo === 'salida')  return 1 - rampa(u / PIT_SALIDA_FIN);
+  if (tipo === 'entrada') return rampa((u - PIT_ENTRADA_INI) / 0.05);
+  return 0;
+}
+
+function generarVuelta(semilla, nVuelta, pista, tipo){
   var rnd = aleatorio(semilla + nVuelta*137);
   var ritmo = 0.92 + rnd()*0.16, dt = 0.1;
   // Trazada propia: cada vuelta se abre y se cierra distinto, como en pista.
   // Metro y medio largo, que es lo que da un circuito estrecho.
   var ampLinea = 1.0 + rnd()*3.0, faseLinea = rnd()*2*Math.PI;
-  var desvio = desvioDe(ampLinea, faseLinea);
+  var linea = desvioDe(ampLinea, faseLinea);
+  // El desvío total suma la trazada y, si la hay, la salida o entrada a boxes
+  var desvio = function(uu){ return linea(uu) + PIT_SEP_M * enBoxes(tipo, uu); };
+  var fin = (tipo === 'entrada') ? PIT_ENTRADA_FIN : 1;
   var pts = [], E = 0, d = 0, vAnt = 0, u = 0, i = 0;
-  while (u < 1 && i < 20000){
+  while (u < fin && i < 20000){
     var curv = curvatura(pista, u);
     var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
+    // En el pit lane manda el limitador
+    if (enBoxes(tipo, u) > 0.5) vObj = PIT_KMH;
     var v = vAnt + (vObj - vAnt)*0.12;
     var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
@@ -529,7 +551,9 @@ function datosVuelta(fecha, sesion, vuelta){
   var k = fecha+'|'+sesion+'|'+vuelta;
   if (!CACHE[k]){
     var ses = buscaSesion(fecha, sesion);
-    CACHE[k] = generarVuelta(ses.semilla, vuelta, ses.pista);
+    // Cada sesión arranca saliendo de boxes y termina entrando en boxes
+    var tipo = (vuelta === 1) ? 'salida' : (vuelta === ses.vueltas ? 'entrada' : null);
+    CACHE[k] = generarVuelta(ses.semilla, vuelta, ses.pista, tipo);
   }
   return CACHE[k];
 }
