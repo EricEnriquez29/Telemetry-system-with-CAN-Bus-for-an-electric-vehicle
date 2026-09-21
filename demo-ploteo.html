@@ -193,13 +193,6 @@
             <label>Colorear con</label>
             <select id="h-mapvar"></select>
           </div>
-          <div class="field">
-            <label>Color de la sesión</label>
-            <select id="h-mapmodo">
-              <option value="media">media de cada metro de pista</option>
-              <option value="propio">valor de cada vuelta</option>
-            </select>
-          </div>
         </div>
       </div>
       <div class="card" style="margin-top:12px;">
@@ -1204,7 +1197,6 @@ function inicializarHist(){
   });
   document.getElementById('h-x').onchange = redibujarHist;
   document.getElementById('h-mapvar').onchange = dibujarMapa;
-  document.getElementById('h-mapmodo').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
   document.getElementById('h-maporigen').onchange = function(){ ultimoAjuste=''; dibujarMapa(); };
 
   // renderer canvas: una sesión completa son ~2000 segmentos, y con el
@@ -1657,7 +1649,9 @@ function dibujarMapa(){
 
   var huecosGps = 0, huecosValor = 0, fueraPista = 0;
   var esSesion = (o.alcance === 'all' && o.spos && ORIGENES.regla);
-  var modo = esSesion ? (document.getElementById('h-mapmodo').value || 'media') : 'propio';
+  // Cada trayectoria con sus propios valores: es lo elegido por el equipo. La
+  // media por metro se probó y se descartó.
+  var modo = 'propio';
   var ancho = esSesion ? ANCHO_VARIAS_M : ANCHO_UNA_M;
 
   // Siempre se dibujan las COORDENADAS reales de cada vuelta, así que se ve por
@@ -1731,10 +1725,7 @@ function dibujarMapa(){
   if (fueraPista) faltantes.push(fueraPista+' fuera de pista');
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
-    (esSesion ? (modo === 'media'
-        ? '  (' + nVueltas + ' trayectorias, color = media de cada metro)'
-        : '  (' + nVueltas + ' trayectorias, color = valor de cada vuelta)')
-      : '') +
+    (esSesion ? '  (' + nVueltas + ' trayectorias, cada una con sus valores)' : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
   var clave = o.fecha+'|'+o.sesion+'|'+o.alcance+'|'+modo;
