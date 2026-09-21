@@ -1066,25 +1066,29 @@ function sano(punto, campo){
   return v;
 }
 
-// Seis tonos en vez de tres. Con verde-amarillo-rojo, cuando la escala va del
-// mínimo real al máximo real, los valores de pista quedaban todos en la mitad
-// alta y solo se distinguían amarillo, naranja y rojo, muy parecidos entre sí.
-// Con más tonos intermedios cada tramo de la escala tiene su propio color.
+// Diez tonos de azul a rojo, tomados de la paleta Turbo: azul, celeste,
+// turquesa, verde, lima, amarillo, ámbar, naranja, rojo y rojo oscuro. Cada
+// tramo de la barra cambia de tono, no solo de intensidad, así que en el mapa se
+// separan bien zonas con pocos km/h de diferencia. Se recortan los extremos de
+// Turbo, que son casi negros y se perderían sobre la foto de satélite.
 var PARADAS_COLOR = [
-  [0.00, [ 59,  76, 192]],   // azul
-  [0.20, [ 47, 163, 230]],   // celeste
-  [0.40, [ 59, 191,  90]],   // verde
-  [0.60, [232, 209,  58]],   // amarillo
-  [0.80, [240, 127,  34]],   // naranja
-  [1.00, [215,  38,  61]]    // rojo
+  [0.000, [ 70, 107, 227]],
+  [0.111, [ 40, 187, 236]],
+  [0.222, [ 26, 228, 182]],
+  [0.333, [100, 253, 106]],
+  [0.444, [164, 252,  60]],
+  [0.556, [225, 221,  55]],
+  [0.667, [254, 174,  45]],
+  [0.778, [246, 111,  26]],
+  [0.889, [212,  52,   5]],
+  [1.000, [165,  20,   3]]
 ];
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
   for (var k=1; k<PARADAS_COLOR.length; k++){
     if (f <= PARADAS_COLOR[k][0]){
       var p0 = PARADAS_COLOR[k-1], p1 = PARADAS_COLOR[k];
-      var u = (f - p0[0]) / (p1[0] - p0[0]);
-      var a = p0[1], b = p1[1];
+      var u = (f - p0[0]) / (p1[0] - p0[0]), a = p0[1], b = p1[1];
       return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
     }
   }
@@ -1703,7 +1707,7 @@ function dibujarMapa(){
     (comun ? '  (escala común)' : '') + (recortada ? '  · p2–p98' : '');
 
   var paradas = [];
-  for (var f=0; f<=10; f++) paradas.push(escalaColor(f/10)+' '+(f*10)+'%');
+  for (var f=0; f<=20; f++) paradas.push(escalaColor(f/20)+' '+(f*5)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
   var huecosGps = 0, huecosValor = 0, fueraPista = 0;
