@@ -1194,7 +1194,10 @@ function inicializarHist(){
   // recalcular los pixeles. Sin esto la linea conservaba el grosor del zoom al
   // que se dibujo y dejaba de corresponder a metros.
   mapa.on('zoomend', function(){
-    capaTrazado.forEach(function(c){ c.setStyle({weight:grosorPx(c.anchoM)}); });
+    capaTrazado.forEach(function(c){
+      var px = grosorPx(c.anchoM);
+      c.setStyle(c.esPunto ? {radius: px/2} : {weight: px});
+    });
   });
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(mapa);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:19,opacity:0.65}).addTo(mapa);
@@ -1683,10 +1686,23 @@ function dibujarMapa(){
       }
     }
     var f2 = max>min ? (valor-min)/(max-min) : 0.5;
-    var linea = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
-      {color: gris ? '#666' : escalaColor(f2), weight:grosorPx(ancho), opacity:0.95}).addTo(mapa);
-    linea.anchoM = ancho;
-    capaTrazado.push(linea);
+    var color = gris ? '#666' : escalaColor(f2);
+    var px = grosorPx(ancho);
+    // En una sesión se dibuja CADA punto de GPS, no una línea que los una. Con
+    // cinco vueltas a menos de dos metros unas de otras, una línea continua las
+    // funde en un solo trazo y no se distingue cuál es cuál; los puntos sueltos
+    // dejan ver la nube, como las marcas de neumático sobre el asfalto.
+    var capa;
+    if (esSesion){
+      capa = L.circleMarker([b.lat, b.lon],
+        {radius: px/2, color: color, fillColor: color, fillOpacity: 0.9, weight: 0}).addTo(mapa);
+      capa.esPunto = true;
+    } else {
+      capa = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
+        {color: color, weight: px, opacity: 0.95}).addTo(mapa);
+    }
+    capa.anchoM = ancho;
+    capaTrazado.push(capa);
   }
 
   var faltantes = [];
@@ -1696,8 +1712,8 @@ function dibujarMapa(){
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
     (esSesion ? (modo === 'media'
-        ? '  (' + nVueltas + ' vueltas, color = media de cada metro de pista)'
-        : '  (' + nVueltas + ' vueltas, color = valor de cada vuelta)')
+        ? '  (' + nVueltas + ' vueltas, un punto por muestra, color = media de cada metro)'
+        : '  (' + nVueltas + ' vueltas, un punto por muestra, color = valor de cada vuelta)')
       : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
