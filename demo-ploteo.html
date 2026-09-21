@@ -1692,22 +1692,11 @@ function dibujarMapa(){
     // cinco vueltas a menos de dos metros unas de otras, una línea continua las
     // funde en un solo trazo y no se distingue cuál es cuál; los puntos sueltos
     // dejan ver la nube, como las marcas de neumático sobre el asfalto.
-    var capa;
-    if (esSesion){
-      // El punto marca la muestra y la línea une con la anterior: así cada
-      // vuelta se lee como un trazo continuo, y a la vez se distingue dónde
-      // cayó cada muestra de GPS.
-      var union = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
-        {color: color, weight: Math.max(0.6, px/2), opacity: 0.85}).addTo(mapa);
-      union.anchoM = ancho/2;
-      capaTrazado.push(union);
-      capa = L.circleMarker([b.lat, b.lon],
-        {radius: px/2, color: color, fillColor: color, fillOpacity: 0.9, weight: 0}).addTo(mapa);
-      capa.esPunto = true;
-    } else {
-      capa = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
-        {color: color, weight: px, opacity: 0.95}).addTo(mapa);
-    }
+    // Trayectorias: cada vuelta es un trazo continuo. Con las cinco a la vez la
+    // línea va fina —1.2 m, menos que los 1.8 m que las separan— para que no se
+    // tapen entre ellas.
+    var capa = L.polyline([[a.lat,a.lon],[b.lat,b.lon]],
+      {color: color, weight: px, opacity: 0.95}).addTo(mapa);
     capa.anchoM = ancho;
     capaTrazado.push(capa);
   }
@@ -1719,8 +1708,8 @@ function dibujarMapa(){
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
     (esSesion ? (modo === 'media'
-        ? '  (' + nVueltas + ' vueltas, un punto por muestra, color = media de cada metro)'
-        : '  (' + nVueltas + ' vueltas, un punto por muestra, color = valor de cada vuelta)')
+        ? '  (' + nVueltas + ' trayectorias, color = media de cada metro)'
+        : '  (' + nVueltas + ' trayectorias, color = valor de cada vuelta)')
       : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
