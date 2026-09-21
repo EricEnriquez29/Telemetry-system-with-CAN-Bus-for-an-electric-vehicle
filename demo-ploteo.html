@@ -58,8 +58,11 @@
 
   /* ── Orígenes: día → sesión → alcance ── */
   .origenes{display:flex;flex-direction:column;gap:5px;}
-  .origen-cab{display:grid;grid-template-columns:16px 118px 96px 128px 30px;gap:6px;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:#666;padding-left:2px;}
-  .origen-row{display:grid;grid-template-columns:16px 118px 96px 128px 30px;gap:6px;align-items:center;}
+  .origen-cab{display:grid;grid-template-columns:34px 118px 96px 128px 30px;gap:6px;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:#666;padding-left:2px;}
+  .origen-row{display:grid;grid-template-columns:34px 118px 96px 128px 30px;gap:6px;align-items:center;}
+  .o-color{width:30px;height:22px;padding:0;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;}
+  .o-color::-webkit-color-swatch-wrapper{padding:2px;}
+  .o-color::-webkit-color-swatch{border:none;border-radius:2px;}
   .swatch{width:13px;height:13px;border-radius:2px;}
   .origen-row select{font-size:10px;padding:3px 5px;width:100%;}
   .ref-tag{font-size:8px;letter-spacing:1px;color:var(--orange);border:1px solid var(--orange);border-radius:2px;padding:1px 4px;text-align:center;}
@@ -155,9 +158,17 @@
 
   <div class="toolbar">
     <div class="field" style="min-width:420px;">
-      <label>Orígenes</label>
-      <div class="origen-cab"><span></span><span>Día</span><span>Sesión</span><span>Alcance</span><span></span></div>
+      <label>Selector de vueltas/sesión</label>
+      <div class="origen-cab"><span>Color</span><span>Día</span><span>Sesión</span><span>Alcance</span><span></span></div>
       <div class="origenes" id="h-origenes"></div>
+      <label style="margin-top:10px;">Vuelta de referencia</label>
+      <div class="origen-row ref-row">
+        <span></span>
+        <select id="r-dia"></select>
+        <select id="r-sesion"></select>
+        <select id="r-vuelta"></select>
+        <span></span>
+      </div>
     </div>
     <div class="field">
       <label>Eje X</label>
@@ -808,31 +819,34 @@ function proyectar(datos, regla){
 
 // Decide, para cada origen, si puede compararse por posición en la pista.
 // Escribe o.spos con las posiciones, o o.motivo con la razón de que no.
-function evaluarOrigenes(orig){
+function evaluarOrigenes(orig, ref){
   orig.forEach(function(o){ o.spos = null; o.motivo = null; });
   if (!orig.length) return;
 
-  var base = orig[0];
+  // Sin referencia explícita se usa el primer origen, como antes
+  var base = ref || orig[0];
+  orig.ref = base;
   var regla = reglaDe(base);
   if (!regla){
-    orig.forEach(function(o){ o.motivo = 'el origen de referencia no tiene GPS suficiente'; });
+    orig.forEach(function(o){ o.motivo = 'la vuelta de referencia no tiene GPS suficiente'; });
     return;
   }
   var metaBase = centroDe(base.meta);
 
-  orig.forEach(function(o, k){
-    if (k > 0){
+  // Todas las filas se comprueban: ninguna es la referencia por estar primera
+  orig.forEach(function(o){
+    {
       // 1. ¿Es siquiera el mismo sitio? Esto se sabe sin calcular nada.
       var d = distanciaGeo(metaBase, centroDe(o.meta));
       if (d > META_MAX){
         o.motivo = 'otro sitio: su línea de meta está a ' +
                    (d > 1000 ? (d/1000).toFixed(1)+' km' : d.toFixed(0)+' m') +
-                   ' de la del origen de referencia';
+                   ' de la de la vuelta de referencia';
         return;
       }
     }
     var pr = proyectar(o.datos, regla);
-    if (k > 0){
+    {
       // 2. Mismo sitio, ¿mismo trazado?
       if (pr.cobertura < COBERTURA_MIN){
         o.motivo = 'el recorrido no encaja con la referencia: solo cubre el ' +
@@ -1257,6 +1271,10 @@ var ORIGENES = [];
 function inicializarHist(){
   var cont = document.getElementById('h-origenes');
   for (var i=0;i<MAX_ORIGENES;i++) cont.appendChild(filaOrigen(i));
+  llenarReferencia();
+  document.getElementById('r-dia').onchange = function(){ document.getElementById('r-sesion').value=''; llenarReferencia(); redibujarHist(); };
+  document.getElementById('r-sesion').onchange = function(){ llenarReferencia(); redibujarHist(); };
+  document.getElementById('r-vuelta').onchange = redibujarHist;
 
   llenarSelect(document.getElementById('h-x'), EJES_X, 's_pista');
   construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
@@ -1304,10 +1322,10 @@ function inicializarHist(){
 function filaOrigen(i){
   var div = document.createElement('div');
   div.className = 'origen-row';
-  div.innerHTML = '<div class="swatch" style="background:'+COLORES[i]+'"></div>' +
+  div.innerHTML = '<input type="color" class="o-color" value="'+COLORES[i]+'" title="Color de esta fila">' +
                   '<select class="o-dia"></select>' +
                   '<select class="o-sesion"></select>' +
-                  '<select class="o-alcance"></select><span class="ref-slot"></span>';
+                  '<select class="o-alcance"></select><span></span>';
 
   var selD = div.querySelector('.o-dia'),
       selS = div.querySelector('.o-sesion'),
@@ -1320,6 +1338,7 @@ function filaOrigen(i){
   selD.onchange = function(){ llenarSesiones(selD, selS, selA); redibujarHist(); };
   selS.onchange = function(){ llenarAlcance(selD, selS, selA, '1'); redibujarHist(); };
   selA.onchange = redibujarHist;
+  div.querySelector('.o-color').onchange = redibujarHist;
 
   llenarSesiones(selD, selS, selA, i===0 ? '1' : '2');
   return div;
@@ -1343,6 +1362,35 @@ function llenarAlcance(selD, selS, selA, preferido){
   if (!selA.value) selA.value = '1';
 }
 
+// La vuelta de referencia se elige aparte de las filas que se grafican. Antes
+// era el primer origen, y eso tenía dos problemas: el orden de las filas
+// cambiaba el resultado, y si la primera era una vuelta de salida de boxes, las
+// demás se quedaban sin posición en la pista. Con "automática" se toma la vuelta
+// de esa sesión que más se parece a las demás, sin contar la primera ni la última.
+function llenarReferencia(){
+  var selD = document.getElementById('r-dia'), selS = document.getElementById('r-sesion'),
+      selV = document.getElementById('r-vuelta');
+  if (!selD.options.length) dias().forEach(function(f){ opcion(selD, f, f); });
+  var sPrev = selS.value, vPrev = selV.value;
+  selS.innerHTML = '';
+  sesionesDe(selD.value).forEach(function(x){ opcion(selS, String(x.sesion), 'Sesión '+x.sesion); });
+  if (Array.prototype.some.call(selS.options, function(op){ return op.value === sPrev; })) selS.value = sPrev;
+  selV.innerHTML = '';
+  var ses = buscaSesion(selD.value, +selS.value);
+  opcion(selV, 'auto', 'Automática');
+  for (var v=1; v<=ses.vueltas; v++) opcion(selV, String(v), 'Vuelta '+v);
+  selV.value = Array.prototype.some.call(selV.options, function(op){ return op.value === vPrev; }) ? vPrev : 'auto';
+}
+function referenciaActiva(){
+  var d = document.getElementById('r-dia').value, s2 = +document.getElementById('r-sesion').value,
+      v = document.getElementById('r-vuelta').value;
+  if (!d || !s2) return null;
+  var auto = (v === 'auto');
+  return {fecha:d, sesion:s2, alcance: auto ? 'all' : v, meta: metaDe(d, s2),
+          etiqueta: d.slice(5) + ' S' + s2 + (auto ? '' : ' V' + v),
+          datos: auto ? datosSesion(d, s2) : datosVuelta(d, s2, +v)};
+}
+
 function origenesActivos(){
   var res = [];
   document.querySelectorAll('#h-origenes .origen-row').forEach(function(row, i){
@@ -1350,25 +1398,17 @@ function origenesActivos(){
         s = row.querySelector('.o-sesion').value,
         a = row.querySelector('.o-alcance').value;
     if (!d || !s || !a) return;
-    res.push({idx:i, color:COLORES[i], fecha:d, sesion:+s, alcance:a,
+    res.push({idx:i, color:row.querySelector('.o-color').value, fecha:d, sesion:+s, alcance:a,
       meta: metaDe(d, +s),
       etiqueta: d.slice(5)+' S'+s+' '+(a==='all'?'completa':'V'+a),
       datos: a==='all' ? datosSesion(d,+s) : datosVuelta(d,+s,+a)});
   });
-  // La referencia es el primer origen ACTIVO. Atarla a la fila 0 dejaba la
-  // comparación sin referencia cuando esa fila estaba vacía: todas las trazas
-  // salían finas y atenuadas, y la etiqueta se quedaba en una fila sin datos.
-  res.forEach(function(o, k){ o.esRef = (k === 0); });
-  marcarFilaReferencia(res.length ? res[0].idx : -1);
+  // Ya no hay un origen que haga de referencia: la vuelta de referencia se
+  // elige aparte, en su propio selector, así que todas las filas se dibujan igual
+  res.forEach(function(o){ o.esRef = false; });
   return res;
 }
 
-function marcarFilaReferencia(idxRef){
-  document.querySelectorAll('#h-origenes .origen-row').forEach(function(row, i){
-    var celda = row.querySelector('.ref-slot');
-    if (celda) celda.innerHTML = (i === idxRef) ? '<span class="ref-tag">ref</span>' : '';
-  });
-}
 
 // El selector del mapa solo ofrece las variables ya elegidas en Y
 // Con varios ejes Y superpuestos, cada uno se escala por su cuenta y el cero de
@@ -1455,7 +1495,7 @@ function sincronizarOrigenMapa(){
   var previo = sel.value;
   sel.innerHTML = '';
   if (!orig.length){ opcion(sel, '', '— sin orígenes —'); return; }
-  orig.forEach(function(o){ opcion(sel, String(o.idx), o.etiqueta + (o.esRef ? '  (ref)' : '')); });
+  orig.forEach(function(o){ opcion(sel, String(o.idx), o.etiqueta); });
   var existe = orig.some(function(o){ return String(o.idx) === previo; });
   sel.value = existe ? previo : String(orig[0].idx);
 }
@@ -1468,7 +1508,7 @@ function redibujarHist(){
   // La regla de medir se construye aquí, con el primer origen, y se descarta al
   // salir. Nada guardado, nada precargado: por eso funciona en una pista que no
   // se ha rodado nunca.
-  evaluarOrigenes(orig);
+  evaluarOrigenes(orig, referenciaActiva());
   // El cursor reutiliza esta evaluación: recalcular la regla en cada movimiento
   // del ratón sería tirar el trabajo y se notaría al pasar por la gráfica.
   ORIGENES = orig;
@@ -1503,8 +1543,8 @@ function redibujarHist(){
         y:o.datos.map(function(p){ return sano(p, y); }),
         name:o.etiqueta, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
-        marker:{size:o.esRef?4:3, color:o.color, opacity:0.9},
-        line:{width:o.esRef?2:1.5, color:o.color},
+        marker:{size:3, color:o.color, opacity:0.9},
+        line:{width:1.8, color:o.color},
         yaxis: ejeDeFranja(k),
         legendgroup: o.etiqueta,
         // Una entrada de leyenda por origen, no una por origen y variable: con
@@ -1573,10 +1613,11 @@ function mostrarReferencia(orig){
   var cont = document.getElementById('h-refinfo');
   if (!orig.length){ cont.innerHTML = ''; return; }
   var R = orig.regla;
-  if (!R){ cont.innerHTML = '<b>Sin regla de medir:</b> el origen de referencia no tiene GPS suficiente.'; return; }
-  var cual = (orig[0].alcance === 'all' && R.vuelta !== undefined)
-    ? 'la vuelta ' + R.vuelta + ' de <b>' + orig[0].etiqueta + '</b>, la que más se parece a las demás'
-    : 'la vuelta de <b>' + orig[0].etiqueta + '</b>';
+  if (!R){ cont.innerHTML = '<b>Sin regla de medir:</b> la vuelta de referencia no tiene GPS suficiente.'; return; }
+  var ref = orig.ref;
+  var cual = (ref.alcance === 'all' && R.vuelta !== undefined)
+    ? 'vuelta ' + R.vuelta + ' de <b>' + ref.etiqueta + '</b>, elegida automáticamente por ser la que más se parece a las demás'
+    : '<b>' + ref.etiqueta + '</b>';
   var t = '<b>Regla de medir:</b> ' + cual + ', ' + R.largo.toFixed(0) + ' m. Se calcula al graficar y no se guarda.';
   // Una regla con un corte de GPS tiene un tramo recto donde debería haber
   // curva: las posiciones de esa zona salen mal y el total de metros se acorta.
@@ -1586,7 +1627,7 @@ function mostrarReferencia(orig){
          (R.cortes.sinFix ? ' (' + R.cortes.sinFix + ' muestras sin señal)' : '') +
          ': la posición no es fiable en esa zona.</span>';
   }
-  var ok = orig.filter(function(o, k){ return k > 0 && o.spos; });
+  var ok = orig.filter(function(o){ return o.spos; });
   if (ok.length){
     t += ' <span class="desc">Encajan contra ella: ' +
          ok.map(function(o){ return o.etiqueta + ' (' + o.p95.toFixed(1) + ' m)'; }).join(', ') +
