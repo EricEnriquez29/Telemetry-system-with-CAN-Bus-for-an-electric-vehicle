@@ -462,14 +462,17 @@ function tasaArco(pista, desvio, u){
 // el pit lane el coche va con limitador, a PIT_KMH.
 //
 // Nada en el análisis detecta estos tramos: están para ver cómo se cuelan.
-var PIT_SEP_M = 12, PIT_KMH = 20;
-var PIT_SALIDA_FIN = 0.12;    // fracción de vuelta en la que termina de incorporarse
-var PIT_ENTRADA_INI = 0.88;   // fracción en la que empieza a meterse a boxes
+// El signo manda el pit lane hacia fuera de la recta, del lado de los edificios.
+// Con signo positivo caía hacia dentro del circuito y la entrada y la salida
+// cruzaban el pasto del infield.
+var PIT_SEP_M = -12, PIT_KMH = 20;
+var PIT_SALIDA_FIN = 0.08;    // fracción de vuelta en la que termina de incorporarse
+var PIT_ENTRADA_INI = 0.90;   // fracción en la que empieza a meterse a boxes
 var PIT_ENTRADA_FIN = 0.97;   // donde se detiene
 function rampa(x){ x = Math.max(0, Math.min(1, x)); return x*x*(3 - 2*x); }
 function enBoxes(tipo, u){
   if (tipo === 'salida')  return 1 - rampa(u / PIT_SALIDA_FIN);
-  if (tipo === 'entrada') return rampa((u - PIT_ENTRADA_INI) / 0.05);
+  if (tipo === 'entrada') return rampa((u - PIT_ENTRADA_INI) / 0.03);
   return 0;
 }
 
@@ -483,12 +486,17 @@ function generarVuelta(semilla, nVuelta, pista, tipo){
   // El desvío total suma la trazada y, si la hay, la salida o entrada a boxes
   var desvio = function(uu){ return linea(uu) + PIT_SEP_M * enBoxes(tipo, uu); };
   var fin = (tipo === 'entrada') ? PIT_ENTRADA_FIN : 1;
-  var pts = [], E = 0, d = 0, vAnt = 0, u = 0, i = 0;
+  // Cada vuelta se simula por separado, y antes todas arrancaban desde cero:
+  // en la gráfica de la sesión salía una caída casi a 0 km/h en cada cruce de
+  // meta que el coche real no tiene. Ahora la vuelta arranca a la velocidad de
+  // crucero de la recta, salvo la de salida, que sale parada del box.
+  var v0 = (62 - curvatura(pista, 0)*30)*(1/ritmo);
+  var pts = [], E = 0, d = 0, vAnt = (tipo === 'salida') ? 0 : v0, u = 0, i = 0;
   while (u < fin && i < 20000){
     var curv = curvatura(pista, u);
     var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
     // En el pit lane manda el limitador
-    if (enBoxes(tipo, u) > 0.5) vObj = PIT_KMH;
+    if (Math.abs(enBoxes(tipo, u)) > 0.5) vObj = PIT_KMH;
     var v = vAnt + (vObj - vAnt)*0.12;
     var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
@@ -692,14 +700,22 @@ function reglaDe(origen){
 
   var elegida = vueltas[0];
   if (vueltas.length > 1){
-    var cand = vueltas.slice(0, CANDIDATAS_MAX);
+    // Con tres vueltas o más, la primera y la última no son candidatas: en una
+    // tanda son la salida y la entrada a boxes. El criterio de "la que más se
+    // parece a las demás" fallaba cuando eran dos de cinco, porque entonces
+    // "las demás" también incluían vueltas de boxes, y acababa eligiendo la
+    // vuelta de salida. Es lo mismo que hace cualquiera a mano.
+    var medio = vueltas.length >= 3 ? vueltas.slice(1, -1) : vueltas;
+    var cand = medio.slice(0, CANDIDATAS_MAX);
     var limpias = cand.filter(function(v){ return !cortesDe(v).hayCorte; });
     if (limpias.length) cand = limpias;
+    var contra = medio.length > 1 ? medio : vueltas;
+    elegida = cand[0];
     var mejor = Infinity;
     cand.forEach(function(v){
       var R = reglaDeVuelta(v);
       if (!R) return;
-      var p95s = vueltas.filter(function(w){ return w !== v; }).slice(0, COMPARADAS_MAX)
+      var p95s = contra.filter(function(w){ return w !== v; }).slice(0, COMPARADAS_MAX)
         .map(function(w){ return proyectar(w, R).p95; })
         .sort(function(a, b){ return a - b; });
       var med = p95s[p95s.length >> 1];
