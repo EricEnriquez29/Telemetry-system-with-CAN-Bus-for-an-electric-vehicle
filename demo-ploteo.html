@@ -1267,6 +1267,9 @@ function grosorPx(anchoM){
 }
 // Orígenes ya evaluados contra la regla de medir, tal como se dibujaron
 var ORIGENES = [];
+// Puntos dibujados en el mapa, para saber cuál hay bajo el ratón
+var PUNTOS_MAPA = [];
+var tipMapa = null;
 
 function inicializarHist(){
   var cont = document.getElementById('h-origenes');
@@ -1295,6 +1298,24 @@ function inicializarHist(){
   // El grosor esta en metros reales, asi que al cambiar el zoom hay que
   // recalcular los pixeles. Sin esto la linea conservaba el grosor del zoom al
   // que se dibujo y dejaba de corresponder a metros.
+  // Del mapa a la gráfica. Hasta ahora la sincronización iba en un solo
+  // sentido: el cursor de la gráfica marcaba el punto en el mapa, pero pasar el
+  // ratón por el mapa no hacía nada. Ahora se busca el punto dibujado más cercano
+  // al ratón, se muestra su información, y la gráfica y la tabla saltan a él.
+  //
+  // Se busca a mano en vez de poner un evento en cada tramo: son miles de tramos
+  // encimados, y así siempre gana el más cercano al ratón, no el de arriba.
+  var pendiente = false;
+  mapa.on('mousemove', function(ev){
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(function(){ pendiente = false; puntoBajoRaton(ev.latlng); });
+  });
+  mapa.on('mouseout', function(){
+    if (tipMapa){ mapa.removeLayer(tipMapa); tipMapa = null; }
+    quitarLineaMapa();
+  });
+
   mapa.on('zoomend', function(){
     capaTrazado.forEach(function(c){
       var px = grosorPx(c.anchoM);
@@ -1682,6 +1703,57 @@ function avisarComparacionDudosa(orig, ejeX, bloqueados){
   cont.innerHTML = avisos.map(function(a){ return '<div class="aviso-comparacion">'+a+'</div>'; }).join('');
 }
 
+function puntoBajoRaton(latlng){
+  if (!PUNTOS_MAPA.length) return;
+  // Tolerancia en píxeles de pantalla, convertida a metros al zoom actual
+  var mPorPx = 156543.03392 * Math.cos(latlng.lat*Math.PI/180) / Math.pow(2, mapa.getZoom());
+  var tolM = 12 * mPorPx, ml = mLon(latlng.lat), mejor = null, dMin = Infinity;
+  for (var k=0; k<PUNTOS_MAPA.length; k++){
+    var p = PUNTOS_MAPA[k];
+    var dx = (p.lon - latlng.lng)*ml, dy = (p.lat - latlng.lat)*M_LAT, d2 = dx*dx + dy*dy;
+    if (d2 < dMin){ dMin = d2; mejor = p; }
+  }
+  if (!mejor || Math.sqrt(dMin) > tolM){
+    if (tipMapa){ mapa.removeLayer(tipMapa); tipMapa = null; }
+    quitarLineaMapa();
+    return;
+  }
+
+  var o = mejor.o, i = mejor.i, d = o.datos[i];
+  var campo = document.getElementById('h-mapvar').value, m = meta(campo);
+  var v = sano(d, campo);
+  var sp = o.spos ? o.spos[i] : null;
+  var html = '<b>' + o.etiqueta + '</b>' + (d.n_vuelta !== undefined ? ' · vuelta ' + d.n_vuelta : '') +
+    '<br>' + m.nombre + ': <b>' + (v !== null ? formatear(v, campo) + ' ' + m.unidad : 'sin dato') + '</b>' +
+    '<br>tiempo ' + d.t_vuelta.toFixed(1) + ' s' +
+    (sp !== null && sp !== undefined ? ' · posición en la pista ' + sp.toFixed(0) + ' m' : ' · sin posición en la pista');
+  // La posición tiene que estar puesta antes de añadirlo al mapa, o Leaflet falla
+  if (!tipMapa){
+    tipMapa = L.tooltip({direction:'top', offset:[0,-8], opacity:0.95})
+      .setLatLng([d.lat, d.lon]).setContent(html).addTo(mapa);
+  } else {
+    tipMapa.setLatLng([d.lat, d.lon]).setContent(html);
+  }
+
+  // Sincroniza la gráfica y la tabla con ese mismo punto
+  var ejeX = document.getElementById('h-x').value;
+  var x = valorEjeX(o, i, ejeX);
+  if (x === null || x === undefined) return;
+  var ys = marcadasDe(document.getElementById('h-y'));
+  var k2 = ORIGENES.indexOf(o);
+  if (k2 < 0 || !ys.length) return;
+  moverCursor(x, k2*ys.length, i);
+  // Línea vertical en la gráfica en ese mismo punto. Plotly no dibuja su propia
+  // línea de cursor en las gráficas WebGL cuando el ratón no está encima, así
+  // que se pone como una forma de la gráfica.
+  Plotly.relayout('g-hist', {shapes:[{type:'line', xref:'x', yref:'paper', x0:x, x1:x, y0:0, y1:1,
+                                       line:{color:'#d8d8d8', width:1, dash:'dot'}}]});
+}
+function quitarLineaMapa(){
+  var g = document.getElementById('g-hist');
+  if (g && g.layout && g.layout.shapes && g.layout.shapes.length) Plotly.relayout('g-hist', {shapes:[]});
+}
+
 function limpiarCursor(){
   document.getElementById('h-valores').innerHTML =
     '<div class="sin-cursor">Pasa el cursor sobre la gráfica.</div>';
@@ -1692,6 +1764,7 @@ function limpiarCursor(){
 // ── Mapa: el origen elegido, coloreado por la variable elegida ──
 function dibujarMapa(){
   capaTrazado.forEach(function(c){ mapa.removeLayer(c); });
+  PUNTOS_MAPA = [];
   capaTrazado = [];
 
   // Los orígenes ya evaluados contra la regla de medir: son los únicos que
@@ -1821,6 +1894,7 @@ function dibujarMapa(){
       {color: color, weight: px, opacity: 0.95}).addTo(mapa);
     capa.anchoM = ancho;
     capaTrazado.push(capa);
+    PUNTOS_MAPA.push({lat:b.lat, lon:b.lon, o:o, i:i});
   }
 
   var faltantes = [];
