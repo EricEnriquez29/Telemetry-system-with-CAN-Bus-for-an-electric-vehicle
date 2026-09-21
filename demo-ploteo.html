@@ -468,15 +468,19 @@ function tasaArco(pista, desvio, u){
 var PIT_SEP_M = -12, PIT_KMH = 20;
 var PIT_SALIDA_FIN = 0.08;    // fracción de vuelta en la que termina de incorporarse
 var PIT_ENTRADA_INI = 0.90;   // fracción en la que empieza a meterse a boxes
-var PIT_ENTRADA_FIN = 0.97;   // donde se detiene
+var PIT_ENTRADA_FIN = 0.97;   // límite de seguridad del bucle
+var PIT_PARADA = 0.95;        // punto del box donde el coche se detiene
+var PIT_PARADA_S = 3;         // segundos parado en una parada en boxes
 function rampa(x){ x = Math.max(0, Math.min(1, x)); return x*x*(3 - 2*x); }
 function enBoxes(tipo, u){
   if (tipo === 'salida')  return 1 - rampa(u / PIT_SALIDA_FIN);
   if (tipo === 'entrada') return rampa((u - PIT_ENTRADA_INI) / 0.03);
+  // Parada: entra al pit lane, se detiene y vuelve a la pista antes de meta
+  if (tipo === 'parada')  return rampa((u - PIT_ENTRADA_INI) / 0.03) * (1 - rampa((u - 0.97) / 0.025));
   return 0;
 }
 
-function generarVuelta(semilla, nVuelta, pista, tipo){
+function generarVuelta(semilla, nVuelta, pista, tipo, vPrevia){
   var rnd = aleatorio(semilla + nVuelta*137);
   var ritmo = 0.92 + rnd()*0.16, dt = 0.1;
   // Trazada propia: cada vuelta se abre y se cierra distinto, como en pista.
@@ -491,13 +495,28 @@ function generarVuelta(semilla, nVuelta, pista, tipo){
   // meta que el coche real no tiene. Ahora la vuelta arranca a la velocidad de
   // crucero de la recta, salvo la de salida, que sale parada del box.
   var v0 = (62 - curvatura(pista, 0)*30)*(1/ritmo);
-  var pts = [], E = 0, d = 0, vAnt = (tipo === 'salida') ? 0 : v0, u = 0, i = 0;
+  // Cada vuelta arranca a la velocidad con que terminó la anterior. Sin esto,
+  // tras la parada en boxes de la vuelta 3 había un salto de 45 a 23 km/h en el
+  // cruce de meta que el coche real no tiene.
+  var vIni = (tipo === 'salida') ? 0 : (vPrevia !== undefined ? vPrevia : v0);
+  var pts = [], E = 0, d = 0, vAnt = vIni, u = 0, i = 0, parado = 0, yaParo = false;
   while (u < fin && i < 20000){
     var curv = curvatura(pista, u);
     var vObj = (62 - curv*30)*(1/ritmo) + (rnd()-0.5)*1.2;
     // En el pit lane manda el limitador
     if (Math.abs(enBoxes(tipo, u)) > 0.5) vObj = PIT_KMH;
+    // En el box el coche se detiene del todo: al terminar la tanda, o unos
+    // segundos en una parada antes de volver a salir
+    var frenaBox = (tipo === 'entrada' || (tipo === 'parada' && !yaParo)) && u >= PIT_PARADA;
+    if (frenaBox) vObj = 0;
     var v = vAnt + (vObj - vAnt)*0.12;
+    if (frenaBox && v < 0.4) v = 0;
+    // La vuelta de salida arranca parada en el box
+    if (tipo === 'salida' && i < 20) v = 0;
+    if (tipo === 'parada' && !yaParo && v === 0 && u >= PIT_PARADA){
+      parado++;
+      if (parado >= PIT_PARADA_S/dt) yaParo = true;
+    }
     var acc = (v - vAnt)/dt/3.6;
     vAnt = v;
     d += v*dt/3600;
@@ -520,6 +539,8 @@ function generarVuelta(semilla, nVuelta, pista, tipo){
       lat:pos.lat, lon:pos.lon
     });
     i++;
+    // La tanda termina con el coche parado en el box
+    if (tipo === 'entrada' && v === 0 && u >= PIT_PARADA) break;
   }
   return pts;
 }
@@ -553,8 +574,13 @@ function datosVuelta(fecha, sesion, vuelta){
   if (!CACHE[k]){
     var ses = buscaSesion(fecha, sesion);
     // Cada sesión arranca saliendo de boxes y termina entrando en boxes
-    var tipo = (vuelta === 1) ? 'salida' : (vuelta === ses.vueltas ? 'entrada' : null);
-    CACHE[k] = generarVuelta(ses.semilla, vuelta, ses.pista, tipo);
+    // La vuelta 3 tiene una parada en boxes
+    var tipo = (vuelta === 1) ? 'salida'
+             : (vuelta === ses.vueltas) ? 'entrada'
+             : (vuelta === 3) ? 'parada' : null;
+    var previa = (vuelta > 1) ? datosVuelta(fecha, sesion, vuelta-1) : null;
+    var vPrevia = previa && previa.length ? previa[previa.length-1].speed_v : undefined;
+    CACHE[k] = generarVuelta(ses.semilla, vuelta, ses.pista, tipo, vPrevia);
   }
   return CACHE[k];
 }
@@ -718,7 +744,10 @@ function reglaDe(origen){
       var p95s = contra.filter(function(w){ return w !== v; }).slice(0, COMPARADAS_MAX)
         .map(function(w){ return proyectar(w, R).p95; })
         .sort(function(a, b){ return a - b; });
-      var med = p95s[p95s.length >> 1];
+      // Promedio, no mediana: con dos o tres comparaciones la mediana es casi el
+      // máximo, y una sola vuelta rara decidía la elección. En la prueba con una
+      // parada en boxes en la vuelta 3, la mediana acababa eligiendo esa vuelta.
+      var med = p95s.reduce(function(a, b){ return a + b; }, 0) / p95s.length;
       if (med < mejor){ mejor = med; elegida = v; }
     });
   }
@@ -1037,11 +1066,30 @@ function sano(punto, campo){
   return v;
 }
 
+// Seis tonos en vez de tres. Con verde-amarillo-rojo, cuando la escala va del
+// mínimo real al máximo real, los valores de pista quedaban todos en la mitad
+// alta y solo se distinguían amarillo, naranja y rojo, muy parecidos entre sí.
+// Con más tonos intermedios cada tramo de la escala tiene su propio color.
+var PARADAS_COLOR = [
+  [0.00, [ 59,  76, 192]],   // azul
+  [0.20, [ 47, 163, 230]],   // celeste
+  [0.40, [ 59, 191,  90]],   // verde
+  [0.60, [232, 209,  58]],   // amarillo
+  [0.80, [240, 127,  34]],   // naranja
+  [1.00, [215,  38,  61]]    // rojo
+];
 function escalaColor(f){
   f = Math.max(0, Math.min(1, f));
-  var c1=[59,167,118], c2=[194,168,56], c3=[204,64,85];
-  var a = f<0.5?c1:c2, b = f<0.5?c2:c3, u = f<0.5?f*2:(f-0.5)*2;
-  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
+  for (var k=1; k<PARADAS_COLOR.length; k++){
+    if (f <= PARADAS_COLOR[k][0]){
+      var p0 = PARADAS_COLOR[k-1], p1 = PARADAS_COLOR[k];
+      var u = (f - p0[0]) / (p1[0] - p0[0]);
+      var a = p0[1], b = p1[1];
+      return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
+    }
+  }
+  var c = PARADAS_COLOR[PARADAS_COLOR.length-1][1];
+  return 'rgb('+c[0]+','+c[1]+','+c[2]+')';
 }
 
 // En vivo: gráfica totalmente estática.
@@ -1638,15 +1686,10 @@ function dibujarMapa(){
       if (v !== null) todos.push(v);
     });
   });
+  // Del mínimo registrado al máximo registrado, sin recortar: es lo que pidió el
+  // equipo. Que se distingan los tonos lo resuelve la escala de seis colores.
   var min = Infinity, max = -Infinity, recortada = false;
-  if (todos.length){
-    todos.sort(function(a,b){ return a-b; });
-    var lo = todos[Math.floor(todos.length*0.02)];
-    var hi = todos[Math.ceil(todos.length*0.98) - 1];
-    recortada = (lo > todos[0] || hi < todos[todos.length-1]);
-    min = lo; max = hi;
-    if (min === max){ min = todos[0]; max = todos[todos.length-1]; recortada = false; }
-  }
+  todos.forEach(function(v){ if (v < min) min = v; if (v > max) max = v; });
   if (min === Infinity){                     // la variable no tiene ni un dato
     document.getElementById('h-mapname').textContent = o.etiqueta + ' · ' + m.nombre + '  (sin datos)';
     document.getElementById('h-min').textContent = '—';
