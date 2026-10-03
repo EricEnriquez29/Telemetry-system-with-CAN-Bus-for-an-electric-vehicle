@@ -1195,8 +1195,21 @@ var iniciado = false;
 function arrancar(){
   if (iniciado) return;
   iniciado = true;
-  inicializarVivo();
-  inicializarHist();
+  // Cada mitad en su propio try. Si la gráfica en vivo falla al construirse,
+  // el análisis tiene que seguir funcionando igual, y al revés: antes una
+  // excepción en la primera dejaba la pestaña entera en blanco, con los
+  // selectores vacíos y sin ninguna pista de por qué.
+  try { inicializarVivo(); } catch (e){ fallo('la gráfica en vivo', e); }
+  try { inicializarHist(); } catch (e){ fallo('el análisis', e); }
+}
+
+function fallo(que, e){
+  console.error('Ploteo — ' + que + ':', e);
+  var el = document.getElementById('h-estado');
+  if (el){
+    el.className = 'pl-estado-carga error';
+    el.textContent = 'No se pudo construir ' + que + ': ' + (e && e.message ? e.message : e);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -1206,6 +1219,10 @@ document.addEventListener('DOMContentLoaded', function(){
       document.querySelectorAll('#tab-2 .pl-panel').forEach(function(x){ x.classList.remove('pl-on'); });
       t.classList.add('pl-on');
       document.getElementById('panel-' + t.dataset.panel).classList.add('pl-on');
+      // Red de seguridad: lo normal es que el menú lateral ya haya llamado a
+      // PloteoTab.abrir() al entrar aquí, pero si esta pestaña se abre por
+      // cualquier otro camino, tocar una de las dos secciones la construye.
+      arrancar();
       // Plotly y Leaflet miden el contenedor al dibujar, y en una pestaña oculta
       // ese contenedor mide cero: hay que avisarles cuando se hace visible.
       ajustarTamanos();
