@@ -19,6 +19,9 @@
       t.setAttribute('aria-selected', i === j ? 'true' : 'false');
       document.getElementById('tab-' + j).style.display = i === j ? 'block' : 'none';
     });
+    // La pestaña de Ploteo construye sus gráficas la primera vez que se abre:
+    // Plotly y Leaflet no pueden medir un contenedor que está en display:none.
+    if (i === 2 && window.PloteoTab) window.PloteoTab.abrir();
     closeMenu();
   }
 

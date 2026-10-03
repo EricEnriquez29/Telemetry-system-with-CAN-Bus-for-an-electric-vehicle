@@ -15,6 +15,9 @@ var FenixConfig = {
   get sessionsForDateUrl() {
     return "http://" + this.BACKEND_HOST + ":" + this.HTTP_PORT + "/sessions_for_date";
   },
+  get sessionSeriesUrl() {
+    return "http://" + this.BACKEND_HOST + ":" + this.HTTP_PORT + "/session_series";
+  },
   get setMetaUrl() {
     return "http://" + this.BACKEND_HOST + ":" + this.HTTP_PORT + "/set_meta";
   }

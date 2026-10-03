@@ -255,6 +255,99 @@ from(bucket: "{config.INFLUX_BUCKET}")
     }
 
 
+# Campos que la pestana de Ploteo puede pedir como serie. Es una lista
+# blanca, no una comodidad: `fields` llega de la URL y se inserta en el filtro
+# Flux por f-string, igual que session_id (ver nota en build_session_summary).
+# Cualquier nombre fuera de esta lista se rechaza en meta_server.py.
+SERIES_FIELDS = (
+    "speed_v", "rpm", "p_hv", "p_mec", "curr_p", "throttle", "brake",
+    "Gx", "Gy", "E_HV", "eta", "soc", "p_regen", "E_regen", "tmp_mot",
+    "tmp_cont", "tmp_cap", "tmp_max", "volt_p", "batt_curr", "tau_est",
+)
+# Siempre viajan: son el eje X y el mapa, no los elige el usuario.
+SERIES_BASE = ("t_vuelta", "d_vuelta", "gps_lat", "gps_lon")
+# Techo de muestras por respuesta. Una sesion de 15 min a 10 Hz son 9000
+# muestras; por encima del techo se devuelve una de cada N, para que una tanda
+# larga no mande decenas de MB al navegador.
+SERIES_MAX_MUESTRAS = 20000
+
+
+def get_session_series(date_str: str, session_id: str, fields: list, lap: int = None) -> dict:
+    """Devuelve las muestras crudas de una sesion, en orden, para graficarlas.
+
+    A diferencia de build_session_summary, que resume, esto entrega la serie
+    completa: cada muestra con su numero de vuelta, su tiempo y distancia DE
+    ESA VUELTA, su coordenada GPS y los campos pedidos.
+
+    Dos conversiones se hacen aqui y no en el navegador, para que el cliente
+    reciba lo mismo que ve en pantalla:
+      - d_vuelta se guarda en km y el eje de Ploteo esta en metros.
+      - gps_lat/gps_lon se llaman lat/lon, que es como los nombra el mapa.
+
+    Nota de seguridad: `session_id` y `fields` se insertan en Flux via f-string.
+    El caller (meta_server.py) valida ambos antes de llamar."""
+    day_start_local = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(hours=config.TZ_OFFSET_HOURS)
+    start = day_start_local.strftime("%Y-%m-%dT%H:%M:%SZ")
+    stop = (day_start_local + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    pedidos = [f for f in fields if f in SERIES_FIELDS]
+    campos = list(SERIES_BASE) + pedidos
+    filtro_campos = " or ".join([f'r._field == "{c}"' for c in campos])
+
+    flux = f'''
+from(bucket: "{config.INFLUX_BUCKET}")
+  |> range(start: {start}, stop: {stop})
+  |> filter(fn: (r) => r._measurement == "vehicle_telemetry" and r.session_id == "{session_id}")
+  |> filter(fn: (r) => {filtro_campos})
+  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])
+'''
+
+    crudas = []
+    for table in query_api.query(flux, org=config.INFLUX_ORG):
+        for rec in table.records:
+            lap_n = rec.values.get("lap_number")
+            if lap_n is None:
+                continue
+            try:
+                lap_n = int(lap_n)
+            except (TypeError, ValueError):
+                continue
+            # La vuelta 0 es lo rodado antes del primer cruce de meta: no es una
+            # vuelta y mezclarla con las demas descuadra el eje.
+            if lap_n == 0:
+                continue
+            if lap is not None and lap_n != lap:
+                continue
+            v = rec.values
+            d_km = v.get("d_vuelta")
+            m = {
+                "n_vuelta": lap_n,
+                "t_vuelta": _r(v.get("t_vuelta"), 1),
+                "d_vuelta": _r(d_km * 1000.0, 1) if d_km is not None else None,
+                "lat": v.get("gps_lat"),
+                "lon": v.get("gps_lon"),
+            }
+            for c in pedidos:
+                m[c] = v.get(c)
+            crudas.append(m)
+
+    # Diezmado parejo: se conserva una de cada `paso`, nunca un recorte del
+    # final, para que la vuelta siga completa aunque pierda resolucion.
+    paso = 1
+    if len(crudas) > SERIES_MAX_MUESTRAS:
+        paso = (len(crudas) // SERIES_MAX_MUESTRAS) + 1
+        crudas = crudas[::paso]
+
+    vueltas = sorted(set(m["n_vuelta"] for m in crudas))
+    return {
+        "date": date_str, "session_id": session_id,
+        "campos": pedidos, "vueltas": vueltas,
+        "n_muestras": len(crudas), "paso": paso,
+        "muestras": crudas,
+    }
+
+
 def get_sessions_for_date(date_str: str) -> list:
     """Devuelve la lista de session_id distintos con datos en ese día."""
     day_start_local = datetime.strptime(date_str, "%Y-%m-%d") + timedelta(hours=config.TZ_OFFSET_HOURS)

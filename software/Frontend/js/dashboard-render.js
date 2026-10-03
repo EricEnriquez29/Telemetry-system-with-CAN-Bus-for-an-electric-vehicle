@@ -103,6 +103,10 @@
   // un mensaje no deje partes del dashboard congeladas en silencio (antes
   // solo la tabla de vueltas tenía este guard).
   function updateDashboard(payload) {
+    // La pestaña de Ploteo se alimenta del mismo snapshot. Va primero y en su
+    // propio try: un fallo suyo no puede dejar el tablero sin actualizar, y un
+    // fallo del tablero no puede dejar la gráfica en vivo congelada.
+    try { if (window.PloteoVivo) window.PloteoVivo.push(payload); } catch (e) { console.error('Ploteo en vivo:', e); }
     try {
       const d = payload.data || {};
       const ts = payload.timestamp || new Date().toISOString();

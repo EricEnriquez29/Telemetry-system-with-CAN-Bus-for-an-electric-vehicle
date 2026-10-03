@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/center.css">
   <link rel="stylesheet" href="css/map-laps-historical.css">
+  <link rel="stylesheet" href="css/ploteo.css">
 </head>
 <body>
 
@@ -313,7 +314,101 @@
 </div>
 
 <div id="tab-2" style="display:none;">
-  <div class="empty-tab">— Ploteo — en construcción —</div>
+
+  <div class="pl-tabs">
+    <div class="pl-tab pl-on" data-panel="vivo">En vivo</div>
+    <div class="pl-tab" data-panel="hist">Análisis</div>
+  </div>
+
+  <!-- ─────────────── EN VIVO ─────────────── -->
+  <div class="pl-panel pl-on" id="panel-vivo">
+    <div class="aviso">
+      <b>Ventana deslizante de 20 segundos.</b> Se alimenta del mismo WebSocket que el tablero, descarta lo viejo y no acumula.
+      Rueda para acercar · doble clic para volver a seguir al coche.
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label>Eje X</label>
+        <select id="v-x"></select>
+      </div>
+      <div class="field">
+        <label>Variables en Y</label>
+        <div class="chk-list" id="v-y"></div>
+        <div class="chk-cuenta" id="v-y-cuenta"></div>
+      </div>
+      <div class="field">
+        <label>Gráfica</label>
+        <button id="v-toggle">Pausar</button>
+      </div>
+      <div class="field">
+        <label>Estado</label>
+        <div class="estado-vivo"><div class="pl-dot" id="v-dot"></div><span id="v-estado">Recibiendo</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>Gráfica en vivo</span><span class="hint" id="v-hint">esperando datos…</span></div>
+      <div id="g-vivo" style="height:430px;"></div>
+    </div>
+  </div>
+
+  <!-- ─────────────── ANÁLISIS ─────────────── -->
+  <div class="pl-panel" id="panel-hist">
+    <div class="aviso">
+      <b>Hasta 3 orígenes comparables.</b> El color identifica el origen y cada variable tiene su franja.
+      El mapa se colorea con una de las variables ya elegidas,
+      y el cursor muestra los valores de <b>todos</b> los orígenes a la vez.
+    </div>
+
+    <div class="toolbar">
+      <div class="field" style="min-width:440px;">
+        <label>Selector de vueltas/sesión</label>
+        <div class="pl-origen-cab"><span>Color</span><span>Día</span><span>Sesión</span><span>Alcance</span><span></span></div>
+        <div class="origenes" id="h-origenes"></div>
+        <div class="pl-estado-carga" id="h-estado"></div>
+      </div>
+      <div class="field">
+        <label>Eje X</label>
+        <select id="h-x"></select>
+      </div>
+      <div class="field">
+        <label>Variables en Y</label>
+        <div class="chk-list" id="h-y"></div>
+        <div class="chk-cuenta" id="h-y-cuenta"></div>
+      </div>
+    </div>
+
+    <div class="grid-hist">
+      <div class="card">
+        <div class="card-title"><span>Gráfica</span><span class="hint">rueda para acercar · arrastra para moverte · doble clic para volver</span></div>
+        <div id="h-aviso"></div>
+        <div id="g-hist" style="height:620px;"></div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title"><span>Trazado</span><span class="var-mapa" id="h-mapname">—</span></div>
+          <div id="pl-mapa"></div>
+          <div class="leyenda-mapa"><span id="h-min">—</span><div id="barra-color"></div><span id="h-max">—</span></div>
+          <div class="mapa-controles">
+            <div class="field">
+              <label>Origen a mostrar</label>
+              <select id="h-maporigen"></select>
+            </div>
+            <div class="field">
+              <label>Colorear con</label>
+              <select id="h-mapvar"></select>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-title"><span>Bajo el cursor</span><span class="hint" id="h-cursor-pos"></span></div>
+          <div id="h-valores"><div class="sin-cursor">Pasa el cursor sobre la gráfica.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="js/config.js"></script>
@@ -328,6 +423,7 @@
 <script src="js/cells-init.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/canvas-widgets.js"></script>
+<script src="js/ploteo.js"></script>
 <script src="js/horizon3d.js"></script>
 <script src="js/dashboard-render.js"></script>
 <script src="js/websocket.js"></script>

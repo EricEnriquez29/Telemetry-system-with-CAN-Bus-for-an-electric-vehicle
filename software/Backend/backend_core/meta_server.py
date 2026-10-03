@@ -5,6 +5,7 @@ que atiende las 3 rutas que consume el Frontend:
   POST /set_meta            setea la línea de meta (requiere header X-Meta-Token)
   GET  /sessions_for_date    lista de sesiones con datos en una fecha
   GET  /session_summary      resumen completo de una sesión histórica
+  GET  /session_series       muestras crudas de una sesión, para graficarlas
 
 Es el "controller" de esta capa: valida y autentica la entrada, y delega el
 trabajo real a vueltas.py e historicos.py — no contiene lógica de negocio
@@ -114,6 +115,10 @@ class _MetaHandler(BaseHTTPRequestHandler):
             self._send(200, {"date": date_str, "sessions": sesiones})
             return
 
+        if parsed.path == "/session_series":
+            self._series(qs)
+            return
+
         if parsed.path != "/session_summary":
             self._send(404, {"error": "not_found"})
             return
@@ -131,6 +136,44 @@ class _MetaHandler(BaseHTTPRequestHandler):
             self._send(500, {"error": str(e)})
             return
         self._send(200, summary)
+
+    def _series(self, qs):
+        """La serie cruda de una sesión para la pestaña de Ploteo.
+
+        `fields` llega como lista separada por comas y se filtra contra la
+        lista blanca de historicos.SERIES_FIELDS antes de tocar la consulta:
+        un nombre inventado no se ignora en silencio, se devuelve 400, porque
+        una gráfica a la que le falta una variable sin avisar es peor que un
+        error."""
+        date_str = qs.get("date", [None])[0]
+        session_id = qs.get("session_id", [None])[0]
+        if not date_str or not session_id:
+            self._send(400, {"error": "faltan_parametros_date_session_id"})
+            return
+        if not _DATE_RE.match(date_str) or not _SESSION_ID_RE.match(session_id):
+            self._send(400, {"error": "formato_invalido"})
+            return
+
+        crudo = qs.get("fields", [""])[0]
+        fields = [f for f in crudo.split(",") if f]
+        desconocidos = [f for f in fields if f not in historicos.SERIES_FIELDS]
+        if desconocidos:
+            self._send(400, {"error": "campos_desconocidos", "campos": desconocidos})
+            return
+
+        lap = qs.get("lap", [None])[0]
+        if lap is not None:
+            if not lap.isdigit():
+                self._send(400, {"error": "lap_invalido"})
+                return
+            lap = int(lap)
+
+        try:
+            serie = historicos.get_session_series(date_str, session_id, fields, lap)
+        except Exception as e:
+            self._send(500, {"error": str(e)})
+            return
+        self._send(200, serie)
 
     def log_message(self, fmt, *args):
         pass  # silenciar el log por request de http.server

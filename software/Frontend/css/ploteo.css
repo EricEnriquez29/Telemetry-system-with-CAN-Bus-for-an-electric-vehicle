@@ -1,0 +1,81 @@
+/* ── Pestaña de Ploteo ──
+   Portado de demo-ploteo.html. Todo cuelga de #tab-2, así que ninguna regla
+   puede alcanzar al dashboard aunque el nombre de la clase se repita. Las
+   clases que el dashboard sí podría tener algún día (tab, panel, dot) llevan
+   además el prefijo pl-; las variables de color son las de base.css. */
+
+#tab-2{padding:14px;}
+
+#tab-2 .pl-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--col1);margin:-14px -14px 14px;}
+#tab-2 .pl-tab{padding:10px 22px;cursor:pointer;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent;}
+#tab-2 .pl-tab:hover{color:var(--text);}
+#tab-2 .pl-tab.pl-on{color:var(--orange);border-bottom-color:var(--orange);background:#111;}
+
+#tab-2 .pl-panel{display:none;}
+#tab-2 .pl-panel.pl-on{display:block;}
+
+#tab-2 .toolbar{background:var(--col1);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;}
+#tab-2 .field{display:flex;flex-direction:column;gap:5px;}
+#tab-2 .field > label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+#tab-2 select,#tab-2 button,#tab-2 input[type=date]{font-family:'Share Tech Mono',monospace;background:#141414;color:var(--text);border:1px solid var(--border);border-radius:3px;padding:5px 8px;font-size:11px;}
+#tab-2 select:focus,#tab-2 button:focus,#tab-2 input[type=date]:focus{outline:1px solid var(--orange);}
+#tab-2 button{cursor:pointer;}
+#tab-2 button:hover{border-color:var(--orange);color:var(--orange);}
+/* El icono del calendario es negro sobre fondo negro sin esto */
+#tab-2 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);cursor:pointer;}
+
+#tab-2 .chk-list{background:#111;border:1px solid var(--border);border-radius:3px;padding:4px;max-height:132px;overflow-y:auto;min-width:190px;}
+#tab-2 .chk-item{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:2px;cursor:pointer;font-size:11px;}
+#tab-2 .chk-item:hover{background:#181818;}
+#tab-2 .chk-item input{accent-color:var(--orange);cursor:pointer;margin:0;}
+#tab-2 .chk-item.sel{background:#1a1a1a;}
+#tab-2 .chk-item .u{color:#666;font-size:10px;}
+#tab-2 .chk-item.bloq{opacity:.35;cursor:not-allowed;}
+#tab-2 .chk-cuenta{font-size:9px;color:#666;padding:2px 6px 0;}
+
+/* ── Selector de vueltas/sesión: día → sesión → alcance ── */
+#tab-2 .origenes{display:flex;flex-direction:column;gap:5px;}
+#tab-2 .pl-origen-cab{display:grid;grid-template-columns:34px 130px 96px 128px 30px;gap:6px;font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:#666;padding-left:2px;}
+#tab-2 .pl-origen-row{display:grid;grid-template-columns:34px 130px 96px 128px 30px;gap:6px;align-items:center;}
+#tab-2 .pl-origen-row select,#tab-2 .pl-origen-row input[type=date]{font-size:10px;padding:3px 5px;width:100%;}
+#tab-2 .pl-o-color{width:30px;height:22px;padding:0;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;}
+#tab-2 .pl-o-color::-webkit-color-swatch-wrapper{padding:2px;}
+#tab-2 .pl-o-color::-webkit-color-swatch{border:none;border-radius:2px;}
+#tab-2 .pl-estado-carga{font-size:9.5px;color:#777;margin-top:6px;min-height:12px;}
+#tab-2 .pl-estado-carga.aviso{color:var(--yellow);}
+#tab-2 .pl-estado-carga.error{color:var(--red);}
+
+#tab-2 .grid-hist{display:grid;grid-template-columns:1fr 400px;gap:12px;}
+@media(max-width:1150px){#tab-2 .grid-hist{grid-template-columns:1fr;}}
+
+#tab-2 .card{background:var(--col1);border:1px solid var(--border);border-radius:4px;padding:10px;}
+#tab-2 .card-title{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+#tab-2 .card-title .hint{color:#666;text-transform:none;letter-spacing:0;font-size:9px;}
+#tab-2 .card-title .var-mapa{color:var(--orange);}
+
+#tab-2 #pl-mapa{height:280px;border-radius:3px;background:#111;}
+#tab-2 .leyenda-mapa{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:9px;color:var(--muted);}
+#tab-2 #barra-color{flex:1;height:9px;border-radius:2px;border:1px solid #222;}
+#tab-2 .mapa-controles{display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid #1a1a1a;}
+#tab-2 .mapa-controles .field{flex:1;}
+#tab-2 .mapa-controles select{width:100%;}
+
+#tab-2 table.cursor-tabla{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:2px;}
+#tab-2 table.cursor-tabla th,#tab-2 table.cursor-tabla td{padding:3px 5px;border-bottom:1px solid #161616;text-align:right;}
+#tab-2 table.cursor-tabla th:first-child,#tab-2 table.cursor-tabla td:first-child{text-align:left;color:var(--muted);font-weight:normal;}
+#tab-2 table.cursor-tabla thead th{font-size:9px;letter-spacing:.5px;border-bottom:1px solid #262626;}
+#tab-2 table.cursor-tabla td{font-weight:bold;}
+#tab-2 table.cursor-tabla tr.destacada td{color:var(--orange);}
+#tab-2 .sin-cursor{font-size:10px;color:#666;padding:6px 2px;}
+
+#tab-2 .aviso-comparacion{background:#1a1207;border-left:3px solid var(--yellow);color:#d8c9a0;
+  font-size:10px;padding:6px 10px;margin-bottom:8px;border-radius:2px;line-height:1.5;}
+#tab-2 .aviso-comparacion b{color:var(--yellow);}
+
+#tab-2 .aviso{background:#141414;border-left:3px solid var(--orange);padding:8px 12px;font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+#tab-2 .aviso b{color:var(--text);}
+
+#tab-2 .estado-vivo{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);}
+#tab-2 .pl-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pl-pulso 1.2s infinite;}
+#tab-2 .pl-dot.off{background:#444;animation:none;}
+@keyframes pl-pulso{0%,100%{opacity:1}50%{opacity:.3}}
