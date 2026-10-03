@@ -93,6 +93,14 @@ function claveSerie(fecha, sesion){ return fecha + '|' + sesion; }
 function serieDe(fecha, sesion){ return SERIES[claveSerie(fecha, sesion)] || null; }
 
 function urlSerie(fecha, sesion){
+  // Si el navegador se quedó con un config.js viejo en caché, esta URL sale
+  // "undefined", la petición acaba en el servidor de páginas y lo que vuelve es
+  // HTML. El error que se veía entonces hablaba de un "<" inesperado, que no
+  // lleva a ninguna parte: mejor decir lo que de verdad pasa.
+  if (!FenixConfig.sessionSeriesUrl){
+    throw new Error('el navegador tiene una versión vieja de la página en caché; ' +
+                    'recarga con Ctrl+Shift+R');
+  }
   return FenixConfig.sessionSeriesUrl +
     '?date=' + encodeURIComponent(fecha) +
     '&session_id=' + encodeURIComponent(sesion) +
@@ -130,7 +138,8 @@ function cargarSerie(fecha, sesion){
   var k = claveSerie(fecha, sesion);
   if (SERIES[k]) return Promise.resolve(SERIES[k]);
   if (PETICIONES[k]) return PETICIONES[k];
-  PETICIONES[k] = fetch(urlSerie(fecha, sesion), {cache:'no-store'})
+  PETICIONES[k] = Promise.resolve()
+    .then(function(){ return fetch(urlSerie(fecha, sesion), {cache:'no-store'}); })
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (j.error) throw new Error(j.error);

@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!-- Los css/ y js/ propios llevan ?v=FECHA. El navegador guarda en cache cada
+     archivo por su URL, asi que sin esto un despliegue puede quedarse a medias:
+     el index.html nuevo cargando el config.js viejo, que es justo lo que paso
+     al estrenar la pestana de Ploteo. Hay que SUBIR ESTA FECHA en cada
+     despliegue que toque css o js. -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -13,11 +18,11 @@
        del navegador (sirve distintos @font-face por compatibilidad), así que
        el hash nunca sería estable. Es una excepción documentada y aceptada. -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/sidebar.css">
-  <link rel="stylesheet" href="css/center.css">
-  <link rel="stylesheet" href="css/map-laps-historical.css">
-  <link rel="stylesheet" href="css/ploteo.css">
+  <link rel="stylesheet" href="css/base.css?v=2026-10-02">
+  <link rel="stylesheet" href="css/sidebar.css?v=2026-10-02">
+  <link rel="stylesheet" href="css/center.css?v=2026-10-02">
+  <link rel="stylesheet" href="css/map-laps-historical.css?v=2026-10-02">
+  <link rel="stylesheet" href="css/ploteo.css?v=2026-10-02">
 </head>
 <body>
 
@@ -411,22 +416,22 @@
   </div>
 </div>
 
-<script src="js/config.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/menu.js"></script>
-<script src="js/rev-lights.js"></script>
-<script src="js/gauges.js"></script>
-<script src="js/map.js"></script>
-<script src="js/meta-form.js"></script>
-<script src="js/historical-modal.js"></script>
-<script src="js/thermo.js"></script>
-<script src="js/cells-init.js"></script>
-<script src="js/charts.js"></script>
-<script src="js/canvas-widgets.js"></script>
-<script src="js/ploteo.js"></script>
-<script src="js/horizon3d.js"></script>
-<script src="js/dashboard-render.js"></script>
-<script src="js/websocket.js"></script>
-<script src="js/main.js"></script>
+<script src="js/config.js?v=2026-10-02"></script>
+<script src="js/utils.js?v=2026-10-02"></script>
+<script src="js/menu.js?v=2026-10-02"></script>
+<script src="js/rev-lights.js?v=2026-10-02"></script>
+<script src="js/gauges.js?v=2026-10-02"></script>
+<script src="js/map.js?v=2026-10-02"></script>
+<script src="js/meta-form.js?v=2026-10-02"></script>
+<script src="js/historical-modal.js?v=2026-10-02"></script>
+<script src="js/thermo.js?v=2026-10-02"></script>
+<script src="js/cells-init.js?v=2026-10-02"></script>
+<script src="js/charts.js?v=2026-10-02"></script>
+<script src="js/canvas-widgets.js?v=2026-10-02"></script>
+<script src="js/ploteo.js?v=2026-10-02"></script>
+<script src="js/horizon3d.js?v=2026-10-02"></script>
+<script src="js/dashboard-render.js?v=2026-10-02"></script>
+<script src="js/websocket.js?v=2026-10-02"></script>
+<script src="js/main.js?v=2026-10-02"></script>
 </body>
 </html>
