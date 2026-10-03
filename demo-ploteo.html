@@ -44,9 +44,6 @@
     font-family:inherit;font-size:10.5px;padding:3px 5px;width:100%;}
   .rango-fila input::placeholder{color:#555;}
   .rango-nota{font-size:9px;color:#666;margin-top:2px;}
-  .ref-info{font-size:9.5px;color:#7a7a7a;margin:0 0 7px 2px;line-height:1.5;}
-  .ref-info b{color:#9a9a9a;}
-  .ref-info .desc{color:#5d5d5d;}
   .chk-list{background:#111;border:1px solid var(--border);border-radius:3px;padding:4px;max-height:132px;overflow-y:auto;min-width:190px;}
   .chk-item{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:2px;cursor:pointer;font-size:11px;}
   .chk-item:hover{background:#181818;}
@@ -151,8 +148,8 @@
 <!-- ─────────────── HISTÓRICO ─────────────── -->
 <div class="panel" id="panel-hist">
   <div class="aviso">
-    <b>Hasta 3 orígenes comparables.</b> El color identifica el origen; el tipo de línea, la variable.
-    El primero es la referencia y va con trazo más grueso. El mapa se colorea con una de las variables ya elegidas,
+    <b>Hasta 3 orígenes comparables.</b> El color identifica el origen y cada variable tiene su franja.
+    El mapa se colorea con una de las variables ya elegidas,
     y el cursor muestra los valores de <b>todos</b> los orígenes a la vez.
   </div>
 
@@ -161,14 +158,6 @@
       <label>Selector de vueltas/sesión</label>
       <div class="origen-cab"><span>Color</span><span>Día</span><span>Sesión</span><span>Alcance</span><span></span></div>
       <div class="origenes" id="h-origenes"></div>
-      <label style="margin-top:10px;">Vuelta de referencia</label>
-      <div class="origen-row ref-row">
-        <span></span>
-        <select id="r-dia"></select>
-        <select id="r-sesion"></select>
-        <select id="r-vuelta"></select>
-        <span></span>
-      </div>
     </div>
     <div class="field">
       <label>Eje X</label>
@@ -186,7 +175,6 @@
     <div class="card">
       <div class="card-title"><span>Gráfica</span><span class="hint">rueda para acercar · arrastra para moverte · doble clic para volver</span></div>
       <div id="h-aviso"></div>
-      <div id="h-refinfo" class="ref-info"></div>
       <div id="g-hist" style="height:620px;"></div>
     </div>
 
@@ -245,14 +233,6 @@ var VARIABLES = [
 // LA VUELTA, pero en una sesión completa están acumulados sobre todas las
 // vueltas. Llamarlos "de vuelta" haría leer 193 s como si fuera una vuelta.
 var EJES_X = [
-  // El eje correcto para comparar vueltas y para correlacionar una medición
-  // con un punto del circuito. No mide lo que recorrió el coche, sino DÓNDE
-  // está: cada muestra se proyecta sobre una trazada de referencia y hereda
-  // la distancia de esa referencia. Abrirse en una curva deja de sumar
-  // metros al eje, así que el metro 234 es el mismo asfalto en todas las
-  // vueltas. Es la misma fuente que usa el mapa —el GPS—, de modo que
-  // gráfica y mapa quedan en el mismo sistema de coordenadas.
-  {id:'s_pista',  nombre:'Posición en la pista', unidad:'m', dec:0},
   {id:'t_vuelta', nombre:'Tiempo transcurrido',  unidad:'s', dec:1},
   // Integral de la velocidad: el recorrido REAL del coche. Sirve para
   // consumo por metro, para medir el largo de una trazada y para saber
@@ -266,7 +246,7 @@ var EJES_X = [
 // forman una serie ordenada y se dibujan como línea; contra cualquier otra
 // variable son una nube de puntos.
 function esEjeDeRecorrido(id){
-  return id === 's_pista' || id === 't_vuelta' || id === 'd_vuelta';
+  return id === 't_vuelta' || id === 'd_vuelta';
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -623,279 +603,6 @@ function datosSesion(fecha, sesion){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  POSICIÓN EN LA PISTA
-//
-//  El odómetro (d_vuelta) integra la velocidad, así que mide la trayectoria
-//  que hizo ESE coche en ESA vuelta. Abrirse cuatro metros en una curva los
-//  suma al total, y esos metros se arrastran hasta la meta: a partir de ahí,
-//  el metro 500 de una vuelta y el metro 500 de la otra son puntos distintos
-//  del circuito. Comparar ahí no compara nada.
-//
-//  La solución es medir sobre UNA sola línea, la misma para todas. Esa línea
-//  —la regla de medir— es la vuelta del PRIMER ORIGEN, y se construye en el
-//  momento de graficar. No se guarda, no se precarga y no hay que declarar
-//  ninguna pista: se rueda donde sea, se eligen orígenes y ya hay eje.
-// ═══════════════════════════════════════════════════════════════════════
-var PASO_REF = 1.0;      // metros entre muestras de la regla
-var META_MAX = 200;      // m entre líneas de meta: más que eso son sitios distintos
-var DESVIO_MAX = 10;     // m, percentil 95 de la distancia a la regla: el ancho de una pista de kart. Provisional hasta la primera sesión real
-var COBERTURA_MIN = 0.5; // fracción de la regla que hay que recorrer
-var SUAVIZADO = 9;       // muestras de la media móvil que alisa la regla
-var AVANCE_MAX_M = 3;    // metros que puede avanzar el coche por muestra: 108 km/h a 10 Hz
-var CANDIDATAS_MAX = 6;  // vueltas que se prueban como regla en una sesión
-var COMPARADAS_MAX = 5;  // vueltas contra las que se mide cada candidata
-
-// Remuestrea una polilínea a paso constante. Sin esto la regla heredaría el
-// espaciado irregular del GPS —más denso donde el coche va lento— y la
-// resolución del eje cambiaría según la zona del circuito.
-function remuestrear(crudo, paso){
-  var x = [crudo[0].x], y = [crudo[0].y], s = [0];
-  var recorrido = 0, resto = paso;
-  for (var i=1; i<crudo.length; i++){
-    var dx = crudo[i].x - crudo[i-1].x, dy = crudo[i].y - crudo[i-1].y;
-    var L = Math.sqrt(dx*dx + dy*dy);
-    if (L < 1e-9) continue;
-    var pos = 0;
-    while (pos + resto <= L){
-      pos += resto;
-      x.push(crudo[i-1].x + dx*pos/L);
-      y.push(crudo[i-1].y + dy*pos/L);
-      s.push(recorrido + pos);
-      resto = paso;
-    }
-    resto -= (L - pos);
-    recorrido += L;
-  }
-  return {x:x, y:y, s:s, largo:recorrido};
-}
-
-// Separa un origen en sus vueltas. Una vuelta suelta es una sola.
-function vueltasDe(datos){
-  if (!datos.length || datos[0].n_vuelta === undefined) return [datos];
-  var res = [], actual = null, n = null;
-  datos.forEach(function(p){
-    if (p.n_vuelta !== n){ actual = []; res.push(actual); n = p.n_vuelta; }
-    actual.push(p);
-  });
-  return res;
-}
-
-// ¿La vuelta tiene cortes de GPS? Cuenta muestras sin fijación y el mayor salto
-// entre dos posiciones seguidas. El umbral del salto es holgado a propósito: un
-// receptor a 1 Hz avanza 17 m entre posiciones a 60 km/h y eso no es un corte.
-function cortesDe(pts){
-  var ref = null, ant = null, peor = 0, sinFix = 0;
-  pts.forEach(function(p){
-    if (!coordValida(p)){ sinFix++; return; }
-    if (!ref) ref = {lat:p.lat, lon:p.lon};
-    var q = aMetros(p, ref);
-    if (ant) peor = Math.max(peor, Math.sqrt((q.x-ant.x)*(q.x-ant.x) + (q.y-ant.y)*(q.y-ant.y)));
-    ant = q;
-  });
-  return {saltoMax:peor, sinFix:sinFix, hayCorte: sinFix > 2 || peor > 25};
-}
-
-// Construye la regla a partir de UNA vuelta.
-//
-// Las posiciones se alisan con una media móvil antes de remuestrear. El ruido
-// del GPS dibuja un zigzag alrededor de la trazada, y un zigzag mide más que la
-// línea que sigue: con 2.5 m de ruido, una pista de 935 m salía de 1075 m, y
-// todos los metros del eje quedaban inflados un 15 %.
-function reglaDeVuelta(pts){
-  var val = pts.filter(coordValida);
-  if (val.length < 20) return null;
-  var ref = {lat:val[0].lat, lon:val[0].lon};
-  var crudo = val.map(function(p){ return aMetros(p, ref); });
-  var n = crudo.length, h = SUAVIZADO >> 1, suave = [];
-  for (var i=0; i<n; i++){
-    var sx = 0, sy = 0;
-    // Circular: la vuelta es un circuito cerrado y el final empalma con el principio
-    for (var k=-h; k<=h; k++){ var q = crudo[(i+k+n)%n]; sx += q.x; sy += q.y; }
-    suave.push({x:sx/(2*h+1), y:sy/(2*h+1)});
-  }
-  suave.push({x:suave[0].x, y:suave[0].y});   // se cierra el circuito
-  var r = remuestrear(suave, PASO_REF);
-  r.ref = ref;
-  return r;
-}
-
-// La regla de medir sale del primer origen.
-//
-// Si ese origen es una sesión, no se usa su primera vuelta: en una sesión real
-// la primera suele ser la de salida de boxes, que arranca fuera del circuito, y
-// con ella de regla las demás sesiones quedaban rechazadas. Tampoco sirve elegir
-// por longitud, porque la de salida mide casi lo mismo que las otras. Se elige
-// la vuelta que MÁS SE PARECE a las demás: cada candidata se usa de regla, se
-// miden contra ella las otras, y gana la que las deja más cerca.
-//
-// Las vueltas con cortes de GPS quedan fuera mientras haya alguna sin cortes.
-function reglaDe(origen){
-  var vueltas = vueltasDe(origen.datos).filter(function(v){
-    return v.filter(coordValida).length >= 20;
-  });
-  if (!vueltas.length) return null;
-
-  var elegida = vueltas[0];
-  if (vueltas.length > 1){
-    // Con tres vueltas o más, la primera y la última no son candidatas: en una
-    // tanda son la salida y la entrada a boxes. El criterio de "la que más se
-    // parece a las demás" fallaba cuando eran dos de cinco, porque entonces
-    // "las demás" también incluían vueltas de boxes, y acababa eligiendo la
-    // vuelta de salida. Es lo mismo que hace cualquiera a mano.
-    var medio = vueltas.length >= 3 ? vueltas.slice(1, -1) : vueltas;
-    var cand = medio.slice(0, CANDIDATAS_MAX);
-    var limpias = cand.filter(function(v){ return !cortesDe(v).hayCorte; });
-    if (limpias.length) cand = limpias;
-    var contra = medio.length > 1 ? medio : vueltas;
-    elegida = cand[0];
-    var mejor = Infinity;
-    cand.forEach(function(v){
-      var R = reglaDeVuelta(v);
-      if (!R) return;
-      var p95s = contra.filter(function(w){ return w !== v; }).slice(0, COMPARADAS_MAX)
-        .map(function(w){ return proyectar(w, R).p95; })
-        .sort(function(a, b){ return a - b; });
-      // Promedio, no mediana: con dos o tres comparaciones la mediana es casi el
-      // máximo, y una sola vuelta rara decidía la elección. En la prueba con una
-      // parada en boxes en la vuelta 3, la mediana acababa eligiendo esa vuelta.
-      var med = p95s.reduce(function(a, b){ return a + b; }, 0) / p95s.length;
-      if (med < mejor){ mejor = med; elegida = v; }
-    });
-  }
-
-  var r = reglaDeVuelta(elegida);
-  if (!r) return null;
-  r.vuelta = elegida[0].n_vuelta;
-  r.cortes = cortesDe(elegida);
-  return r;
-}
-
-function proyectar(datos, regla){
-  var N = regla.x.length, j = 0, ant = null, desp = 0, vuelta = null, perdidas = 0;
-  var s = new Array(datos.length), dists = [];
-  for (var i=0; i<datos.length; i++){
-    var p = datos[i];
-    if (!coordValida(p)){ s[i] = null; perdidas++; continue; }
-    // Cada cruce de meta reinicia la búsqueda y suma una longitud de circuito
-    if (p.n_vuelta !== undefined && vuelta !== null && p.n_vuelta !== vuelta){
-      j = 0; ant = null; desp += regla.largo; perdidas = 0;
-    }
-    if (p.n_vuelta !== undefined) vuelta = p.n_vuelta;
-
-    var m = aMetros(p, regla.ref);
-    var salto;
-    if (ant === null){
-      salto = Math.round(30/PASO_REF);
-    } else {
-      var ax = m.x - ant.x, ay = m.y - ant.y;
-      var porDistancia = Math.sqrt(ax*ax + ay*ay) * 1.5 + 1;
-      // Tras un corte de GPS la línea recta desde la última posición atraviesa
-      // el circuito y es mucho más corta que lo recorrido, así que la ventana no
-      // llegaba: con 15 s sin señal la posición quedaba 193 m desviada para el
-      // resto de la vuelta. Se abre también según el tiempo sin señal.
-      var porTiempo = perdidas > 0 ? (perdidas + 1) * AVANCE_MAX_M : 0;
-      salto = Math.ceil(Math.max(porDistancia, porTiempo) / PASO_REF);
-    }
-    var hasta = Math.min(N-1, j + salto);
-    var mejor = j, dMin = Infinity;
-    for (var k=j; k<=hasta; k++){
-      var dx = regla.x[k] - m.x, dy = regla.y[k] - m.y, d2 = dx*dx + dy*dy;
-      if (d2 < dMin){ dMin = d2; mejor = k; }
-    }
-    j = mejor;
-    ant = m;
-    perdidas = 0;
-    s[i] = +(regla.s[mejor] + desp).toFixed(1);
-    dists.push(Math.sqrt(dMin));
-  }
-  dists.sort(function(a,b){ return a-b; });
-  var p95 = dists.length ? dists[Math.floor(dists.length*0.95)] : Infinity;
-  var ultimo = null;
-  for (var i=s.length-1; i>=0; i--){ if (s[i] !== null){ ultimo = s[i]; break; } }
-  var vueltas = (datos.length && datos[datos.length-1].n_vuelta) || 1;
-  var cobertura = (ultimo === null) ? 0 : (ultimo - (vueltas-1)*regla.largo) / regla.largo;
-  return {s:s, p95:p95, cobertura:cobertura};
-}
-
-// Decide, para cada origen, si puede compararse por posición en la pista.
-// Escribe o.spos con las posiciones, o o.motivo con la razón de que no.
-function evaluarOrigenes(orig, ref){
-  orig.forEach(function(o){ o.spos = null; o.motivo = null; });
-  if (!orig.length) return;
-
-  // Sin referencia explícita se usa el primer origen, como antes
-  var base = ref || orig[0];
-  orig.ref = base;
-  var regla = reglaDe(base);
-  if (!regla){
-    orig.forEach(function(o){ o.motivo = 'la vuelta de referencia no tiene GPS suficiente'; });
-    return;
-  }
-  var metaBase = centroDe(base.meta);
-
-  // Todas las filas se comprueban: ninguna es la referencia por estar primera
-  orig.forEach(function(o){
-    {
-      // 1. ¿Es siquiera el mismo sitio? Esto se sabe sin calcular nada.
-      var d = distanciaGeo(metaBase, centroDe(o.meta));
-      if (d > META_MAX){
-        o.motivo = 'otro sitio: su línea de meta está a ' +
-                   (d > 1000 ? (d/1000).toFixed(1)+' km' : d.toFixed(0)+' m') +
-                   ' de la de la vuelta de referencia';
-        return;
-      }
-    }
-    var pr = proyectar(o.datos, regla);
-    {
-      // 2. Mismo sitio, ¿mismo trazado?
-      if (pr.cobertura < COBERTURA_MIN){
-        o.motivo = 'el recorrido no encaja con la referencia: solo cubre el ' +
-                   Math.round(pr.cobertura*100) + ' % de la vuelta';
-        return;
-      }
-      if (pr.p95 > DESVIO_MAX){
-        o.motivo = 'trazado distinto: el 5 % de la vuelta pasa a más de ' +
-                   pr.p95.toFixed(0) + ' m de la referencia';
-        return;
-      }
-    }
-    o.spos = pr.s;
-    o.p95 = pr.p95;
-  });
-  orig.regla = regla;
-}
-
-// El valor del eje X de una muestra. La posición en la pista no vive en el
-// dato, sino en el origen, porque depende de contra qué regla se midió.
-// Se llama valorEjeX y no valorX porque moverCursor recibe un parámetro con ese
-// nombre, y dentro de esa función tapaba a esta.
-function valorEjeX(o, i, campo){
-  if (campo === 's_pista') return o.spos ? o.spos[i] : null;
-  return sano(o.datos[i], campo);
-}
-// Índice de la muestra más cercana a un valor, sobre un arreglo de posiciones.
-function indiceEnPos(spos, valor){
-  var min = Infinity, max = -Infinity, n = 0;
-  for (var i=0;i<spos.length;i++){
-    var v = spos[i];
-    if (v === null) continue;
-    if (v < min) min = v;
-    if (v > max) max = v;
-    n++;
-  }
-  if (!n) return null;
-  var margen = (max - min) / Math.max(1, n - 1) * 3;
-  if (valor < min - margen || valor > max + margen) return null;
-  var mejor = null, dm = Infinity;
-  for (var i=0;i<spos.length;i++){
-    if (spos[i] === null) continue;
-    var d = Math.abs(spos[i] - valor);
-    if (d < dm){ dm = d; mejor = i; }
-  }
-  return mejor;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 //  Utilidades
 // ═══════════════════════════════════════════════════════════════════════
 function meta(id){ return EJES_X.concat(VARIABLES).find(function(v){return v.id===id;}) || {nombre:id,unidad:''}; }
@@ -1131,10 +838,7 @@ var CONFIG_HIST = {displayModeBar:false, responsive:true, scrollZoom:true, doubl
 var vivo = {buffer:[], vuelta:1, i:0, corriendo:true, datos:null, zoom:null};
 
 function inicializarVivo(){
-  // En vivo no hay con qué comparar, así que tampoco hay regla de medir:
-  // la posición en la pista no tiene sentido y no se ofrece.
-  llenarSelect(document.getElementById('v-x'),
-    EJES_X.filter(function(e){ return e.id !== 's_pista'; }), 't_vuelta');
+  llenarSelect(document.getElementById('v-x'), EJES_X, 't_vuelta');
   construirLista(document.getElementById('v-y'), ['speed_v','p_hv','throttle'], redibujarVivo);
   document.getElementById('v-x').onchange = redibujarVivo;
   document.getElementById('v-toggle').onclick = function(){
@@ -1274,12 +978,8 @@ var tipMapa = null;
 function inicializarHist(){
   var cont = document.getElementById('h-origenes');
   for (var i=0;i<MAX_ORIGENES;i++) cont.appendChild(filaOrigen(i));
-  llenarReferencia();
-  document.getElementById('r-dia').onchange = function(){ document.getElementById('r-sesion').value=''; llenarReferencia(); redibujarHist(); };
-  document.getElementById('r-sesion').onchange = function(){ llenarReferencia(); redibujarHist(); };
-  document.getElementById('r-vuelta').onchange = redibujarHist;
 
-  llenarSelect(document.getElementById('h-x'), EJES_X, 's_pista');
+  llenarSelect(document.getElementById('h-x'), EJES_X, 't_vuelta');
   construirLista(document.getElementById('h-y'), ['speed_v','p_hv'], function(){
     sincronizarSelectorMapa();
     redibujarHist();
@@ -1381,35 +1081,6 @@ function llenarAlcance(selD, selS, selA, preferido){
   for (var v=1; v<=s.vueltas; v++) opcion(selA, String(v), 'Vuelta '+v);
   selA.value = preferido;
   if (!selA.value) selA.value = '1';
-}
-
-// La vuelta de referencia se elige aparte de las filas que se grafican. Antes
-// era el primer origen, y eso tenía dos problemas: el orden de las filas
-// cambiaba el resultado, y si la primera era una vuelta de salida de boxes, las
-// demás se quedaban sin posición en la pista. Con "automática" se toma la vuelta
-// de esa sesión que más se parece a las demás, sin contar la primera ni la última.
-function llenarReferencia(){
-  var selD = document.getElementById('r-dia'), selS = document.getElementById('r-sesion'),
-      selV = document.getElementById('r-vuelta');
-  if (!selD.options.length) dias().forEach(function(f){ opcion(selD, f, f); });
-  var sPrev = selS.value, vPrev = selV.value;
-  selS.innerHTML = '';
-  sesionesDe(selD.value).forEach(function(x){ opcion(selS, String(x.sesion), 'Sesión '+x.sesion); });
-  if (Array.prototype.some.call(selS.options, function(op){ return op.value === sPrev; })) selS.value = sPrev;
-  selV.innerHTML = '';
-  var ses = buscaSesion(selD.value, +selS.value);
-  opcion(selV, 'auto', 'Automática');
-  for (var v=1; v<=ses.vueltas; v++) opcion(selV, String(v), 'Vuelta '+v);
-  selV.value = Array.prototype.some.call(selV.options, function(op){ return op.value === vPrev; }) ? vPrev : 'auto';
-}
-function referenciaActiva(){
-  var d = document.getElementById('r-dia').value, s2 = +document.getElementById('r-sesion').value,
-      v = document.getElementById('r-vuelta').value;
-  if (!d || !s2) return null;
-  var auto = (v === 'auto');
-  return {fecha:d, sesion:s2, alcance: auto ? 'all' : v, meta: metaDe(d, s2),
-          etiqueta: d.slice(5) + ' S' + s2 + (auto ? '' : ' V' + v),
-          datos: auto ? datosSesion(d, s2) : datosVuelta(d, s2, +v)};
 }
 
 function origenesActivos(){
@@ -1526,25 +1197,8 @@ function redibujarHist(){
   var ys = marcadasDe(document.getElementById('h-y'));
   var orig = origenesActivos();
 
-  // La regla de medir se construye aquí, con el primer origen, y se descarta al
-  // salir. Nada guardado, nada precargado: por eso funciona en una pista que no
-  // se ha rodado nunca.
-  evaluarOrigenes(orig, referenciaActiva());
-  // El cursor reutiliza esta evaluación: recalcular la regla en cada movimiento
-  // del ratón sería tirar el trabajo y se notaría al pasar por la gráfica.
+  // El cursor reutiliza estos orígenes tal como se dibujaron
   ORIGENES = orig;
-  var bloqueados = orig.filter(function(o){ return o.motivo; });
-
-  // Si algún origen no se puede medir contra esa regla, comparar por posición
-  // en la pista no significa nada, así que la opción se desactiva. Un aviso al
-  // lado de una gráfica dibujada no basta: una gráfica creíble y falsa es lo
-  // único que puede llevar a una mala decisión.
-  var opt = Array.prototype.find.call(selX.options, function(x){ return x.value === 's_pista'; });
-  if (opt){
-    opt.disabled = bloqueados.length > 0;
-    opt.textContent = 'Posición en la pista [m]' + (opt.disabled ? '  — no disponible' : '');
-  }
-  if (selX.value === 's_pista' && bloqueados.length) selX.value = 't_vuelta';
 
   var ejeX = selX.value;
   var dispersion = !esEjeDeRecorrido(ejeX);
@@ -1560,7 +1214,7 @@ function redibujarHist(){
   orig.forEach(function(o, io_){
     ys.forEach(function(y,k){
       trazas.push({
-        x:o.datos.map(function(_, i){ return valorEjeX(o, i, ejeX); }),
+        x:o.datos.map(function(p){ return sano(p, ejeX); }),
         y:o.datos.map(function(p){ return sano(p, y); }),
         name:o.etiqueta, type:'scattergl',
         mode: dispersion ? 'markers' : 'lines',
@@ -1614,8 +1268,7 @@ function redibujarHist(){
   lay.xaxis.anchor = ejeDeFranja(ys.length - 1);
   Plotly.react('g-hist', trazas, lay, CONFIG_HIST);
 
-  avisarComparacionDudosa(orig, ejeX, bloqueados);
-  mostrarReferencia(orig);
+  avisarComparacionDudosa(orig, ejeX);
 
   // La tabla del cursor corresponde a la selección anterior: si no se limpia,
   // sigue mostrando variables ya desmarcadas o columnas de orígenes quitados
@@ -1627,37 +1280,7 @@ function redibujarHist(){
 
 // Una herramienta de análisis no debe dejar comparar en silencio cosas que no
 // son equivalentes.
-// Un sistema que elige la regla de medir solo tiene que decir cuál eligió y qué
-// tan bien encaja lo demás. Si no, cuando algo salga raro no hay por dónde
-// empezar.
-function mostrarReferencia(orig){
-  var cont = document.getElementById('h-refinfo');
-  if (!orig.length){ cont.innerHTML = ''; return; }
-  var R = orig.regla;
-  if (!R){ cont.innerHTML = '<b>Sin regla de medir:</b> la vuelta de referencia no tiene GPS suficiente.'; return; }
-  var ref = orig.ref;
-  var cual = (ref.alcance === 'all' && R.vuelta !== undefined)
-    ? 'vuelta ' + R.vuelta + ' de <b>' + ref.etiqueta + '</b>, elegida automáticamente por ser la que más se parece a las demás'
-    : '<b>' + ref.etiqueta + '</b>';
-  var t = '<b>Regla de medir:</b> ' + cual + ', ' + R.largo.toFixed(0) + ' m. Se calcula al graficar y no se guarda.';
-  // Una regla con un corte de GPS tiene un tramo recto donde debería haber
-  // curva: las posiciones de esa zona salen mal y el total de metros se acorta.
-  // Si no hubo otra vuelta sin cortes, al menos que se sepa.
-  if (R.cortes && R.cortes.hayCorte){
-    t += ' <span style="color:var(--yellow)">Esa vuelta tiene un corte de GPS' +
-         (R.cortes.sinFix ? ' (' + R.cortes.sinFix + ' muestras sin señal)' : '') +
-         ': la posición no es fiable en esa zona.</span>';
-  }
-  var ok = orig.filter(function(o){ return o.spos; });
-  if (ok.length){
-    t += ' <span class="desc">Encajan contra ella: ' +
-         ok.map(function(o){ return o.etiqueta + ' (' + o.p95.toFixed(1) + ' m)'; }).join(', ') +
-         '.</span>';
-  }
-  cont.innerHTML = t;
-}
-
-function avisarComparacionDudosa(orig, ejeX, bloqueados){
+function avisarComparacionDudosa(orig, ejeX){
   var cont = document.getElementById('h-aviso');
   var avisos = [];
 
@@ -1665,14 +1288,15 @@ function avisarComparacionDudosa(orig, ejeX, bloqueados){
   // perfectamente razonable en la que, a mitad de vuelta, cada traza está en
   // un punto distinto del circuito.
   if (orig.length > 1 && ejeX === 'd_vuelta'){
-    avisos.push('<b>Eje no apto para comparar.</b> La distancia recorrida es la ' +
+    avisos.push('<b>Cuidado al comparar.</b> La distancia recorrida es la ' +
                 'trayectoria de cada vuelta: abrirse en una curva suma metros que se ' +
                 'arrastran hasta la meta, así que el mismo valor de X cae en puntos ' +
-                'distintos del circuito. Para comparar, usa <b>Posición en la pista</b>.');
+                'cada vez más separados del circuito. Al principio de la vuelta las trazas ' +
+                'van alineadas; hacia el final pueden quedar a decenas de metros unas de ' +
+                'otras. El mapa dice dónde estaba cada una de verdad.');
   }
 
-  // El aviso vale para los tres ejes de recorrido, incluida la posicion en la
-  // pista: en una sesion se encadena vuelta tras vuelta, asi que una vuelta
+  // En una sesion el eje se encadena vuelta tras vuelta, asi que una vuelta
   // suelta solo coincide con la PRIMERA vuelta de la sesion y a partir de ahi
   // se queda sin datos, aunque la grafica siga dibujando la sesion.
   if (orig.length > 1 && esEjeDeRecorrido(ejeX)){
@@ -1682,12 +1306,6 @@ function avisarComparacionDudosa(orig, ejeX, bloqueados){
                   'en una vuelta el eje cuenta desde su cruce de meta, y en una sesión se acumula sobre todas las vueltas. ' +
                   'La vuelta suelta solo coincide con la primera vuelta de la sesión; más allá, la tabla marca «sin dato».');
     }
-  }
-
-  if (bloqueados && bloqueados.length){
-    avisos.push('<b>Sin posición en la pista.</b> ' +
-      bloqueados.map(function(o){ return o.etiqueta + ': ' + o.motivo; }).join('. ') +
-      '. Se comparan por tiempo, que sí vale entre circuitos distintos.');
   }
 
   var vistos = {}, duplicados = [];
@@ -1722,11 +1340,9 @@ function puntoBajoRaton(latlng){
   var o = mejor.o, i = mejor.i, d = o.datos[i];
   var campo = document.getElementById('h-mapvar').value, m = meta(campo);
   var v = sano(d, campo);
-  var sp = o.spos ? o.spos[i] : null;
   var html = '<b>' + o.etiqueta + '</b>' + (d.n_vuelta !== undefined ? ' · vuelta ' + d.n_vuelta : '') +
     '<br>' + m.nombre + ': <b>' + (v !== null ? formatear(v, campo) + ' ' + m.unidad : 'sin dato') + '</b>' +
-    '<br>tiempo ' + d.t_vuelta.toFixed(1) + ' s' +
-    (sp !== null && sp !== undefined ? ' · posición en la pista ' + sp.toFixed(0) + ' m' : ' · sin posición en la pista');
+    '<br>tiempo ' + d.t_vuelta.toFixed(1) + ' s · recorridos ' + d.d_vuelta.toFixed(0) + ' m';
   // La posición tiene que estar puesta antes de añadirlo al mapa, o Leaflet falla
   if (!tipMapa){
     tipMapa = L.tooltip({direction:'top', offset:[0,-8], opacity:0.95})
@@ -1737,7 +1353,7 @@ function puntoBajoRaton(latlng){
 
   // Sincroniza la gráfica y la tabla con ese mismo punto
   var ejeX = document.getElementById('h-x').value;
-  var x = valorEjeX(o, i, ejeX);
+  var x = sano(d, ejeX);
   if (x === null || x === undefined) return;
   var ys = marcadasDe(document.getElementById('h-y'));
   var k2 = ORIGENES.indexOf(o);
@@ -1824,39 +1440,14 @@ function dibujarMapa(){
   for (var f=0; f<=20; f++) paradas.push(escalaColor(f/20)+' '+(f*5)+'%');
   barra.style.background = 'linear-gradient(to right,'+paradas.join(',')+')';
 
-  var huecosGps = 0, huecosValor = 0, fueraPista = 0;
-  var esSesion = (o.alcance === 'all' && o.spos && ORIGENES.regla);
-  // Cada trayectoria con sus propios valores: es lo elegido por el equipo. La
-  // media por metro se probó y se descartó.
-  var modo = 'propio';
+  var huecosGps = 0, huecosValor = 0;
+  var esSesion = (o.alcance === 'all');
   var ancho = esSesion ? ANCHO_VARIAS_M : ANCHO_UNA_M;
 
-  // Siempre se dibujan las COORDENADAS reales de cada vuelta, así que se ve por
-  // dónde fue el coche de verdad, salidas de pista incluidas. Lo que cambia con
-  // el modo es qué valor decide el color de cada tramo.
-  //
-  //   media  — el promedio de todas las vueltas en ese metro de pista. Las cinco
-  //            líneas salen del mismo color: es el comportamiento típico.
-  //   propio — el valor de esa vuelta en ese punto. Se ven las diferencias entre
-  //            vueltas, que con la media quedan escondidas.
-  var media = null, LR = 0;
-  if (esSesion && modo === 'media'){
-    var R = ORIGENES.regla;
-    LR = Math.round(R.largo);
-    var suma = new Array(LR), cuenta = new Array(LR);
-    for (var i=0;i<o.datos.length;i++){
-      var sp = o.spos[i];
-      if (sp === null || sp === undefined) continue;
-      var v = sano(o.datos[i], campo);
-      if (v === null) continue;
-      var bin = Math.round(sp) % LR;
-      suma[bin] = (suma[bin] || 0) + v;
-      cuenta[bin] = (cuenta[bin] || 0) + 1;
-    }
-    media = new Array(LR);
-    for (var b=0;b<LR;b++) if (cuenta[b]) media[b] = suma[b]/cuenta[b];
-  }
-
+  // Se dibujan las COORDENADAS reales de cada vuelta, coloreadas con el valor de
+  // esa vuelta en ese punto: se ve por donde fue el coche de verdad, salidas de
+  // pista y entradas a boxes incluidas. Promediar las vueltas se probo y se
+  // descarto, porque esconde justo las diferencias que se buscan.
   for (var i=1;i<o.datos.length;i++){
     var a = o.datos[i-1], b = o.datos[i];
     // Un corte de GPS lanzaba una excepción dentro de Leaflet y dejaba el mapa
@@ -1867,21 +1458,8 @@ function dibujarMapa(){
     var vb = sano(b, campo);
     if (vb === null){ huecosValor++; continue; }
 
-    var valor = vb, gris = false;
-    if (media){
-      var sp2 = o.spos[i];
-      if (sp2 === null || sp2 === undefined){
-        // Sin posición en la pista no hay metro al que pertenecer: es un tramo
-        // fuera del circuito, como una salida a boxes. Se dibuja, pero en gris,
-        // porque no forma parte del mapa de calor de la pista.
-        gris = true; fueraPista++;
-      } else {
-        var mb = media[Math.round(sp2) % LR];
-        if (mb === undefined) gris = true; else valor = mb;
-      }
-    }
-    var f2 = max>min ? (valor-min)/(max-min) : 0.5;
-    var color = gris ? '#666' : escalaColor(f2);
+    var f2 = max>min ? (vb-min)/(max-min) : 0.5;
+    var color = escalaColor(f2);
     var px = grosorPx(ancho);
     // En una sesión se dibuja CADA punto de GPS, no una línea que los una. Con
     // cinco vueltas a menos de dos metros unas de otras, una línea continua las
@@ -1900,13 +1478,12 @@ function dibujarMapa(){
   var faltantes = [];
   if (huecosGps) faltantes.push(huecosGps+' sin GPS');
   if (huecosValor) faltantes.push(huecosValor+' sin valor');
-  if (fueraPista) faltantes.push(fueraPista+' fuera de pista');
   document.getElementById('h-mapname').textContent =
     o.etiqueta + ' · ' + m.nombre +
     (esSesion ? '  (' + nVueltas + ' trayectorias, cada una con sus valores)' : '') +
     (faltantes.length ? '  · '+faltantes.join(', ') : '');
 
-  var clave = o.fecha+'|'+o.sesion+'|'+o.alcance+'|'+modo;
+  var clave = o.fecha+'|'+o.sesion+'|'+o.alcance;
   if (clave !== ultimoAjuste){
     // animate:false — con la animación por defecto el encuadre puede quedarse
     // a medias y el mapa se queda en el zoom anterior
@@ -1946,9 +1523,7 @@ function moverCursor(valorX, nTraza, idxPunto){
     // Series contra tiempo o distancia: cada origen busca su punto más cercano
     // al mismo valor de X, para que la comparación sea del mismo punto de pista
     orig.forEach(function(o){
-      var i = (ejeX === 's_pista')
-        ? (o.spos ? indiceEnPos(o.spos, valorX) : null)
-        : indiceMasCercano(o.datos, ejeX, valorX);
+      var i = indiceMasCercano(o.datos, ejeX, valorX);
       o.punto = (i === null) ? null : o.datos[i];
       o.iPunto = i;
     });
@@ -1964,10 +1539,8 @@ function moverCursor(valorX, nTraza, idxPunto){
     if (marcadorCursor) mapa.removeLayer(marcadorCursor);
     marcadorCursor = L.circleMarker([oMapa.punto.lat, oMapa.punto.lon],
       {radius:7, color:'#fff', weight:2, fillColor:oMapa.color, fillOpacity:1}).addTo(mapa);
-    var sP = (oMapa.spos && oMapa.iPunto !== null) ? oMapa.spos[oMapa.iPunto] : null;
     document.getElementById('h-cursor-pos').textContent =
-      (sP === null || sP === undefined ? 'sin posición de pista' : sP.toFixed(0)+' m de pista') +
-      ' · recorridos '+oMapa.punto.d_vuelta.toFixed(0)+' m · '+
+      'recorridos '+oMapa.punto.d_vuelta.toFixed(0)+' m · '+
       oMapa.punto.t_vuelta.toFixed(1)+' s';
   }
 
@@ -1980,11 +1553,11 @@ function moverCursor(valorX, nTraza, idxPunto){
   // pondría la palabra "null" donde debería verse que no hay dato.
   function celda(o, campo){
     if (!o.punto) return '<td>—</td>';
-    var v = (campo === 's_pista') ? valorEjeX(o, o.iPunto, campo) : sano(o.punto, campo);
+    var v = sano(o.punto, campo);
     return '<td>' + (v !== null ? formatear(v, campo) : '<span style="color:#555">sin dato</span>') + '</td>';
   }
 
-  ['s_pista','t_vuelta','d_vuelta'].forEach(function(campo){
+  ['t_vuelta','d_vuelta'].forEach(function(campo){
     var m = meta(campo);
     html += '<tr><td>'+m.nombre+' ['+m.unidad+']</td>';
     orig.forEach(function(o){ html += celda(o, campo); });
